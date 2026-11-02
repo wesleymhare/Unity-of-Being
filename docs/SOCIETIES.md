@@ -83,7 +83,7 @@ in `data/societies_lineages.py`, trims each polygon to `public/data/land.geojson
 computes a label anchor inside each shape, and writes `public/data/societies.geojson`.
 `box()` and `blob()` build rough rectangles and ellipses for quick footprints.
 
-Coverage today: about 400 stages in a few dozen lineages. Strongest for Europe, the
+Coverage today: about 440 stages in about 70 lineages. Strongest for Europe, the
 Near East, South Asia and North America; thinner for sub-Saharan Africa, the Pacific,
 Central and South America, and Siberia. Adding stages is the main work still to do.
 

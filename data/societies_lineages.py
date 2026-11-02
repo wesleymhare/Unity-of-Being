@@ -30,6 +30,7 @@ LINES = {
     'hispanic-america': ['Spanish-speaking Americans'],
     'anglo-america': ['Anglo-Americans'],
     'albanian': ['Illyrians'],
+    'nahua': ['Nahua peoples'],
     'dravidian': [],
 }
 

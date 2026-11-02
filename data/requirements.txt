@@ -2,3 +2,5 @@
 shapely>=2.0
 numpy
 Pillow
+scipy
+rasterio

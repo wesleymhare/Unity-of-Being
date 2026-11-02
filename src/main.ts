@@ -2,7 +2,7 @@ import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import './style.css';
-import { BiomeModel, CLASSES, GROUPS, climateShift, type KoppenClass } from './biomes';
+import { BiomeModel, CLASSES, GROUPS, climateShift, type EcoMeta, type EcoPatch } from './biomes';
 import { LabelLayer, type LabelProps } from './labels';
 import {
   getLeaderHistory,
@@ -91,6 +91,7 @@ const loadingText = $('loading-text');
 const loadingProgress = $<HTMLElement>('loading-progress');
 const mapVeil = $('map-veil');
 const mapVeilText = $('map-veil-text');
+const eraNote = $('era-note');
 const legend = $('legend');
 const legendTitle = $('legend-title');
 const legendBody = $('legend-body');
@@ -149,7 +150,9 @@ map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-le
 map.addControl(new maplibregl.ScaleControl({ maxWidth: 110, unit: 'metric' }), 'bottom-left');
 map.touchZoomRotate.disableRotation();
 map.on('error', (event) => console.error('Map error:', event.error));
-if (import.meta.env.DEV) (window as unknown as { __map: maplibregl.Map }).__map = map;
+if (import.meta.env.DEV) {
+  Object.assign(window, { __map: map, __biome: () => biomeModel });
+}
 
 // Keep the canvas in sync when the map container changes size (mobile panels,
 // browser resize, and embedded previews do not always emit a window resize).
@@ -186,7 +189,7 @@ const YEAR_FILTERS: Record<string, (value: number) => Filter> = {
 const LENS_LAYERS: Record<Lens, string[]> = {
   polities: ['polity-fill', 'polity-line', 'polity-realm-casing', 'polity-realm-line', 'polity-hl'],
   societies: ['society-fill', 'society-casing', 'society-line', 'society-hl'],
-  biomes: ['biome-raster', 'ocean-mask'],
+  biomes: ['biome-raster', 'eco-lines', 'ocean-mask'],
 };
 
 const fillLayerOf = (lens: Lens): string | null =>
@@ -200,11 +203,13 @@ let biomeModel: BiomeModel | null = null;
 
 const polityLabels = new LabelLayer<Props>(map, (p) => openPanel(p));
 const societyLabels = new LabelLayer<Props>(map, (p) => openPanel(p));
+// Ecoregion patches are often thin strips with long names, so let names overhang them.
+const biomeLabels = new LabelLayer<EcoPatch>(map, (patch) => openBiomePanel(patch.lx, patch.ly), 2.2);
 
-function activeLabels(): LabelLayer<Props> | null {
+function activeLabels(): { schedule(): void } | null {
   if (activeLens === 'polities') return polityLabels;
   if (activeLens === 'societies') return societyLabels;
-  return null;
+  return biomeLabels;
 }
 
 function lensProps(lens: Lens): Props[] {
@@ -228,16 +233,20 @@ function scheduleHash(): void {
 }
 
 // ---- Legend -----------------------------------------------------------------
-const textOn = (hex: string): string => {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return r * 0.299 + g * 0.587 + b * 0.114 > 150 ? '#1b1710' : '#f6f0e0';
-};
+function renderEraNote(): void {
+  eraNote.hidden = activeLens !== 'biomes';
+  if (activeLens !== 'biomes') return;
+  const shift = climateShift(year);
+  eraNote.textContent =
+    `${shift.era}. Climate moved ${signed(shift.warm)}° of latitude` +
+    (shift.humid > 0.02 ? `, Sahara and Arabia ${Math.round(shift.humid * 100)}% wetter` : '') +
+    '. Schematic.';
+}
 
 function renderLegend(): void {
+  renderEraNote();
   legendBody.replaceChildren();
-  if (activeLens === 'polities') {
+  if (activeLens !== 'societies') {
     legend.hidden = true;
     return;
   }
@@ -265,40 +274,7 @@ function renderLegend(): void {
       legendBody.append(row);
     }
     if (!present.size) legendBody.textContent = 'No societies are mapped for this year.';
-    return;
   }
-
-  legendTitle.textContent = 'Köppen–Geiger climate';
-  for (const group of Object.keys(GROUPS) as KoppenClass['group'][]) {
-    const row = document.createElement('div');
-    row.className = 'legend-group';
-    const head = document.createElement('span');
-    head.className = 'legend-group-name';
-    head.textContent = `${group} ${GROUPS[group]}`;
-    const chips = document.createElement('div');
-    chips.className = 'legend-chips';
-    const seen = new Set<string>();
-    for (const klass of CLASSES) {
-      if (!klass || klass.group !== group || seen.has(klass.colour)) continue;
-      seen.add(klass.colour);
-      const chip = document.createElement('i');
-      chip.style.background = klass.colour;
-      chip.style.color = textOn(klass.colour);
-      chip.textContent = klass.code;
-      chip.title = `${klass.code}: ${klass.name}`;
-      chips.append(chip);
-    }
-    row.append(head, chips);
-    legendBody.append(row);
-  }
-  const shift = climateShift(year);
-  const note = document.createElement('p');
-  note.className = 'legend-note';
-  note.textContent =
-    `${shift.era}. Climate moved ${signed(shift.warm)}° of latitude` +
-    (shift.humid > 0.02 ? `, Sahara and Arabia ${Math.round(shift.humid * 100)}% wetter` : '') +
-    '. Schematic.';
-  legendBody.append(note);
 }
 
 legendToggle.addEventListener('click', () => {
@@ -343,11 +319,28 @@ function setYear(next: number): void {
   });
 }
 
-function renderBiomes(): void {
+let biomeLabelTimer = 0;
+function scheduleBiomeLabels(delay = 220): void {
+  if (biomeLabelTimer) window.clearTimeout(biomeLabelTimer);
+  biomeLabelTimer = window.setTimeout(() => {
+    biomeLabelTimer = 0;
+    if (!biomeModel || activeLens !== 'biomes') return;
+    biomeLabels.setFeatures(biomeModel.patches());
+    biomeLabels.setYear(year, true);
+  }, delay);
+}
+
+/** Recompute the shifted climate for the year; redraw and relabel only if it changed. */
+function renderBiomes(force = false): void {
   if (!biomeModel) return;
   const source = map.getSource('biome') as maplibregl.ImageSource | undefined;
   if (!source) return;
-  if (biomeModel.render(year)) source.updateImage({ image: biomeModel.canvas });
+  const changed = biomeModel.update(year);
+  if (changed) {
+    biomeModel.draw();
+    source.updateImage({ image: biomeModel.canvas });
+  }
+  if (changed || force) scheduleBiomeLabels(force ? 0 : 220);
 }
 
 // ---- Panel ------------------------------------------------------------------
@@ -384,7 +377,7 @@ function renderFacts(facts: WikiFacts | null, extraFacts: WikiFact[] = []): void
 function renderFallback(name: string, hits: { title: string; snippet: string }[]): void {
   pSummary.classList.remove('error');
   pSummary.classList.add('muted');
-  const label = activeLens === 'societies' ? 'society' : 'polity';
+  const label = activeLens === 'societies' ? 'society' : activeLens === 'biomes' ? 'ecoregion' : 'polity';
   pSummary.textContent = hits.length
     ? `No single Wikipedia article matches this ${label}. Closest matches are below.`
     : `No single Wikipedia article matches this ${label}.`;
@@ -682,50 +675,64 @@ function scheduleBiomePanel(): void {
 
 function openBiomePanel(lng: number, lat: number, movePin = true): void {
   if (!biomeModel) return;
-  const index = biomeModel.classAt(lng, lat, year);
-  const klass = CLASSES[index];
+  const klass = CLASSES[biomeModel.classAt(lng, lat)];
   if (!klass) {
     closePanel();
     return;
   }
+  const ecoId = biomeModel.ecoAt(lng, lat);
+  const meta = biomeModel.meta;
+  const ecoEntry = ecoId > 0 ? meta.eco[ecoId - 1] : null;
+  const ecoName = ecoEntry ? ecoEntry[0] : null;
   const shift = climateShift(year);
   biomePoint = { lng, lat };
   selectedKey = -1;
   selectedProps = null;
   panelQid = null;
-  resetPanel();
+  const ticket = resetPanel();
+  const controller = panelAbort as AbortController;
 
-  pName.textContent = `${klass.code} · ${klass.name}`;
-  pName.title = klass.name;
+  const title = ecoName ? `${klass.code} ${ecoName}` : `${klass.code} ${klass.name}`;
+  pName.textContent = title;
+  pName.title = title;
   pYears.textContent = `${fmtYear(year)} · ${shift.era}`;
-  pKind.textContent = 'Biome';
-  pSource.textContent = 'Köppen–Geiger';
+  pKind.textContent = ecoName ? 'Ecoregion' : 'Climate';
+  pSource.textContent = 'WWF ecoregions × Köppen–Geiger';
   pFine.textContent =
-    'Climate: Köppen–Geiger map (Rubel et al. 2016, 1951–2000) moved by a simple, schematic climate-shift model · Text: Wikipedia (CC BY-SA)';
+    'Ecoregions: RESOLVE Ecoregions 2017 (Dinerstein et al., CC BY 4.0), a revision of WWF’s · Climate: Köppen–Geiger (Rubel et al. 2017, 1951–2000) moved by a schematic climate-shift model · Text: Wikipedia (CC BY-SA)';
   pSwatch.style.background = klass.colour;
-  pSummary.textContent =
-    `${GROUPS[klass.group]} climate. Typical vegetation: ${klass.veg.toLowerCase()}. ` +
-    `At this place in ${fmtYear(year)} the map shows ${klass.name.toLowerCase()}.`;
-  pLink.href = wikiUrl(klass.wiki);
-  pLink.textContent = 'Read on Wikipedia';
-  pLink.title = klass.wiki;
+  pSummary.textContent = ecoName ? 'Loading Wikipedia…' :
+    `${GROUPS[klass.group]} climate. Typical vegetation: ${klass.veg.toLowerCase()}.`;
+  pLink.href = ecoName ? wikiSearchUrl(ecoName) : wikiUrl(klass.wiki);
+  pLink.textContent = ecoName ? 'Search Wikipedia' : 'Read on Wikipedia';
 
   const wetter = shift.humid > 0.02 ? `, Sahara and Arabia ${Math.round(shift.humid * 100)}% wetter` : '';
-  const rows: WikiFact[] = [
-    { label: 'Class', value: `${klass.code} (${GROUPS[klass.group]})` },
+  const rows: WikiFact[] = [];
+  if (ecoEntry) {
+    rows.push({ label: 'Ecoregion', value: ecoEntry[0] });
+    rows.push({ label: 'Biome', value: meta.biomes[ecoEntry[1]] });
+    rows.push({ label: 'Realm', value: meta.realms[ecoEntry[2]] });
+  }
+  rows.push(
+    { label: 'Climate', value: `${klass.code} · ${klass.name}` },
     { label: 'Temperature', value: klass.temp },
     { label: 'Rainfall', value: klass.rain },
     { label: 'Vegetation', value: klass.veg },
+    { label: 'Climate age', value: `${shift.era}: ${signed(shift.warm)}° of latitude${wetter}` },
     {
       label: 'Position',
       value: `${Math.abs(lat).toFixed(1)}° ${lat >= 0 ? 'N' : 'S'}, ${Math.abs(lng).toFixed(1)}° ${lng >= 0 ? 'E' : 'W'}`,
     },
-    { label: 'Climate age', value: `${shift.era}: ${signed(shift.warm)}° of latitude${wetter}` },
-  ];
-  renderFacts(null, rows);
+  );
 
   showPanel();
-  document.title = `${klass.name} · Unity of Being`;
+  document.title = `${title} · Unity of Being`;
+  if (ecoName) {
+    renderFacts(null, rows);
+    void loadPanel(ecoName, null, ecoName, ticket, controller.signal, rows);
+  } else {
+    renderFacts(null, rows);
+  }
   if (movePin) {
     hideBiomePin();
     const dot = document.createElement('div');
@@ -787,9 +794,10 @@ function setLens(next: Lens): void {
   }
   polityLabels.clear();
   societyLabels.clear();
+  biomeLabels.clear();
   setLensVisibility();
   updateLensButtons();
-  if (next === 'biomes') renderBiomes();
+  if (next === 'biomes') renderBiomes(true);
   setYear(year);
   activeLabels()?.schedule();
   scheduleHash();
@@ -918,7 +926,7 @@ function checkSources(): void {
 
 map.on('load', async () => {
   try {
-    const [land, polityData, societyData, rivers, lakes, koppen, ocean] = await Promise.all([
+    const [land, polityData, societyData, rivers, lakes, koppen, ecoBin, ecoMeta, ecoLines, ocean] = await Promise.all([
       getJson(`${BASE}data/land.geojson`),
       getJson<FeatureCollection>(`${BASE}data/polities.geojson`, (loaded, total) => {
         const megabytes = loaded / 1048576;
@@ -942,6 +950,9 @@ map.on('load', async () => {
         console.error('Biome data:', error);
         return null;
       }),
+      getResponse(`${BASE}data/ecoregions.bin`).then((blob) => blob.arrayBuffer()).catch(() => null),
+      getJson<EcoMeta>(`${BASE}data/ecoregions.json`).catch(() => null),
+      getJson(`${BASE}data/ecoregion-lines.geojson`).catch(() => null),
       getJson(`${BASE}data/ocean.geojson`).catch(() => null),
     ]);
 
@@ -961,9 +972,9 @@ map.on('load', async () => {
     polityLabels.setFeatures(polityProps);
     societyLabels.setFeatures(societyProps);
 
-    if (koppen && ocean) {
+    if (koppen && ecoBin && ecoMeta && ocean) {
       try {
-        biomeModel = new BiomeModel(koppen);
+        biomeModel = new BiomeModel(koppen, ecoBin, ecoMeta);
       } catch (error) {
         console.error('Biome model:', error);
       }
@@ -1024,6 +1035,7 @@ map.on('load', async () => {
         coordinates: BiomeModel.bounds,
       } as maplibregl.ImageSourceSpecification);
       map.addSource('ocean', { type: 'geojson', data: ocean as GeoData });
+      if (ecoLines) map.addSource('ecolines', { type: 'geojson', data: ecoLines as GeoData });
       map.addLayer({
         id: 'biome-raster',
         type: 'raster',
@@ -1031,6 +1043,19 @@ map.on('load', async () => {
         paint: { 'raster-opacity': 0.9, 'raster-resampling': 'linear', 'raster-fade-duration': 0 },
         layout: { visibility: visible('biomes') },
       });
+      if (ecoLines) {
+        map.addLayer({
+          id: 'eco-lines',
+          type: 'line',
+          source: 'ecolines',
+          paint: {
+            'line-color': '#1d1710',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.35, 4, 0.7, 9, 1.4],
+            'line-opacity': 0.62,
+          },
+          layout: { 'line-join': 'round', 'line-cap': 'round', visibility: visible('biomes') },
+        });
+      }
       map.addLayer({
         id: 'ocean-mask',
         type: 'fill',
@@ -1198,7 +1223,7 @@ map.on('load', async () => {
 
     updateLensButtons();
     setLensVisibility();
-    if (activeLens === 'biomes') renderBiomes();
+    if (activeLens === 'biomes') renderBiomes(true);
     setYear(year);
     relabel();
     dataReady = true;

@@ -1,22 +1,50 @@
-# Biomes lens: Köppen–Geiger climate through time
+# Biomes lens: ecoregions on Köppen–Geiger climate, through time
 
-The Biomes lens colours the land by Köppen–Geiger climate class and lets the year
-slider nudge the map through well-known climate swings. Click anywhere for the
-class, its typical temperature, rainfall and vegetation, and the climate age shown.
+The Biomes lens names the land by **ecoregion and climate together**. Each WWF-style
+ecoregion is split wherever the Köppen–Geiger class changes, and every patch is
+labelled "<class> <ecoregion>":
+
+- `Am North Western Ghats montane rain forests`
+- `Aw North Western Ghats montane rain forests`
+
+The year slider shifts the climate, so a patch can change class (and name) as the
+centuries pass. Ecoregion borders are drawn as thin lines over the Köppen colours.
+Click anywhere for the ecoregion, its WWF biome and realm, the climate class, and
+the climate age shown. There is no separate Köppen legend; the class code in each
+label is the key, and the panel spells it out.
 
 ## Data
 
-- **Base map:** Köppen–Geiger classes at about 3 km (100 arc-seconds), reference
-  period 1951–2000. Rubel, Brugger, Haslinger & Auer (2017), after Kottek et al.
-  (2006) and Rubel & Kottek (2010). The raster comes from the `kgcpy` package on
-  PyPI (BSD-licensed code), fetched by `npm run data:biomes:download`.
-- **Built file:** `public/data/koppen.bin`, 1/6 degree, one byte per cell, run-length
-  encoded (about 160 KB). `public/data/ocean.geojson` is the open sea, used to trim
-  the colours exactly to the Natural Earth coastline.
-- Rebuild with `npm run data:biomes:build` (needs `data/requirements.txt`).
+- **Ecoregions:** RESOLVE Ecoregions 2017 (Dinerstein et al. 2017, BioScience 67:534),
+  CC BY 4.0. It is a revision of WWF's Terrestrial Ecoregions of the World (Olson et
+  al. 2001) and keeps its names (846 ecoregions here, plus a "Rock and Ice" region
+  made for Antarctica and the Greenland ice sheet). The polygons come from the
+  Catalogue of Life gazetteers repo (`teow/features`), fetched by
+  `npm run data:biomes:download`.
+- **Climate:** Köppen–Geiger classes at about 3 km (100 arc-seconds), reference period
+  1951–2000. Rubel, Brugger, Haslinger & Auer (2017), after Kottek et al. (2006) and
+  Rubel & Kottek (2010). The raster comes from the `kgcpy` package on PyPI
+  (BSD-licensed code).
+- **Built files** (`npm run data:biomes:build`, needs `data/requirements.txt`), all on one
+  1/12 degree grid (4320 x 2160):
+  - `public/data/koppen.bin`: one byte per cell, run-length encoded (about 460 KB)
+  - `public/data/ecoregions.bin`: ecoregion id per cell, run-length encoded (about 570 KB)
+  - `public/data/ecoregions.json`: names, biomes and realms
+  - `public/data/ecoregion-lines.geojson`: the borders between ecoregions, traced from
+    the grid and smoothed (about 1.2 MB)
+  - `public/data/ocean.geojson`: open sea, used to trim the colours to the coastline
 
 Class numbers follow kgcpy: 1 = Af, 2 = Am, 3 = As, 4 = Aw, 5 = BSh, 6 = BSk,
 7 = BWh, 8 = BWk, 9 = Cfa ... 29 = Dwd, 30 = EF, 31 = ET, 0 = open sea.
+
+## How patches and labels are made
+
+For each climate state the browser works out the Köppen class of every land cell, then
+finds each connected area of one (ecoregion, class) pair (about 8,700 in the modern
+frame; 3,337 distinct pairs). Each patch gets a label anchor on a wide row near its
+middle, plus the free width and height there, so the shared label engine can place it.
+Names may overhang thin patches, and long names appear only when zoomed in far enough.
+The work is redone, debounced, only when the climate state changes (about 0.1 second).
 
 ## How the past is drawn
 
@@ -48,10 +76,15 @@ The keyframes live in `KEYFRAMES` in `src/biomes.ts`; change them there.
 
 ## Limits (read before trusting it)
 
-- This shows direction and rough size, not a reconstruction. Real swings were
-  regional, not a clean latitude shift. The Medieval Climate Anomaly and Little Ice
+- **Ecoregions are modern.** They are drawn with today's borders and names in every
+  year; only the Köppen class half of each label changes with time. Real ecoregions
+  also shifted over the millennia, and none of that is modelled.
+- This shows direction and rough size of climate change, not a reconstruction. Real swings
+  were regional, not a clean latitude shift. The Medieval Climate Anomaly and Little Ice
   Age, for example, were not synchronous worldwide.
 - Mountains, monsoon strength, ocean currents, sea level and coastlines are not
   adjusted. Rainfall changes outside the Africa–Arabia–Thar belt are not modelled.
-- The ocean mask uses modern coastlines, so drowned or exposed shelves are ignored.
-- Treat the modern frame (about 1975) as the only measured one.
+- The 1/12 degree grid (about 9 km) is coarse for small ecoregions; the smallest get
+  a patch only as large as a few cells, and ecoregion borders follow the grid.
+- Köppen and ecoregion data come from different sources, so a Köppen colour edge and an
+  ecoregion line can disagree by a few kilometres.

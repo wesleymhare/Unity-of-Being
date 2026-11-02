@@ -775,3 +775,23 @@ a { color: var(--brass); }
 @media (max-width: 760px) {
   #legend { left: 8px; bottom: 112px; width: min(260px, calc(100vw - 16px)); max-height: 40vh; }
 }
+
+.era-note {
+  position: fixed;
+  left: 16px;
+  bottom: 132px;
+  z-index: 8;
+  max-width: min(330px, calc(100vw - 32px));
+  padding: 7px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 7px;
+  background: rgba(22, 29, 36, 0.92);
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+.poly-label.eco { font-size: inherit; font-weight: 600; }
+@media (max-width: 760px) {
+  .era-note { left: 8px; bottom: 108px; max-width: calc(100vw - 16px); }
+}

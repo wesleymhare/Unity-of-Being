@@ -16,7 +16,13 @@
 - **Biomes lens.** Köppen–Geiger classes (Rubel et al.) shifted through time by a small, documented model: warm/cold swings and the African Humid Period. Click any place for class, temperature, rainfall and vegetation. See `docs/BIOMES.md`.
 - Initial load no longer hides the loader before the active lens has drawn.
 
+### Ecoregions on the Biomes lens
+- WWF-style ecoregions (RESOLVE 2017, CC BY 4.0, 846 + Rock and Ice) are overlaid on the Köppen climate, one patch per (ecoregion, climate class) pair, labelled like "Am North Western Ghats montane rain forests". About 3,300 distinct pairs today, about 8,700 patches. Patches are recomputed in the browser whenever the climate shift changes, so labels follow the slider.
+- The Köppen legend on the side is gone; a small climate-age note replaces it. The click panel shows ecoregion, biome, realm, climate class and its description, and loads the ecoregion's Wikipedia summary.
+- Grids moved from 1/6 to 1/12 degree so small ecoregions survive.
+
 ## Known rough edges
+- Ecoregions are modern in every year; only the Köppen half of a biome label changes with time.
 - Initial load downloads and parses the 25 MB border GeoJSON: several seconds on slow machines. Fix later with vector tiles (PMTiles) or per-era files.
 - Some Cliopatria shapes have straight-line edges (their source geometry).
 - Labels are HTML markers; placement is recomputed on move/zoom, not every animation frame.

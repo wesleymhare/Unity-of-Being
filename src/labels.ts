@@ -116,6 +116,8 @@ function ellipsize(text: string, font: number, realm: boolean, limit: number): s
 export class LabelLayer<T extends LabelProps> {
   private readonly map: maplibregl.Map;
   private readonly onClick: (feature: T) => void;
+  /** How far a name may overhang the free width and height of its shape (1 = stay inside). */
+  private readonly slack: number;
   private all: T[] = [];
   private active: T[] = [];
   private year = 0;
@@ -123,9 +125,10 @@ export class LabelLayer<T extends LabelProps> {
   private readonly placed = new Map<number, Placed>();
   private raf = 0;
 
-  constructor(map: maplibregl.Map, onClick: (feature: T) => void) {
+  constructor(map: maplibregl.Map, onClick: (feature: T) => void, slack = 1) {
     this.map = map;
     this.onClick = onClick;
+    this.slack = slack;
   }
 
   setFeatures(features: T[]): void {
@@ -207,8 +210,8 @@ export class LabelLayer<T extends LabelProps> {
       if (names.has(f.n) && !isSelected) continue;
 
       const realm = !!f.g;
-      const freeW = (f.cw ?? f.sz) * ppd;
-      const freeH = (f.ch ?? f.sz) * ppd;
+      const freeW = (f.cw ?? f.sz) * ppd * this.slack;
+      const freeH = (f.ch ?? f.sz) * ppd * this.slack;
       const fontMax = clamp(8.5 + Math.log10(Math.max(10, c.score)) * (realm ? 3.1 : 2.8), 11, realm ? 21 : 19);
 
       // Try every font size and line count; prefer a bigger font, but pay a

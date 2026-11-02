@@ -22,6 +22,8 @@ import {
 maplibregl.setWorkerUrl(workerUrl);
 
 const BASE = import.meta.env.BASE_URL;
+/** Zoom at which local society identities (level 3) fade in. */
+const LOCAL_ZOOM = 3.6;
 const MIN_YEAR = -3400;
 const MAX_YEAR = 2024;
 
@@ -39,6 +41,10 @@ interface Props extends LabelProps {
   kind?: string;
   fam?: string;
   fg?: string;
+  /** Societies: level (1 broad sphere, 2 people, 3 local identity), lineage id, one-line note. */
+  lv?: number;
+  ln?: string;
+  nt?: string;
 }
 
 interface MapFeature {
@@ -99,6 +105,9 @@ const legendToggle = $<HTMLButtonElement>('legend-toggle');
 
 const pName = $('p-name');
 const pYears = $('p-years');
+const pNote = $('p-note');
+const pLineage = $('p-lineage');
+const pLineageList = $<HTMLOListElement>('p-lineage-list');
 const pKind = $('p-kind');
 const pSource = $('p-source');
 const pFine = $('p-fine');
@@ -173,6 +182,12 @@ const leafFilter = (value: number): Filter => ['all', yearFilter(value), ['!', [
 const realmFilter = (value: number): Filter => ['all', yearFilter(value), ['has', 'r']];
 const highlightFilter = (value: number, key: number): Filter => [
   'all', yearFilter(value), ['==', ['get', 'k'], key],
+];
+/** Opacity that is `full` everywhere, except local identities (level 3), which fade in with zoom. */
+const localFade = (full: number): maplibregl.ExpressionSpecification => [
+  'interpolate', ['linear'], ['zoom'],
+  LOCAL_ZOOM - 0.6, ['case', ['==', ['get', 'lv'], 3], 0, full],
+  LOCAL_ZOOM + 0.4, full,
 ];
 const NO_FEATURE: Filter = ['==', ['get', 'k'], -1];
 
@@ -589,6 +604,8 @@ function resetPanel(): number {
   pWdLink.hidden = true;
   pLink.title = '';
   pSummary.classList.remove('muted', 'error');
+  pNote.hidden = true;
+  pLineage.hidden = true;
   return panelTicket;
 }
 
@@ -604,6 +621,54 @@ function showPanel(): void {
 function updateSelection(): void {
   polityLabels.setSelected(selectedKey);
   societyLabels.setSelected(selectedKey);
+}
+
+let lineages = new Map<string, Props[]>();
+
+function buildLineages(): void {
+  lineages = new Map();
+  for (const p of societyProps) {
+    if (!p.ln) continue;
+    const list = lineages.get(p.ln);
+    if (list) list.push(p);
+    else lineages.set(p.ln, [p]);
+  }
+  for (const list of lineages.values()) list.sort((a, b) => a.s - b.s || b.e - a.e);
+}
+
+function renderLineage(p: Props): void {
+  pLineageList.replaceChildren();
+  const stages = p.ln ? lineages.get(p.ln) : undefined;
+  pNote.hidden = !p.nt;
+  pNote.textContent = p.nt ?? '';
+  if (activeLens !== 'societies' || !stages || stages.length < 2) {
+    pLineage.hidden = true;
+    return;
+  }
+  pLineage.hidden = false;
+  for (const stage of stages) {
+    const li = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = stage.n;
+    const years = document.createElement('span');
+    years.textContent = fmtRange(stage.s, stage.e);
+    button.append(years);
+    if (stage.k === p.k) {
+      li.className = 'current';
+      button.setAttribute('aria-current', 'true');
+    } else {
+      button.addEventListener('click', () => {
+        // Jump to the middle of the stage (clamped to the slider) and open it.
+        const mid = Math.round(clamp((Math.max(stage.s, MIN_YEAR) + Math.min(stage.e, MAX_YEAR)) / 2, MIN_YEAR, MAX_YEAR));
+        setYear(mid);
+        map.easeTo({ center: [stage.lx, stage.ly], duration: 700 });
+        openPanel(stage);
+      });
+    }
+    li.append(button);
+    pLineageList.append(li);
+  }
 }
 
 function openPanel(p: Props): void {
@@ -635,6 +700,7 @@ function openPanel(p: Props): void {
   pLink.textContent = 'Search Wikipedia';
 
   showPanel();
+  renderLineage(p);
   document.title = `${name} · Unity of Being`;
 
   const highlight = highlightLayerOf(activeLens);
@@ -969,6 +1035,7 @@ map.on('load', async () => {
     });
     polityProps = polityFeatures.map((feature) => feature.properties);
     societyProps = societyFeatures.map((feature) => feature.properties);
+    buildLineages();
     polityLabels.setFeatures(polityProps);
     societyLabels.setFeatures(societyProps);
 
@@ -1025,7 +1092,10 @@ map.on('load', async () => {
       type: 'fill',
       source: 'societies',
       filter: yearFilter(year),
-      paint: { 'fill-color': ['get', 'c'], 'fill-opacity': 0.62 },
+      paint: {
+        'fill-color': ['get', 'c'],
+        'fill-opacity': localFade(0.62),
+      },
       layout: { visibility: visible('societies') },
     });
 
@@ -1158,7 +1228,7 @@ map.on('load', async () => {
       paint: {
         'line-color': '#201811',
         'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.9, 4, 1.4, 9, 2.4],
-        'line-opacity': 0.26,
+        'line-opacity': localFade(0.26),
       },
       layout: { ...roundLines, visibility: visible('societies') },
     });
@@ -1170,7 +1240,7 @@ map.on('load', async () => {
       paint: {
         'line-color': '#2a2118',
         'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.35, 4, 0.65, 9, 1.3],
-        'line-opacity': 0.6,
+        'line-opacity': localFade(0.6),
       },
       layout: { ...roundLines, visibility: visible('societies') },
     });
@@ -1189,7 +1259,10 @@ map.on('load', async () => {
         return;
       }
       const fill = fillLayerOf(activeLens);
-      const hits = fill ? map.queryRenderedFeatures(event.point, { layers: [fill] }) : [];
+      let hits = fill ? map.queryRenderedFeatures(event.point, { layers: [fill] }) : [];
+      if (activeLens === 'societies' && map.getZoom() < LOCAL_ZOOM + 0.5) {
+        hits = hits.filter((hit) => (hit.properties as { lv?: number }).lv !== 3);
+      }
       if (!hits.length) {
         closePanel();
         return;

@@ -4,10 +4,20 @@ Each entry is a people, culture or language community, not a state. Footprints
 are coarse polygons of [longitude, latitude] points. They are trimmed to the
 coastline by data/build-societies.py unless `clip=False` (island groups).
 
-add(name, start, end, family, kind, languages, wikipedia_title, polygon, clip=True)
+add(name, start, end, family, kind, languages, wikipedia_title, polygon, clip=True,
+    lvl=2, line=None, note='')
 `polygon` is one ring, or a list of rings for a split footprint. Years are CE
 (negative = BCE).
+
+A society is a *stage in time*: "who you belong to" in a place and period. Stages
+that continue one another share a `line` (lineage id), so the panel can walk from
+Proto-Dravidian to Sangam Tamil to modern Tamil. `lvl` is the scale of the
+affinity: 1 broad sphere, 2 people (default), 3 local or regional identity
+(shown only when zoomed in). `note` is one line on what holds the people together.
+Helpers: box(west, south, east, north) and blob(lon, lat, rx, ry, rot=0) make
+quick rough footprints.
 """
+import math
 
 FAMILIES = {
     'IE': ('Indo-European', '#5b86c9'),
@@ -31,12 +41,31 @@ FAMILIES = {
 SOCIETIES = []
 
 
-def add(name, start, end, family, kind, languages, wiki, polygon, clip=True):
+def add(name, start, end, family, kind, languages, wiki, polygon, clip=True,
+        lvl=2, line=None, note=''):
     rings = polygon if isinstance(polygon[0][0], (list, tuple)) else [polygon]
     SOCIETIES.append({
         'name': name, 's': start, 'e': end, 'family': family, 'kind': kind,
         'languages': languages, 'wiki': wiki, 'rings': rings, 'clip': clip,
+        'lvl': lvl, 'line': line, 'note': note,
     })
+
+
+def box(w, s, e, n):
+    """A rectangle as one ring."""
+    return [[w, s], [e, s], [e, n], [w, n]]
+
+
+def blob(lon, lat, rx, ry, rot=0, n=14):
+    """An ellipse (radii in degrees, rotated by `rot` degrees) as one ring."""
+    a = math.radians(rot)
+    out = []
+    for i in range(n):
+        t = 2 * math.pi * i / n
+        x, y = rx * math.cos(t), ry * math.sin(t)
+        out.append([round(lon + x * math.cos(a) - y * math.sin(a), 2),
+                    round(lat + x * math.sin(a) + y * math.cos(a), 2)])
+    return out
 
 
 # ---- Near East and Egypt ----------------------------------------------------
@@ -441,3 +470,10 @@ add('Anglo-Americans', 1900, 2024, 'IE', 'People', 'Indo-European (Germanic: Eng
      [-81.0, 30.5], [-85.0, 30.0], [-97.0, 26.5], [-106.0, 31.5], [-117.0, 32.6], [-124.0, 40.0]])
 add('French Canadians', 1608, 2024, 'IE', 'People', 'Indo-European (Romance: French)', 'French Canadians',
     [[-79.0, 46.0], [-64.0, 49.5], [-59.5, 48.0], [-66.0, 45.0], [-73.5, 45.0], [-77.0, 45.5]])
+
+
+# ---- Later batches (stages in time, local identities) ------------------------
+import importlib  # noqa: E402
+
+for _module in ('societies_more_1',):
+    importlib.import_module(_module).register()

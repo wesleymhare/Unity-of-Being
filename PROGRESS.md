@@ -42,6 +42,10 @@
 - Added a Californians people-level identity and widened the 1900+ Anglo-American footprint to the Pacific coast so SoCal has a full stack.
 - Tested with mocked Wikipedia/Wikidata responses (the build sandbox cannot reach them). First live check is on the deployed site.
 
+### Provinces on the map, Help button (3 November 2026)
+- **Provinces inside big polities** are drawn on the map (same colour as the parent, dashed internal borders, own labels from zoom 3.4, clickable with Wikipedia panel): Roman Empire, Achaemenid, Sasanian, Ottoman, Han, Tang, Ming, Qing, Mughal, British Raj. Built from modern Natural Earth boundaries, so approximate. See `docs/SUBDIVISIONS.md`. The panel list of Wikidata subdivisions stays for polities that have them.
+- **Help button** (top right, "?") now holds the sources and a short how-to; the footer credits line is gone.
+
 ## Known rough edges
 - Ecoregions are modern in every year; only the Köppen half of a biome label changes with time.
 - Initial load downloads and parses the 25 MB border GeoJSON: several seconds on slow machines. Fix later with vector tiles (PMTiles) or per-era files.
@@ -53,6 +57,7 @@
 - `public/data/land.geojson` stores Afro-Eurasia in a frame shifted by -360 degrees (MapLibre draws it fine). The Python tools normalise it in `geo_labels.load_land`; the cleaner fix is in `data/build-land.mjs`.
 
 ## Next
+- **Planned (parked):** rename Societies to Civilizations (sociocultural, ancestry) and add a new Societies lens for de facto control networks, trade routes, communities and factions. See `docs/PLAN-LENSES.md`.
 - Check the new panel features live (flag choice, infobox parsing on odd articles, subdivision coverage) and tune the map-image filter in `src/wiki.ts`.
 - Check the Society Wikipedia titles and add more Americas and Oceania entries; consider a second-level split of the broad Indo-European entries.
 - Worldview lens (curated file).

@@ -124,6 +124,10 @@ export class LabelLayer<T extends LabelProps> {
   private selectedKey = -1;
   private readonly placed = new Map<number, Placed>();
   private raf = 0;
+  /** Labels stay hidden below this zoom. */
+  minZoom = 0;
+  /** Hide individual labels (used to drop a polity's name once its provinces are labelled). */
+  suppress: ((feature: T) => boolean) | null = null;
 
   constructor(map: maplibregl.Map, onClick: (feature: T) => void, slack = 1) {
     this.map = map;
@@ -174,6 +178,10 @@ export class LabelLayer<T extends LabelProps> {
       return;
     }
 
+    if (this.map.getZoom() < this.minZoom) {
+      this.clear();
+      return;
+    }
     const ppd = (512 * Math.pow(2, this.map.getZoom())) / 360;
     const bounds = this.map.getBounds();
     const small = width < 720;
@@ -184,6 +192,7 @@ export class LabelLayer<T extends LabelProps> {
     const candidates: Candidate[] = [];
     for (const f of this.active) {
       if (!Number.isFinite(f.lx) || !Number.isFinite(f.ly) || !Number.isFinite(f.sz)) continue;
+      if (this.suppress?.(f)) continue;
       const score = f.sz * ppd;
       const isSelected = f.k === this.selectedKey;
       if (score < 26 && !isSelected) continue;

@@ -546,18 +546,6 @@ a { color: var(--brass); }
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-.credits {
-  margin-top: 3px;
-  overflow: hidden;
-  font-size: 10px;
-  line-height: 1.5;
-  color: var(--faint);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.credits a { color: var(--brass); text-decoration: none; }
-.credits a:hover { text-decoration: underline; }
-
 /* ---- Map labels and controls ------------------------------------------- */
 .poly-label {
   max-width: 190px;
@@ -643,8 +631,7 @@ a { color: var(--brass); }
   .year-kicker { display: none; }
   .speed-label { display: none; }
   #ticks span { font-size: 9px; }
-  .credits { display: none; }
-}
+  }
 
 @media (max-width: 420px) {
   #year-label { font-size: 23px; }
@@ -964,3 +951,60 @@ a { color: var(--brass); }
   color: var(--faint); font-size: 11px;
 }
 .subs li button:hover { color: var(--brass-lt); }
+
+/* Help popover */
+.help-btn {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--brass-lt);
+  font: 700 14px/1 Georgia, serif;
+  cursor: pointer;
+}
+.help-btn:hover, .help-btn[aria-expanded="true"] { background: rgba(210, 173, 100, 0.2); }
+.help {
+  position: fixed;
+  top: 62px;
+  right: 14px;
+  z-index: 40;
+  width: min(380px, calc(100vw - 28px));
+  max-height: calc(100vh - 150px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(22, 29, 36, 0.97);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  color: #ded7c7;
+}
+.help[hidden] { display: none; }
+.help-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  font: 700 15px Georgia, serif;
+  color: #f1e8d3;
+}
+.help-head button { border: 0; background: none; color: var(--faint); font-size: 22px; cursor: pointer; line-height: 1; }
+.help-body { overflow-y: auto; padding: 4px 14px 12px; font-size: 12.5px; line-height: 1.5; }
+.help-body h3 {
+  margin: 12px 0 4px;
+  font-size: 9.5px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.help-body ul { margin: 0; padding-left: 16px; }
+.help-body li { margin: 3px 0; }
+.help-body a { color: var(--brass-lt); text-decoration: none; }
+.help-body a:hover { text-decoration: underline; }
+.help-fine { margin: 10px 0 0; font-size: 11px; color: var(--faint); }
+@media (max-width: 760px) {
+  .help { top: 58px; right: 8px; max-height: calc(100vh - 120px); }
+  .help-btn { margin-left: auto; }
+}

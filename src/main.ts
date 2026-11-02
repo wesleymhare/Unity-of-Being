@@ -56,6 +56,10 @@ interface Props extends LabelProps {
   lv?: number;
   ln?: string;
   nt?: string;
+  /** Provinces: parent polity name, its Wikidata id, and the era the province list describes. */
+  p?: string;
+  pq?: string;
+  era?: string;
 }
 
 interface MapFeature {
@@ -145,7 +149,25 @@ const pOsmFrame = $<HTMLIFrameElement>('p-osm-frame');
 const pOsmLink = $<HTMLAnchorElement>('p-osm-link');
 const pLink = $<HTMLAnchorElement>('p-link');
 const pWdLink = $<HTMLAnchorElement>('p-wd-link');
+const helpBtn = $<HTMLButtonElement>('help-btn');
+const helpBox = $('help');
 const lensButtons = [...document.querySelectorAll<HTMLButtonElement>('.lens-btn')];
+
+function setHelp(open: boolean): void {
+  helpBox.hidden = !open;
+  helpBtn.setAttribute('aria-expanded', String(open));
+}
+helpBtn.addEventListener('click', (event) => {
+  event.stopPropagation();
+  setHelp(helpBox.hidden === true);
+});
+$('help-close').addEventListener('click', () => setHelp(false));
+document.addEventListener('click', (event) => {
+  if (!helpBox.hidden && !helpBox.contains(event.target as Node)) setHelp(false);
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !helpBox.hidden) setHelp(false);
+});
 
 slider.value = String(year);
 yearLabel.textContent = fmtYear(year);
@@ -216,13 +238,15 @@ const YEAR_FILTERS: Record<string, (value: number) => Filter> = {
   'polity-line': leafFilter,
   'polity-realm-casing': realmFilter,
   'polity-realm-line': realmFilter,
+  'sub-fill': (value) => ['all', yearFilter(value), ['!', ['has', 'bd']]],
+  'sub-line': (value) => ['all', yearFilter(value), ['has', 'bd']],
   'society-fill': yearFilter,
   'society-casing': yearFilter,
   'society-line': yearFilter,
 };
 
 const LENS_LAYERS: Record<Lens, string[]> = {
-  polities: ['polity-fill', 'polity-line', 'polity-realm-casing', 'polity-realm-line', 'polity-hl'],
+  polities: ['polity-fill', 'polity-line', 'polity-realm-casing', 'polity-realm-line', 'polity-hl', 'sub-fill', 'sub-line', 'sub-hl'],
   societies: ['society-fill', 'society-casing', 'society-line', 'society-hl'],
   biomes: ['biome-raster', 'eco-lines', 'ocean-mask'],
 };
@@ -232,11 +256,29 @@ const fillLayerOf = (lens: Lens): string | null =>
 const highlightLayerOf = (lens: Lens): string | null =>
   lens === 'polities' ? 'polity-hl' : lens === 'societies' ? 'society-hl' : null;
 
+/** Province shapes carry keys from here up, so they never clash with polity keys. */
+const SUB_K = 1_000_000;
+/** From this zoom, internal borders and province names replace the parent polity's name. */
+const SUB_ZOOM = 3.4;
+let subProps: Props[] = [];
+let subParents = new Set<string>();
 let polityProps: Props[] = [];
 let societyProps: Props[] = [];
 let biomeModel: BiomeModel | null = null;
 
-const polityLabels = new LabelLayer<Props>(map, (p) => { overlapSet = []; openPanel(p); });
+const polityLabels = new LabelLayer<Props>(map, (p) => {
+  // A polity with provinces lists them.
+  overlapSet = [p, ...subProps.filter((item) => item.p === p.n && activeAt(item))].slice(0, 60);
+  openPanel(p);
+});
+const activeAt = (item: Props): boolean => item.s <= year && item.e >= year;
+const subLabels = new LabelLayer<Props>(map, (p) => {
+  // Offer the parent polity next to the province.
+  overlapSet = [p, ...polityProps.filter((item) => item.n === p.p && !item.g && activeAt(item)).slice(0, 1)];
+  openPanel(p);
+}, 1);
+subLabels.minZoom = SUB_ZOOM;
+polityLabels.suppress = (f) => map.getZoom() >= SUB_ZOOM && subParents.has(f.n);
 const societyLabels = new LabelLayer<Props>(map, (p) => {
   const stack = standingAt(p.lx, p.ly, year);
   overlapSet = stack.some((item) => item.k === p.k) ? stack : [p, ...stack];
@@ -246,7 +288,9 @@ const societyLabels = new LabelLayer<Props>(map, (p) => {
 const biomeLabels = new LabelLayer<EcoPatch>(map, (patch) => openBiomePanel(patch.lx, patch.ly), 2.2);
 
 function activeLabels(): { schedule(): void } | null {
-  if (activeLens === 'polities') return polityLabels;
+  if (activeLens === 'polities') {
+    return { schedule: () => { polityLabels.schedule(); subLabels.schedule(); } };
+  }
   if (activeLens === 'societies') return societyLabels;
   return biomeLabels;
 }
@@ -330,7 +374,15 @@ let yearRaf = 0;
 function setYear(next: number): void {
   year = clamp(Math.round(next), MIN_YEAR, MAX_YEAR);
 
-  if (selectedProps && (selectedProps.s > year || selectedProps.e < year)) closePanel();
+  if (selectedProps && (selectedProps.s > year || selectedProps.e < year)) {
+    // A province keeps its identity across the shape-runs it is stored in; follow it.
+    const sel = selectedProps;
+    const next = sel.k >= SUB_K
+      ? subProps.find((item) => item.n === sel.n && item.p === sel.p && item.s <= year && item.e >= year)
+      : undefined;
+    if (next) openPanel(next);
+    else closePanel();
+  }
 
   if (yearRaf) return;
   yearRaf = requestAnimationFrame(() => {
@@ -341,13 +393,12 @@ function setYear(next: number): void {
     for (const [id, make] of Object.entries(YEAR_FILTERS)) {
       if (map.getLayer(id)) map.setFilter(id, make(year));
     }
-    const highlight = highlightLayerOf(activeLens);
-    if (highlight && map.getLayer(highlight)) {
-      map.setFilter(highlight, selectedKey >= 0 ? highlightFilter(year, selectedKey) : NO_FEATURE);
-    }
+    setHighlight(selectedKey >= 0 ? selectedProps : null);
 
     if (activeLens === 'biomes') renderBiomes();
+    subParents = new Set(subProps.filter((item) => item.s <= year && item.e >= year).map((item) => item.p as string));
     polityLabels.setYear(year, activeLens === 'polities');
+    subLabels.setYear(year, activeLens === 'polities');
     societyLabels.setYear(year, activeLens === 'societies');
     renderLegend();
     if (activeLens === 'biomes' && !panel.hidden && biomePoint) scheduleBiomePanel();
@@ -595,7 +646,7 @@ function applyPolityFlag(): void {
 function applyArticleImage(summary: WikiSummary | null, facts: WikiFacts | null): void {
   panelFacts = facts;
   if (activeLens === 'biomes') return;
-  if (activeLens === 'polities') {
+  if (activeLens === 'polities' && !(selectedProps && selectedProps.k >= SUB_K)) {
     applyPolityFlag();
     return;
   }
@@ -830,7 +881,17 @@ function showPanel(): void {
   });
 }
 
+function setHighlight(p: Props | null): void {
+  for (const id of ['polity-hl', 'society-hl', 'sub-hl']) {
+    if (map.getLayer(id)) map.setFilter(id, NO_FEATURE);
+  }
+  if (!p) return;
+  const id = p.k >= SUB_K ? 'sub-hl' : highlightLayerOf(activeLens);
+  if (id && map.getLayer(id)) map.setFilter(id, highlightFilter(year, p.k));
+}
+
 function updateSelection(): void {
+  subLabels.setSelected(selectedKey);
   polityLabels.setSelected(selectedKey);
   societyLabels.setSelected(selectedKey);
 }
@@ -922,7 +983,8 @@ function renderOthers(current: Props): void {
   const others = overlapSet.filter((item) => item.k !== current.k);
   pOthers.hidden = others.length === 0;
   const societies = activeLens === 'societies';
-  pOthersHead.textContent = societies ? 'Where you stand · peer identities' : 'Also here';
+  const provinces = !societies && others.length > 0 && current.k < SUB_K && others.every((item) => item.k >= SUB_K);
+  pOthersHead.textContent = societies ? 'Where you stand · peer identities' : provinces ? 'Provinces (approximate)' : 'Also here';
   let tier = -1;
   for (const item of others) {
     const level = item.lv ?? 2;
@@ -938,7 +1000,7 @@ function renderOthers(current: Props): void {
     const dot = document.createElement('i');
     dot.style.background = item.c;
     const label = document.createElement('span');
-    label.textContent = `${item.n} · ${fmtRange(item.s, item.e)}`;
+    label.textContent = item.k >= SUB_K ? `${item.n} · province of ${item.p}` : `${item.n} · ${fmtRange(item.s, item.e)}`;
     button.title = label.textContent;
     button.append(dot, label);
     button.addEventListener('click', () => openPanel(item));
@@ -1010,12 +1072,15 @@ function openPanel(p: Props): void {
   const controller = panelAbort as AbortController;
 
   const societies = activeLens === 'societies';
+  const province = p.k >= SUB_K;
   pName.textContent = name;
   pName.title = name;
-  pYears.textContent = fmtRange(p.s, p.e);
-  pKind.textContent = societies ? 'Society' : p.g ? 'Realm' : 'Polity';
-  pSource.textContent = societies ? 'Curated' : 'Cliopatria';
-  pFine.textContent = societies
+  pYears.textContent = province ? `Part of ${p.p} · ${p.era}` : fmtRange(p.s, p.e);
+  pKind.textContent = province ? 'Province' : societies ? 'Society' : p.g ? 'Realm' : 'Polity';
+  pSource.textContent = province ? 'Approximate borders' : societies ? 'Curated' : 'Cliopatria';
+  pFine.textContent = province
+    ? 'Province borders: approximated from Natural Earth (public domain) inside Cliopatria shapes (CC BY 4.0) · Text: Wikipedia (CC BY-SA) · Modern map: OpenStreetMap (ODbL)'
+    : societies
     ? 'Footprints: curated approximations, see docs/SOCIETIES.md · Text: Wikipedia (CC BY-SA) · Modern map: OpenStreetMap (ODbL)'
     : 'Borders: Cliopatria (CC BY 4.0) · Text: Wikipedia (CC BY-SA) · Facts: Wikidata (CC0) · Modern map: OpenStreetMap (ODbL)';
   pSwatch.style.background = p.c;
@@ -1028,8 +1093,7 @@ function openPanel(p: Props): void {
   renderOthers(p);
   document.title = `${name} · Unity of Being`;
 
-  const highlight = highlightLayerOf(activeLens);
-  if (highlight && map.getLayer(highlight)) map.setFilter(highlight, highlightFilter(year, p.k));
+  setHighlight(p);
   updateSelection();
   renderOsm(p.lx, p.ly, p.sz, name);
 
@@ -1038,6 +1102,8 @@ function openPanel(p: Props): void {
     if (p.kind) extraFacts.push({ label: 'Type', value: p.kind });
     if (p.fam) extraFacts.push({ label: 'Languages', value: p.fam });
     if (p.fg) extraFacts.push({ label: 'Family group', value: p.fg });
+  } else if (province) {
+    extraFacts.push({ label: 'Part of', value: p.p ?? '' });
   } else if (p.m) {
     extraFacts.push({ label: 'Realm', value: p.m });
   }
@@ -1155,10 +1221,7 @@ function closePanel(): void {
   selectedProps = null;
   biomePoint = null;
   hideBiomePin();
-  for (const lens of ['polities', 'societies'] as Lens[]) {
-    const id = highlightLayerOf(lens);
-    if (id && map.getLayer(id)) map.setFilter(id, NO_FEATURE);
-  }
+  setHighlight(null);
   document.title = 'Unity of Being';
   updateSelection();
 }
@@ -1324,7 +1387,7 @@ function checkSources(): void {
 
 map.on('load', async () => {
   try {
-    const [land, polityData, societyData, rivers, lakes, koppen, ecoBin, ecoMeta, ecoLines, ocean] = await Promise.all([
+    const [land, polityData, societyData, rivers, lakes, koppen, ecoBin, ecoMeta, ecoLines, ocean, subData] = await Promise.all([
       getJson(`${BASE}data/land.geojson`),
       getJson<FeatureCollection>(`${BASE}data/polities.geojson`, (loaded, total) => {
         const megabytes = loaded / 1048576;
@@ -1352,6 +1415,7 @@ map.on('load', async () => {
       getJson<EcoMeta>(`${BASE}data/ecoregions.json`).catch(() => null),
       getJson(`${BASE}data/ecoregion-lines.geojson`).catch(() => null),
       getJson(`${BASE}data/ocean.geojson`).catch(() => null),
+      getJson<FeatureCollection>(`${BASE}data/subdivisions.geojson`).catch(() => null),
     ]);
 
     loadingText.textContent = 'Building map…';
@@ -1365,11 +1429,23 @@ map.on('load', async () => {
     societyFeatures.forEach((feature, index) => {
       feature.properties.k = index;
     });
+    // Provinces: polygons get keys from SUB_K up; internal border lines (bd) carry none.
+    const subFeatures = subData?.features ?? [];
+    subProps = [];
+    for (const feature of subFeatures) {
+      const props = feature.properties as Props & { bd?: number };
+      if (props.bd) continue;
+      props.k = SUB_K + subProps.length;
+      props.q = '';
+      props.nt = `Provinces as in ${props.era}; borders are approximated from modern boundaries, so edges are rough.`;
+      subProps.push(props);
+    }
     polityProps = polityFeatures.map((feature) => feature.properties);
     societyProps = societyFeatures.map((feature) => feature.properties);
     societyFootprints = buildFootprints(societyFeatures);
     buildLineages();
     polityLabels.setFeatures(polityProps);
+    subLabels.setFeatures(subProps);
     societyLabels.setFeatures(societyProps);
 
     if (koppen && ecoBin && ecoMeta && ocean) {
@@ -1401,6 +1477,10 @@ map.on('load', async () => {
     map.addSource('societies', {
       type: 'geojson',
       data: { type: 'FeatureCollection', features: societyFeatures } as GeoData,
+    });
+    map.addSource('subdivisions', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: subFeatures } as GeoData,
     });
 
     const visible = (lens: Lens): 'visible' | 'none' => (activeLens === lens ? 'visible' : 'none');
@@ -1553,6 +1633,37 @@ map.on('load', async () => {
       layout: { 'line-join': 'round', visibility: visible('polities') },
     });
 
+    // Provinces inside big polities: same colour as the parent, so only their borders show.
+    map.addLayer({
+      id: 'sub-fill',
+      type: 'fill',
+      source: 'subdivisions',
+      filter: ['all', yearFilter(year), ['!', ['has', 'bd']]],
+      paint: { 'fill-color': ['get', 'c'], 'fill-opacity': 0.02 },
+      layout: { visibility: visible('polities') },
+    });
+    map.addLayer({
+      id: 'sub-line',
+      type: 'line',
+      source: 'subdivisions',
+      filter: ['all', yearFilter(year), ['has', 'bd']],
+      paint: {
+        'line-color': '#2a2118',
+        'line-opacity': ['interpolate', ['linear'], ['zoom'], SUB_ZOOM - 1.2, 0, SUB_ZOOM + 0.2, 0.85],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 2, 0.7, 6, 1.7],
+        'line-dasharray': [2.5, 1.5],
+      },
+      layout: { ...roundLines, visibility: visible('polities') },
+    });
+    map.addLayer({
+      id: 'sub-hl',
+      type: 'line',
+      source: 'subdivisions',
+      filter: NO_FEATURE,
+      paint: { 'line-color': '#f6e7b8', 'line-width': 2.2, 'line-opacity': 0.95 },
+      layout: { 'line-join': 'round', visibility: visible('polities') },
+    });
+
     map.addLayer({
       id: 'society-casing',
       type: 'line',
@@ -1618,8 +1729,19 @@ map.on('load', async () => {
         seen.add(key);
         stack.push(all[key]);
       }
-      overlapSet = stack;
-      if (stack.length) openPanel(stack[0]);
+      // Provinces under the click: listed first when zoomed in, after the polity otherwise.
+      const subHits = map.getLayer('sub-fill')
+        ? map.queryRenderedFeatures(event.point, { layers: ['sub-fill'] })
+        : [];
+      const subs: Props[] = [];
+      for (const hit of subHits) {
+        const key = (hit.properties as { k?: number }).k;
+        const item = typeof key === 'number' ? subProps[key - SUB_K] : undefined;
+        if (item && !subs.includes(item)) subs.push(item);
+      }
+      const ordered = map.getZoom() >= SUB_ZOOM - 0.2 ? [...subs, ...stack] : [...stack, ...subs];
+      overlapSet = ordered;
+      if (ordered.length) openPanel(ordered[0]);
     });
     for (const lens of ['polities', 'societies'] as Lens[]) {
       const layer = fillLayerOf(lens) as string;

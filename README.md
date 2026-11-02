@@ -15,8 +15,9 @@ npm run preview    # serve the production build
 
 ## Rebuild the data (only needed if you change the pipeline)
 ```
-npm run data:download   # fetches Cliopatria into data/raw/ (git-ignored)
-npm run data:build      # simplifies it into public/data/polities.geojson and land.geojson
+npm run data:download   # Cliopatria + Natural Earth rivers/lakes into data/raw/ (git-ignored)
+npm run data:build      # builds polities.geojson, land.geojson, rivers.geojson, lakes.geojson
+npm run data:water      # rebuild only the Natural Earth water layers
 ```
 
 ## Deploy
@@ -25,8 +26,8 @@ One-time setup: repo Settings, Pages, Source = GitHub Actions.
 
 ## Data and credits
 - Borders: Cliopatria (Seshat Global History Databank), CC BY 4.0, simplified for the web.
-- Coastlines: Natural Earth (public domain) via world-atlas.
-- Summaries: fetched live from Wikipedia (CC BY-SA), linked in the panel.
+- Coastlines, rivers and lakes: Natural Earth (public domain), simplified for the web.
+- Panel: live Wikipedia summaries and search (CC BY-SA), Wikidata facts (CC0), Wikimedia Commons images, and an OpenStreetMap embed (ODbL).
 - Map engine: MapLibre GL JS.
 
 Borders are one scholarly reading of the evidence and are often disputed.

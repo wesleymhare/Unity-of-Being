@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "data:download": "node data/download.mjs",
-    "data:build": "node data/build-data.mjs"
+    "data:build": "node data/build-data.mjs",
+    "data:water": "node data/build-water.mjs"
   },
   "dependencies": {
     "maplibre-gl": "^6.16.0"

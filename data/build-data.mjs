@@ -1,6 +1,8 @@
-// Builds the two data files the site loads:
+// Builds the data files the site loads:
 //   public/data/polities.geojson  (Cliopatria, simplified, with start/end years)
 //   public/data/land.geojson      (Natural Earth land, 1:50m)
+//   public/data/rivers.geojson    (Natural Earth rivers, 1:50m)
+//   public/data/lakes.geojson     (Natural Earth lakes, 1:50m)
 // Run `npm run data:download` first.
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -57,3 +59,6 @@ console.log(`polities.geojson: ${fc.features.length} shapes, ${(statSync('public
 
 // ---- Land (Natural Earth, public domain) -----------------------------------
 await import('./build-land.mjs');
+
+// ---- Rivers and lakes (Natural Earth, public domain) -----------------------
+await import('./build-water.mjs');

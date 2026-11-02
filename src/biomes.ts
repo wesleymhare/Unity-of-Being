@@ -201,6 +201,38 @@ export interface EcoPatch {
   eco: number;
 }
 
+/** Number of lightness shades an ecoregion can take within its Köppen colour. */
+const SHADES = 6;
+/** Total lightness range covered by the shades (0 to 1). */
+const SHADE_SPAN = 0.34;
+
+function hexToHsl(hex: string): [number, number, number] {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const d = max - min;
+  if (d === 0) return [0, 0, l];
+  const sat = d / (1 - Math.abs(2 * l - 1));
+  let h: number;
+  if (max === r) h = ((g - b) / d + 6) % 6;
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  return [h * 60, sat, l];
+}
+
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  const [r, g, b] =
+    h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] :
+    h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+}
+
 function decodeRuns(buffer: ArrayBuffer, wide: boolean): { width: number; height: number; data: Uint8Array | Uint16Array } {
   const view = new DataView(buffer);
   const width = view.getUint16(0, true);
@@ -224,7 +256,10 @@ export class BiomeModel {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly image: ImageData;
   private readonly pixels: Uint32Array;
-  private readonly palette = new Uint32Array(CLASSES.length);
+  /** Packed colour per (Köppen class, ecoregion shade). */
+  private readonly palette = new Uint32Array(CLASSES.length * SHADES);
+  /** Shade (0 to SHADES - 1) of each ecoregion id, chosen so neighbours differ. */
+  private readonly shadeOfEco: Uint8Array;
   private readonly width: number;
   private readonly height: number;
   private readonly grid: Uint8Array;
@@ -260,11 +295,16 @@ export class BiomeModel {
 
     CLASSES.forEach((klass, index) => {
       if (!klass) return;
-      const r = parseInt(klass.colour.slice(1, 3), 16);
-      const g = parseInt(klass.colour.slice(3, 5), 16);
-      const b = parseInt(klass.colour.slice(5, 7), 16);
-      this.palette[index] = ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0;
+      const [h, sat, light] = hexToHsl(klass.colour);
+      // Keep the lightest and darkest shade inside a readable range.
+      const centre = Math.min(0.92 - SHADE_SPAN / 2, Math.max(0.12 + SHADE_SPAN / 2, light));
+      for (let shade = 0; shade < SHADES; shade++) {
+        const l = centre + (shade / (SHADES - 1) - 0.5) * SHADE_SPAN;
+        const [r, g, b] = hslToRgb(h, sat, l);
+        this.palette[index * SHADES + shade] = ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0;
+      }
     });
+    this.shadeOfEco = this.chooseShades(meta.eco.length);
 
     for (let y = 0; y < CANVAS_SIZE; y++) {
       this.rowOfY[y] = this.rowOfLat(BiomeModel.latOfY(y));
@@ -285,6 +325,65 @@ export class BiomeModel {
     for (let c = 0; c < this.width; c++) {
       this.lonFactor[c] = BiomeModel.humidLon(-180 + (c + 0.5) / CELLS_PER_DEGREE);
     }
+  }
+
+  /**
+   * Give every ecoregion one of SHADES lightness levels so that neighbours look as
+   * different as possible. Neighbours that share a Köppen class (so the same hue) count
+   * most; neighbours of another class already differ in hue and count less.
+   */
+  private chooseShades(count: number): Uint8Array {
+    const n = count + 1; // ids are 1-based
+    const hard = new Uint16Array(n * n); // adjacent cells with the same class
+    const soft = new Uint16Array(n * n); // adjacent cells with different classes
+    const { eco, grid, width, height } = this;
+    const touch = (a: number, ca: number, b: number, cb: number): void => {
+      if (a === b || a === 0 || b === 0) return;
+      const m = ca === cb ? hard : soft;
+      if (m[a * n + b] < 65535) { m[a * n + b]++; m[b * n + a]++; }
+    };
+    for (let row = 0; row < height; row++) {
+      const offset = row * width;
+      for (let col = 0; col < width; col++) {
+        const i = offset + col;
+        const a = eco[i];
+        if (a === 0) continue;
+        const right = col + 1 < width ? i + 1 : offset;
+        touch(a, grid[i], eco[right], grid[right]);
+        if (row + 1 < height) touch(a, grid[i], eco[i + width], grid[i + width]);
+      }
+    }
+    // Colour the most-connected ecoregions first.
+    const degree = new Int32Array(n);
+    for (let a = 1; a < n; a++) {
+      for (let b = 1; b < n; b++) if (hard[a * n + b] > 4 || soft[a * n + b] > 4) degree[a]++;
+    }
+    const order = Array.from({ length: count }, (_, k) => k + 1).sort((a, b) => degree[b] - degree[a]);
+    const shade = new Int8Array(n).fill(-1);
+    for (const a of order) {
+      let best = 0;
+      let bestHard = -1;
+      let bestSoft = -1;
+      for (let candidate = 0; candidate < SHADES; candidate++) {
+        let nearestHard = SHADES;
+        let softSum = 0;
+        for (let b = 1; b < n; b++) {
+          if (shade[b] < 0) continue;
+          const gap = Math.abs(candidate - shade[b]);
+          if (hard[a * n + b] > 4 && gap < nearestHard) nearestHard = gap;
+          if (soft[a * n + b] > 4) softSum += gap;
+        }
+        if (nearestHard > bestHard || (nearestHard === bestHard && softSum > bestSoft)) {
+          best = candidate;
+          bestHard = nearestHard;
+          bestSoft = softSum;
+        }
+      }
+      shade[a] = best;
+    }
+    const out = new Uint8Array(n);
+    for (let a = 1; a < n; a++) out[a] = Math.max(0, shade[a]);
+    return out;
   }
 
   static get bounds(): [[number, number], [number, number], [number, number], [number, number]] {
@@ -364,12 +463,13 @@ export class BiomeModel {
 
   /** Draw the current climate state onto the canvas. */
   draw(): void {
-    const { cls, width, pixels, palette, rowOfY, colOfX } = this;
+    const { cls, eco, shadeOfEco, width, pixels, palette, rowOfY, colOfX } = this;
     for (let y = 0; y < CANVAS_SIZE; y++) {
       const rowStart = rowOfY[y] * width;
       const offset = y * CANVAS_SIZE;
       for (let x = 0; x < CANVAS_SIZE; x++) {
-        pixels[offset + x] = palette[cls[rowStart + colOfX[x]]];
+        const cell = rowStart + colOfX[x];
+        pixels[offset + x] = palette[cls[cell] * SHADES + shadeOfEco[eco[cell]]];
       }
     }
     this.ctx.putImageData(this.image, 0, 0);

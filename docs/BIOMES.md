@@ -13,6 +13,17 @@ Click anywhere for the ecoregion, its WWF biome and realm, the climate class, an
 the climate age shown. There is no separate Köppen legend; the class code in each
 label is the key, and the panel spells it out.
 
+## Colour
+
+Hue comes from the Köppen class (`colour` in `CLASSES`). Within a class, every ecoregion
+gets one of six lightness shades (`SHADES` in `src/biomes.ts`), so neighbouring ecoregions
+of the same climate look different and the ecoregion borders are readable by colour as
+well as by line. Shades are chosen once at load by a greedy graph colouring over
+ecoregion adjacency on the grid: neighbours that share a Köppen class in the modern map
+must differ most, neighbours of other classes differ where possible. An ecoregion keeps
+its shade as the climate shifts, so a patch changes hue, not lightness, when its class
+changes.
+
 ## Data
 
 - **Ecoregions:** RESOLVE Ecoregions 2017 (Dinerstein et al. 2017, BioScience 67:534),

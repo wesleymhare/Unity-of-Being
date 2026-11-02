@@ -10,9 +10,8 @@
     "data:download": "node data/download.mjs",
     "data:build": "node data/build-data.mjs",
     "data:water": "node data/build-water.mjs",
-    "data:societies": "python3 data/build-societies.py",
-    "data:biomes:download": "node data/download-biomes.mjs",
-    "data:biomes:build": "python3 data/build-biomes.py"
+    "data:societies:download": "node data/download-societies.mjs",
+    "data:societies:build": "node data/build-societies.mjs"
   },
   "dependencies": {
     "maplibre-gl": "^6.16.0"

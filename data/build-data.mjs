@@ -56,7 +56,4 @@ writeFileSync('public/data/polities.geojson', JSON.stringify(fc));
 console.log(`polities.geojson: ${fc.features.length} shapes, ${(statSync('public/data/polities.geojson').size / 1e6).toFixed(1)} MB`);
 
 // ---- Land (Natural Earth, public domain) -----------------------------------
-const topo = JSON.parse(readFileSync(require.resolve('world-atlas/land-50m.json'), 'utf8'));
-const land = feature(topo, topo.objects.land);
-writeFileSync('public/data/land.geojson', JSON.stringify(land, (k, v) => (typeof v === 'number' ? Math.round(v * 100) / 100 : v)));
-console.log(`land.geojson: ${(statSync('public/data/land.geojson').size / 1e6).toFixed(1)} MB`);
+await import('./build-land.mjs');

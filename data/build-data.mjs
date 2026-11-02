@@ -1,12 +1,12 @@
 // Builds the data files the site loads:
-//   public/data/polities.geojson  (Cliopatria, simplified, with start/end years)
+//   public/data/polities.geojson  (Cliopatria, simplified and cleaned, with start/end years)
 //   public/data/land.geojson      (Natural Earth land, 1:50m)
 //   public/data/rivers.geojson    (Natural Earth rivers, 1:50m)
 //   public/data/lakes.geojson     (Natural Earth lakes, 1:50m)
 // Run `npm run data:download` first.
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, statSync } from 'node:fs';
 import { feature } from 'topojson-client';
 
 const require = createRequire(import.meta.url);
@@ -30,32 +30,13 @@ const r = spawnSync(process.execPath, [
 ], { stdio: 'inherit' });
 if (r.status !== 0) throw new Error('mapshaper failed');
 
-// Add a label point (lx, ly) and size (sz, in degrees) from each shape's largest ring.
-const ringArea = (ring) => {
-  let a = 0, cx = 0, cy = 0;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const [x0, y0] = ring[j], [x1, y1] = ring[i];
-    const f = x0 * y1 - x1 * y0;
-    a += f; cx += (x0 + x1) * f; cy += (y0 + y1) * f;
-  }
-  a /= 2;
-  return a === 0 ? { a: 0, cx: ring[0][0], cy: ring[0][1] } : { a, cx: cx / (6 * a), cy: cy / (6 * a) };
-};
-const fc = JSON.parse(readFileSync(TMP, 'utf8'));
-for (const f of fc.features) {
-  const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
-  let best = null, total = 0;
-  for (const p of polys) {
-    const m = ringArea(p[0]);
-    total += Math.abs(m.a);
-    if (!best || Math.abs(m.a) > Math.abs(best.a)) best = m;
-  }
-  f.properties.lx = +best.cx.toFixed(2);
-  f.properties.ly = +best.cy.toFixed(2);
-  f.properties.sz = +Math.sqrt(total).toFixed(2);
-}
-writeFileSync('public/data/polities.geojson', JSON.stringify(fc));
-console.log(`polities.geojson: ${fc.features.length} shapes, ${(statSync('public/data/polities.geojson').size / 1e6).toFixed(1)} MB`);
+// Clean the shapes: drop Cliopatria's overlapping group shapes, add label anchors and
+// colours. Needs Python 3 with shapely and numpy (see data/requirements.txt).
+const clean = spawnSync('python3', ['data/clean-polities.py', TMP, 'public/data/polities.geojson'], {
+  stdio: 'inherit',
+});
+if (clean.status !== 0) throw new Error('data/clean-polities.py failed');
+console.log(`polities.geojson: ${(statSync('public/data/polities.geojson').size / 1e6).toFixed(1)} MB`);
 
 // ---- Land (Natural Earth, public domain) -----------------------------------
 await import('./build-land.mjs');

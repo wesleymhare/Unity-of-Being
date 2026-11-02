@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Unity of Being</title>
-  <meta name="description" content="An interactive map of human history: polities, societies and worldviews across time.">
+  <meta name="description" content="An interactive map of human history: polities, societies and biomes across time.">
   <meta name="theme-color" content="#161d24">
   <link rel="icon" href="data:,">
   <link rel="preconnect" href="https://en.wikipedia.org">
@@ -16,16 +16,25 @@
     <div class="lens-switch" role="group" aria-label="Map lens">
       <button type="button" class="lens-btn is-active" data-lens="polities" aria-pressed="true">Polities</button>
       <button type="button" class="lens-btn" data-lens="societies" aria-pressed="false">Societies</button>
+      <button type="button" class="lens-btn" data-lens="biomes" aria-pressed="false">Biomes</button>
     </div>
     <div class="era">3400 BCE – 2024 CE</div>
   </header>
 
-  <div id="map" role="application" aria-label="Map of historical polities and societies"></div>
+  <div id="map" role="application" aria-label="Map of historical polities, societies and biomes"></div>
 
   <div id="loading" role="status" aria-live="polite">
     <div id="loading-text">Loading map data…</div>
     <div class="loading-bar" aria-hidden="true"><i id="loading-progress"></i></div>
   </div>
+
+  <aside id="legend" hidden aria-label="Map legend">
+    <div class="legend-head">
+      <span id="legend-title">Legend</span>
+      <button id="legend-toggle" type="button" aria-expanded="true" aria-label="Show or hide the legend">–</button>
+    </div>
+    <div id="legend-body"></div>
+  </aside>
 
   <aside id="panel" hidden aria-live="polite" aria-label="Feature details">
     <div class="panel-top">
@@ -95,10 +104,11 @@
     </div>
     <div class="credits">
       Borders &amp; dates: <a href="https://github.com/Seshat-Global-History-Databank/cliopatria" target="_blank" rel="noopener noreferrer">Cliopatria</a> (Seshat, CC BY 4.0) ·
-      Societies: <a href="https://github.com/Glottography/asher2007world" target="_blank" rel="noopener noreferrer">Glottography / Asher &amp; Moseley 2007</a> (CC BY 4.0) ·
+      Societies: curated (<a href="https://github.com/wesleymhare/Unity-of-Being/blob/main/docs/SOCIETIES.md" target="_blank" rel="noopener noreferrer">what counts</a>) ·
+      Climate: <a href="https://doi.org/10.1127/metz/2016/0816" target="_blank" rel="noopener noreferrer">Köppen–Geiger, Rubel et al.</a> (shifted through time, schematic) ·
       Coastlines, rivers &amp; lakes: Natural Earth (public domain) ·
       Text: Wikipedia (CC BY-SA) · Facts &amp; rulers: Wikidata (CC0) · Modern map: OpenStreetMap (ODbL).
-      Borders and society areas are scholarly approximations and often disputed.
+      Borders, society areas and past climates are approximations and often disputed.
     </div>
   </footer>
 

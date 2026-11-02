@@ -114,6 +114,14 @@ frame and as the test that the new Köppen code reproduces it.
 - Köppen classes depend on thresholds, so small climate differences can flip a class
   and make borders look jumpy between time steps.
 
+## Decisions (owner, 2 November 2026)
+
+1. Model-based climate with stated uncertainty is acceptable.
+2. No file-size budget concern; lazy loading is fine.
+3. Remove the schematic model once the real data is in.
+
+(Original questions kept below for the record.)
+
 ## Decisions needed from the owner
 
 1. Is "model-based, with stated uncertainty" acceptable, or does every map need direct

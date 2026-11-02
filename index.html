@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Unity of Being</title>
+  <meta name="description" content="An interactive map of human history: polities, societies and worldviews across time.">
+  <link rel="icon" href="data:,">
+</head>
+<body>
+  <header id="topbar">
+    <div class="brand">Unity of Being</div>
+    <div class="lens" aria-label="Current view">Polities</div>
+  </header>
+
+  <div id="map" role="application" aria-label="Map of historical polities"></div>
+  <div id="loading">Loading map data…</div>
+
+  <aside id="panel" hidden aria-live="polite">
+    <button id="panel-close" aria-label="Close panel">×</button>
+    <div class="kicker">POLITY</div>
+    <h2 id="p-name"></h2>
+    <div id="p-years" class="meta"></div>
+    <p id="p-summary" class="summary"></p>
+    <a id="p-link" href="#" target="_blank" rel="noopener">Read on Wikipedia</a>
+    <div class="fine">Summary: Wikipedia (CC BY-SA)</div>
+  </aside>
+
+  <footer id="timeline">
+    <div class="controls">
+      <button id="play" aria-label="Play">▶</button>
+      <label class="speed">Speed
+        <select id="speed" aria-label="Years per second">
+          <option value="10">10 years/s</option>
+          <option value="50" selected>50 years/s</option>
+          <option value="200">200 years/s</option>
+          <option value="1000">1000 years/s</option>
+        </select>
+      </label>
+      <div id="year-label" aria-live="off">150 CE</div>
+    </div>
+    <div class="scrub">
+      <input id="year" type="range" min="-3400" max="2024" step="1" value="150" aria-label="Year">
+      <div id="ticks"></div>
+    </div>
+    <div class="credits">
+      Borders: <a href="https://github.com/Seshat-Global-History-Databank/cliopatria" target="_blank" rel="noopener">Cliopatria</a> (Seshat, CC BY 4.0, simplified) ·
+      Coastlines: Natural Earth ·
+      Summaries: Wikipedia. Borders are one scholarly view and often disputed.
+    </div>
+  </footer>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

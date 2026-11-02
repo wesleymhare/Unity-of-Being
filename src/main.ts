@@ -117,6 +117,9 @@ const pYears = $('p-years');
 const pKind = $('p-kind');
 const pSource = $('p-source');
 const pFine = $('p-fine');
+const lensNote = $('lens-note');
+const mapVeil = $('map-veil');
+const mapVeilText = $('map-veil-text');
 const pSwatch = $('p-swatch');
 const pLeaders = $('p-leaders');
 const pLeadersHead = $('p-leaders-head');
@@ -282,6 +285,7 @@ function updateLabels(): void {
   for (const feature of features) {
     const p = feature.properties;
     if (p.s > year || p.e < year) continue;
+    if (!Number.isFinite(p.lx) || !Number.isFinite(p.ly) || !Number.isFinite(p.sz)) continue;
     const score = p.sz * pxPerDegree;
     if (score < 16) continue;
     if (!bounds.contains([p.lx, p.ly])) continue;
@@ -396,6 +400,7 @@ function setYear(next: number): void {
     yearRaf = 0;
     slider.value = String(year);
     yearLabel.textContent = fmtYear(year);
+    lensNote.hidden = activeLens !== 'societies' || year >= 1500;
     for (const id of [
       'polity-fill', 'polity-line', 'polity-casing',
       'society-fill', 'society-line', 'society-casing',
@@ -746,6 +751,20 @@ function clearMarkers(): void {
   markers.clear();
 }
 
+function activeSourceId(): string {
+  return activeLens === 'societies' ? 'societies' : 'polities';
+}
+
+function showLoading(message: string): void {
+  loadingDone = false;
+  loading.hidden = false;
+  loading.classList.remove('hide', 'error');
+  loadingText.textContent = message;
+  loadingProgress.style.width = '100%';
+  mapVeil.hidden = false;
+  mapVeilText.textContent = message;
+}
+
 function setLensVisibility(): void {
   const polityVisibility = activeLens === 'polities' ? 'visible' : 'none';
   const societyVisibility = activeLens === 'societies' ? 'visible' : 'none';
@@ -775,8 +794,12 @@ function setLens(next: Lens): void {
   selectedKey = -1;
   selectedFeature = null;
   clearMarkers();
+  if (!map.isSourceLoaded(activeSourceId())) {
+    showLoading(next === 'societies' ? 'Drawing language areas…' : 'Drawing borders…');
+  }
   setLensVisibility();
   updateLensButtons();
+  lensNote.hidden = activeLens !== 'societies' || year >= 1500;
   setYear(year);
   scheduleHash();
 }
@@ -859,8 +882,10 @@ let loadingDone = false;
 let dataReady = false;
 function finishLoading(): void {
   if (loadingDone || !dataReady) return;
+  if (!map.loaded() || !map.isSourceLoaded(activeSourceId())) return;
   loadingDone = true;
   loading.classList.add('hide');
+  mapVeil.hidden = true;
   window.setTimeout(() => {
     loading.hidden = true;
   }, 260);
@@ -869,6 +894,8 @@ function failLoading(message: string): void {
   loadingText.textContent = message;
   loading.classList.add('error');
   loadingProgress.style.width = '0%';
+  mapVeil.hidden = false;
+  mapVeilText.textContent = message;
 }
 
 function checkSources(): void {
@@ -876,6 +903,8 @@ function checkSources(): void {
 }
 
 map.on('load', async () => {
+  loading.hidden = false;
+  loading.classList.remove('hide', 'error');
   try {
     const [land, polityData, societyData, rivers, lakes] = await Promise.all([
       getJson(`${BASE}data/land.geojson`),
@@ -1119,7 +1148,7 @@ map.on('load', async () => {
     scheduleLabels();
     dataReady = true;
     checkSources();
-    map.once('idle', finishLoading);
+    map.on('idle', finishLoading);
     window.setTimeout(finishLoading, 1200);
     window.setTimeout(() => {
       if (!loadingDone && !map.isSourceLoaded('polities')) {

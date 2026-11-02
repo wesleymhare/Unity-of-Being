@@ -1,50 +1,19 @@
 // Builds public/data/societies.geojson.
-// Base areas: Glottography / Asher & Moseley 2007, CC BY 4.0.
-// Historical examples are curated approximations, also CC BY 4.0 (project data).
-import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-
-const CONTEMPORARY = 'data/raw/societies/contemporary-languages-simple.geojson';
-const TRADITIONAL = 'data/raw/societies/traditional-languages-simple.geojson';
-
-function ensureSimplified(input, output, percent) {
-  if (existsSync(output)) return;
-  if (!existsSync(input)) {
-    throw new Error(`Missing ${input}. Run: npm run data:societies:download`);
-  }
-  console.log(`Simplifying ${input}…`);
-  const result = spawnSync(
-    process.execPath,
-    [
-      'node_modules/mapshaper/bin/mapshaper',
-      '-i', input,
-      '-filter-fields', 'title',
-      '-simplify', `${percent}%`, 'keep-shapes',
-      '-o', output,
-      'format=geojson', 'precision=0.02',
-    ],
-    { stdio: 'inherit' },
-  );
-  if (result.status !== 0) {
-    throw new Error(`Could not simplify ${input} (mapshaper exited ${result.status}).`);
-  }
-}
-
-ensureSimplified(
-  'data/raw/societies/contemporary-languages.geojson',
-  CONTEMPORARY,
-  6,
-);
-ensureSimplified(
-  'data/raw/societies/traditional-languages.geojson',
-  TRADITIONAL,
-  6,
-);
+//
+// The old version used ~8,500 Glottography language polygons. Those are useful
+// for a modern language atlas, but they collapse into the same dense mosaic for
+// every year between 1500 and 1900 and leave almost no pre-1500 coverage.
+//
+// This layer is a deliberately broad, curated temporal atlas. Each region has
+// six successive society stages, so the map changes across the whole timeline
+// instead of showing one static constellation. Shapes are conceptual regions,
+// not scholarly borders. Project data, CC BY 4.0.
+import { statSync, writeFileSync } from 'node:fs';
 
 const PALETTE = [
   '#7f9b6a', '#5f8fa3', '#b08a56', '#8d7397', '#4f9a8b', '#a46b64', '#7e8fc4',
   '#b39b4f', '#6f9f7c', '#9b7d5c', '#5d8f9f', '#a07b8f', '#849a55', '#6f7e9e',
-  '#b06f5a', '#5e9a93',
+  '#b06f5a', '#5e9a93', '#8b9d7a', '#6d83a0', '#b58f63', '#8c7d9b',
 ];
 
 const hash = (value) => {
@@ -91,92 +60,319 @@ function deriveGeometry(feature) {
   feature.properties.sz = +Math.sqrt(total).toFixed(2);
 }
 
-const out = [];
-const seen = new Set();
+const STAGES = [
+  { s: -3400, e: -1000, era: 'Early' },
+  { s: -1000, e: 500, era: 'Classical' },
+  { s: 500, e: 1500, era: 'Medieval' },
+  { s: 1500, e: 1800, era: 'Early modern' },
+  { s: 1800, e: 1945, era: 'Modern' },
+  { s: 1945, e: 2024, era: 'Contemporary' },
+];
 
-function addBase(file, startYear, endYear, sourceLabel) {
-  const collection = JSON.parse(readFileSync(file, 'utf8'));
-  for (const feature of collection.features) {
-    const name = String(feature.properties?.title ?? '').trim();
-    if (!name || !feature.geometry) continue;
-    const key = `${name}|${startYear}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    feature.properties = {
-      n: name,
-      s: startYear,
-      e: endYear,
-      w: name,
-      q: '',
-      m: '',
-      src: sourceLabel,
-      kind: 'Language area',
-      level: 'language',
+// One broad ring per region. Overlap between neighbouring regions is expected:
+// these are conceptual culture areas, not mutually exclusive territories.
+const REGIONS = [
+  {
+    key: 'nile',
+    article: 'History of Egypt',
+    ring: [[24, 32], [35, 32], [35, 22], [31, 22], [24, 24], [24, 32]],
+    names: [
+      'Early Nile societies', 'Ancient Egyptian society', 'Medieval Egyptian society',
+      'Ottoman Egypt', 'Modern Egyptian society', 'Contemporary Egypt',
+    ],
+  },
+  {
+    key: 'mesopotamia',
+    article: 'History of Mesopotamia',
+    ring: [[38, 37.5], [49, 37.5], [49, 29], [44, 29], [40, 31], [38, 34], [38, 37.5]],
+    names: [
+      'Early Mesopotamian societies', 'Babylonian and Assyrian societies',
+      'Medieval Mesopotamian societies', 'Ottoman Iraq', 'Modern Iraqi society',
+      'Contemporary Iraq',
+    ],
+  },
+  {
+    key: 'anatolia',
+    article: 'History of Anatolia',
+    ring: [[26, 42], [44, 42], [44, 36], [32, 36], [26, 38], [26, 42]],
+    names: [
+      'Early Anatolian societies', 'Greek and Roman Anatolia',
+      'Byzantine and Turkish Anatolia', 'Ottoman Anatolia', 'Modern Turkish society',
+      'Contemporary Turkey',
+    ],
+  },
+  {
+    key: 'levant',
+    article: 'History of the Levant',
+    ring: [[34, 37.5], [39, 37.5], [39, 29], [34, 29], [34, 37.5]],
+    names: [
+      'Early Levantine societies', 'Israelite and Phoenician societies', 'Islamic Levant',
+      'Ottoman Levant', 'Modern Levantine societies', 'Contemporary Levant',
+    ],
+  },
+  {
+    key: 'iran',
+    article: 'History of Iran',
+    ring: [[44, 40], [63, 40], [63, 25], [44, 25], [44, 40]],
+    names: [
+      'Early Iranian societies', 'Achaemenid and Parthian Iran', 'Sasanian and Islamic Iran',
+      'Safavid Iran', 'Modern Iranian society', 'Contemporary Iran',
+    ],
+  },
+  {
+    key: 'south-asia',
+    article: 'History of South Asia',
+    ring: [[60, 35], [78, 35], [92, 35], [92, 8], [77, 8], [60, 20], [60, 35]],
+    names: [
+      'Early South Asian societies', 'Vedic and Mauryan societies', 'Medieval Indian societies',
+      'Mughal India', 'British India', 'Contemporary South Asia',
+    ],
+  },
+  {
+    key: 'north-china',
+    article: 'History of China',
+    ring: [[96, 42], [122, 42], [122, 32], [105, 32], [96, 36], [96, 42]],
+    names: [
+      'Early Yellow River societies', 'Zhou and Han China', 'Medieval Chinese society',
+      'Ming and Qing China', 'Modern China', 'Contemporary China',
+    ],
+  },
+  {
+    key: 'south-china',
+    article: 'History of China',
+    ring: [[100, 32], [122, 32], [122, 20], [108, 20], [100, 25], [100, 32]],
+    names: [
+      'Early Yangtze societies', 'Southern kingdoms and Han China', 'Medieval southern China',
+      'Late imperial south China', 'Modern south China', 'Contemporary south China',
+    ],
+  },
+  {
+    key: 'steppe',
+    article: 'Eurasian Steppe',
+    ring: [[30, 55], [75, 55], [110, 48], [100, 40], [75, 40], [30, 44], [30, 55]],
+    names: [
+      'Early steppe pastoralists', 'Scythians and Xiongnu', 'Turkic and Mongol steppe',
+      'Early modern steppe', 'Imperial steppe', 'Contemporary steppe',
+    ],
+  },
+  {
+    key: 'greece',
+    article: 'History of Greece',
+    ring: [[19, 42], [29, 42], [29, 34], [19, 34], [19, 42]],
+    names: [
+      'Early Aegean societies', 'Ancient Greek society', 'Byzantine Greek society',
+      'Ottoman Greece', 'Modern Greek society', 'Contemporary Greece',
+    ],
+  },
+  {
+    key: 'italy',
+    article: 'History of Italy',
+    ring: [[10, 47], [19, 47], [19, 37], [10, 37], [10, 47]],
+    names: [
+      'Early Italic societies', 'Roman society', 'Medieval Italian societies',
+      'Renaissance Italy', 'Modern Italian society', 'Contemporary Italy',
+    ],
+  },
+  {
+    key: 'west-europe',
+    article: 'History of Europe',
+    ring: [[-5, 55], [16, 55], [16, 43], [-5, 43], [-5, 55]],
+    names: [
+      'Early European societies', 'Roman and post-Roman Europe', 'Medieval European society',
+      'Early modern Europe', 'Industrial Europe', 'Contemporary Europe',
+    ],
+  },
+  {
+    key: 'scandinavia',
+    article: 'History of Scandinavia',
+    ring: [[4, 71], [31, 71], [31, 55], [4, 55], [4, 71]],
+    names: [
+      'Early Nordic societies', 'Viking and Norse society', 'Medieval Scandinavian society',
+      'Early modern Scandinavia', 'Modern Scandinavia', 'Contemporary Scandinavia',
+    ],
+  },
+  {
+    key: 'arabia',
+    article: 'History of Arabia',
+    ring: [[34, 32], [60, 32], [60, 12], [34, 12], [34, 32]],
+    names: [
+      'Early Arabian societies', 'Bedouin and caravan societies', 'Islamic Arabian society',
+      'Ottoman and Wahhabi Arabia', 'Modern Arabian society', 'Contemporary Arabia',
+    ],
+  },
+  {
+    key: 'west-africa',
+    article: 'History of West Africa',
+    ring: [[-17, 20], [16, 20], [16, 5], [-17, 5], [-17, 20]],
+    names: [
+      'Early West African societies', 'Nok and Sahelian societies', 'Ghana, Mali and Songhai',
+      'Atlantic West Africa', 'Colonial West Africa', 'Contemporary West Africa',
+    ],
+  },
+  {
+    key: 'east-africa',
+    article: 'History of East Africa',
+    ring: [[35, 15], [52, 15], [52, -5], [35, -5], [35, 15]],
+    names: [
+      'Early East African societies', 'Aksum and the Horn', 'Swahili coast and Ethiopian society',
+      'Omani and Ethiopian empires', 'Colonial East Africa', 'Contemporary East Africa',
+    ],
+  },
+  {
+    key: 'southern-africa',
+    article: 'History of Southern Africa',
+    ring: [[12, -5], [35, -5], [35, -35], [12, -35], [12, -5]],
+    names: [
+      'Early Bantu and Khoisan societies', 'Iron Age southern Africa',
+      'Great Zimbabwe and Kongo', 'Atlantic and Indian Ocean trade',
+      'Colonial southern Africa', 'Contemporary southern Africa',
+    ],
+  },
+  {
+    key: 'mesoamerica',
+    article: 'Mesoamerica',
+    ring: [[-105, 23], [-87, 23], [-87, 14], [-105, 14], [-105, 23]],
+    names: [
+      'Early Mesoamerican societies', 'Maya and Teotihuacan', 'Toltec and Aztec societies',
+      'Colonial New Spain', 'Modern Mexico and Central America', 'Contemporary Mesoamerica',
+    ],
+  },
+  {
+    key: 'andes',
+    article: 'History of the Andes',
+    ring: [[-81, 5], [-65, 5], [-65, -20], [-81, -20], [-81, 5]],
+    names: [
+      'Early Andean societies', 'Moche and Tiwanaku', 'Inca society',
+      'Colonial Peru', 'Modern Andean republics', 'Contemporary Andes',
+    ],
+  },
+  {
+    key: 'amazon',
+    article: 'Amazon basin',
+    ring: [[-75, 5], [-45, 5], [-45, -15], [-75, -15], [-75, 5]],
+    names: [
+      'Early Amazonian societies', 'Amazonian chiefdoms', 'Forest and river societies',
+      'Colonial Amazon', 'Modern Amazon', 'Contemporary Amazon',
+    ],
+  },
+  {
+    key: 'east-north-america',
+    article: 'History of the United States',
+    ring: [[-95, 50], [-70, 50], [-70, 30], [-95, 30], [-95, 50]],
+    names: [
+      'Early Eastern Woodlands societies', 'Mississippian and Iroquoian societies',
+      'Contact-era Eastern nations', 'Colonial and early republic',
+      'Industrial United States', 'Contemporary Eastern North America',
+    ],
+  },
+  {
+    key: 'west-north-america',
+    article: 'History of the Western United States',
+    ring: [[-125, 55], [-95, 55], [-95, 30], [-125, 30], [-125, 55]],
+    names: [
+      'Early Western societies', 'Pueblo and Pacific coast societies',
+      'Contact-era Western nations', 'Colonial and frontier West',
+      'Modern Western North America', 'Contemporary Western North America',
+    ],
+  },
+  {
+    key: 'oceania',
+    article: 'History of Oceania',
+    ring: [[110, -10], [155, -10], [155, -40], [110, -40], [110, -10]],
+    names: [
+      'Aboriginal Australian societies', 'Aboriginal and Pacific societies',
+      'Pacific voyaging societies', 'Colonial Oceania', 'Modern Oceania',
+      'Contemporary Oceania',
+    ],
+  },
+  {
+    key: 'japan-korea',
+    article: 'History of Japan',
+    ring: [[124, 46], [146, 46], [146, 30], [124, 30], [124, 46]],
+    names: [
+      'Jōmon and Yayoi societies', 'Early Japanese and Korean kingdoms',
+      'Medieval Japanese and Korean societies', 'Edo and Joseon',
+      'Imperial Japan and modern Korea', 'Contemporary Japan and Korea',
+    ],
+  },
+  {
+    key: 'southeast-asia',
+    article: 'History of Southeast Asia',
+    ring: [[95, 25], [130, 25], [130, -10], [110, -10], [95, 5], [95, 25]],
+    names: [
+      'Early Southeast Asian societies', 'Funan, Srivijaya and Angkor',
+      'Medieval Southeast Asian societies', 'Early modern Southeast Asia',
+      'Colonial Southeast Asia', 'Contemporary Southeast Asia',
+    ],
+  },
+  {
+    key: 'himalaya',
+    article: 'History of Tibet',
+    ring: [[75, 38], [100, 38], [100, 26], [75, 26], [75, 38]],
+    names: [
+      'Early Himalayan societies', 'Tibetan Empire', 'Medieval Tibet',
+      'Dalai Lama Tibet', 'Modern Himalayan states', 'Contemporary Himalaya',
+    ],
+  },
+  {
+    key: 'caribbean',
+    article: 'History of the Caribbean',
+    ring: [[-85, 25], [-60, 25], [-60, 10], [-85, 10], [-85, 25]],
+    names: [
+      'Taíno and Carib societies', 'Contact-era Caribbean', 'Colonial Caribbean',
+      'Plantation Caribbean', 'Modern Caribbean', 'Contemporary Caribbean',
+    ],
+  },
+  {
+    key: 'siberia',
+    article: 'History of Siberia',
+    ring: [[60, 70], [160, 70], [160, 50], [60, 50], [60, 70]],
+    names: [
+      'Early Siberian societies', 'Siberian peoples', 'Siberian khanates',
+      'Russian Siberia', 'Modern Siberia', 'Contemporary Siberia',
+    ],
+  },
+];
+
+const out = [];
+
+for (const region of REGIONS) {
+  for (let stage = 0; stage < STAGES.length; stage++) {
+    const { s, e } = STAGES[stage];
+    const name = region.names[stage];
+    const feature = {
+      type: 'Feature',
+      properties: {
+        n: name,
+        s,
+        e,
+        w: region.article,
+        q: '',
+        m: '',
+        src: 'Curated regional atlas (project data, CC BY 4.0)',
+        kind: stage === 0 ? 'Early society' : 'Society',
+        level: 'curated',
+        region: region.key,
+      },
+      geometry: { type: 'Polygon', coordinates: [region.ring] },
     };
     deriveGeometry(feature);
     out.push(feature);
   }
 }
 
-addBase(
-  CONTEMPORARY,
-  1901,
-  2024,
-  'Glottography / Asher & Moseley 2007 (contemporary languages), CC BY 4.0',
-);
-addBase(
-  TRADITIONAL,
-  1500,
-  1900,
-  'Glottography / Asher & Moseley 2007 (time-of-contact languages), CC BY 4.0',
-);
-
-// Curated approximations for named societies that are not single language areas.
-// These are deliberately broad first-pass footprints, not scholarly boundaries.
-const CURATED = [
+// Named examples that should remain visible across several regional stages.
+const OVERLAYS = [
   {
-    n: 'Ancient Egyptians',
-    s: -3100,
-    e: -30,
-    w: 'Ancient Egypt',
-    kind: 'Civilization',
-    coordinates: [[
-      [29.5, 31.6], [32.5, 31.6], [35.5, 23.0], [34.0, 21.8], [31.0, 24.0],
-      [29.0, 29.0], [29.5, 31.6],
-    ]],
-  },
-  {
-    n: 'Sumerians',
-    s: -3500,
-    e: -1900,
-    w: 'Sumer',
-    kind: 'Civilization',
-    coordinates: [[
-      [43.5, 33.2], [48.5, 33.2], [49.0, 29.5], [47.0, 28.5], [44.0, 29.5],
-      [43.5, 33.2],
-    ]],
-  },
-  {
-    n: 'Ancient Greeks',
-    s: -800,
-    e: -146,
-    w: 'Ancient Greece',
-    kind: 'Civilization',
-    coordinates: [[
-      [19.0, 34.0], [29.0, 34.0], [29.5, 41.5], [26.0, 42.5], [22.0, 41.0],
-      [19.0, 38.0], [19.0, 34.0],
-    ]],
-  },
-  {
-    n: 'Han Chinese',
-    s: -206,
-    e: 220,
-    w: 'Han dynasty',
-    kind: 'Civilization',
-    coordinates: [[
-      [100.0, 40.0], [122.0, 40.0], [122.0, 22.0], [110.0, 20.0], [102.0, 22.0],
-      [98.0, 30.0], [100.0, 40.0],
-    ]],
+    n: 'Bedouin Arabs',
+    s: -500,
+    e: 2024,
+    w: 'Bedouin',
+    kind: 'People',
+    ring: [
+      [34, 12], [43, 11.5], [52, 12.5], [59, 17], [59, 26], [55, 31],
+      [47, 33], [41, 34], [37, 32], [34, 29], [33, 24], [34, 12],
+    ],
   },
   {
     n: 'Maya',
@@ -184,21 +380,9 @@ const CURATED = [
     e: 1500,
     w: 'Maya civilization',
     kind: 'Civilization',
-    coordinates: [[
-      [-93.0, 15.0], [-87.0, 15.0], [-86.5, 21.5], [-90.0, 22.5], [-93.5, 19.0],
-      [-93.0, 15.0],
-    ]],
-  },
-  {
-    n: 'Old Norse',
-    s: 800,
-    e: 1100,
-    w: 'Old Norse',
-    kind: 'Historical people',
-    coordinates: [[
-      [4.0, 57.0], [12.0, 55.0], [16.0, 56.0], [20.0, 60.0], [31.0, 70.0],
-      [20.0, 71.0], [10.0, 64.0], [4.0, 62.0], [4.0, 57.0],
-    ]],
+    ring: [
+      [-93, 15], [-87, 15], [-86.5, 21.5], [-90, 22.5], [-93.5, 19], [-93, 15],
+    ],
   },
   {
     n: 'Swahili coast',
@@ -206,22 +390,9 @@ const CURATED = [
     e: 1500,
     w: 'Swahili coast',
     kind: 'Historical people',
-    coordinates: [[
-      [38.0, -15.0], [41.5, -15.0], [42.0, 0.0], [41.0, 4.0], [39.0, 4.0],
-      [38.0, -5.0], [38.0, -15.0],
-    ]],
-  },
-  {
-    n: 'Bedouin Arabs',
-    s: -500,
-    e: 2024,
-    w: 'Bedouin',
-    kind: 'People',
-    coordinates: [[
-      [34.0, 12.0], [43.0, 11.5], [52.0, 12.5], [59.0, 17.0], [59.0, 26.0],
-      [55.0, 31.0], [47.0, 33.0], [41.0, 34.0], [37.0, 32.0], [34.0, 29.0],
-      [33.0, 24.0], [34.0, 12.0],
-    ]],
+    ring: [
+      [38, -15], [41.5, -15], [42, 0], [41, 4], [39, 4], [38, -5], [38, -15],
+    ],
   },
   {
     n: 'Old High German',
@@ -229,11 +400,10 @@ const CURATED = [
     e: 1050,
     w: 'Old High German',
     kind: 'Language stage',
-    coordinates: [[
-      [6.5, 46.5], [7.0, 49.5], [6.8, 51.5], [8.0, 53.7], [12.0, 54.0],
-      [15.0, 51.5], [16.5, 48.5], [15.0, 46.5], [12.0, 45.5], [9.0, 45.5],
-      [6.5, 46.5],
-    ]],
+    ring: [
+      [6.5, 46.5], [7, 49.5], [6.8, 51.5], [8, 53.7], [12, 54], [15, 51.5],
+      [16.5, 48.5], [15, 46.5], [12, 45.5], [9, 45.5], [6.5, 46.5],
+    ],
   },
   {
     n: 'Modern Southern California',
@@ -241,14 +411,14 @@ const CURATED = [
     e: 2024,
     w: 'Southern California',
     kind: 'Culture region',
-    coordinates: [[
-      [-121.0, 32.5], [-114.5, 32.5], [-114.3, 35.0], [-117.0, 35.5],
-      [-119.0, 35.0], [-120.5, 34.0], [-121.0, 32.5],
-    ]],
+    ring: [
+      [-121, 32.5], [-114.5, 32.5], [-114.3, 35], [-117, 35.5], [-119, 35],
+      [-120.5, 34], [-121, 32.5],
+    ],
   },
 ];
 
-for (const entry of CURATED) {
+for (const entry of OVERLAYS) {
   const feature = {
     type: 'Feature',
     properties: {
@@ -258,25 +428,25 @@ for (const entry of CURATED) {
       w: entry.w,
       q: '',
       m: '',
-      src: 'Curated approximation (project data, CC BY 4.0)',
+      src: 'Curated regional atlas (project data, CC BY 4.0)',
       kind: entry.kind,
       level: 'curated',
+      region: 'overlay',
     },
-    geometry: { type: 'Polygon', coordinates: entry.coordinates },
+    geometry: { type: 'Polygon', coordinates: [entry.ring] },
   };
   deriveGeometry(feature);
   out.push(feature);
 }
 
 out.forEach((feature, index) => {
-  const name = feature.properties.n;
   feature.properties.k = index;
-  feature.properties.c = PALETTE[hash(name) % PALETTE.length];
+  feature.properties.c = PALETTE[hash(feature.properties.n) % PALETTE.length];
 });
 
 const collection = { type: 'FeatureCollection', features: out };
 writeFileSync('public/data/societies.geojson', JSON.stringify(collection));
 console.log(
   `societies.geojson: ${out.length} features, ` +
-    `${(statSync('public/data/societies.geojson').size / 1024 / 1024).toFixed(1)} MB`,
+    `${(statSync('public/data/societies.geojson').size / 1024).toFixed(1)} KB`,
 );

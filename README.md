@@ -3,7 +3,7 @@
 An interactive map of human history: polities, societies and worldviews, with a year slider.
 Tier 1 (this version) is a Paradox-style political map of 3400 BCE to 2024 CE.
 
-Live site: https://wesleymhare.github.io/unity-of-being/
+Live site: https://wesleymhare.github.io/Unity-of-Being/
 
 ## Run locally
 ```

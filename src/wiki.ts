@@ -42,11 +42,20 @@ export interface Leader {
   end?: number;
 }
 
+export interface DatedImage {
+  file: string;
+  start?: number;
+  end?: number;
+}
+
 export interface WikiFacts {
   qid: string;
   description?: string;
   facts: WikiFact[];
   image?: string;
+  /** Flags (P41) and coats of arms (P94), with the years they were in use when Wikidata says. */
+  flags?: DatedImage[];
+  arms?: DatedImage[];
   enwikiTitle?: string;
 }
 
@@ -272,6 +281,35 @@ function stringValue(claim: WikidataClaim | undefined): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
+function datedImages(claims: Record<string, WikidataClaim[]>, property: string): DatedImage[] {
+  const result: DatedImage[] = [];
+  for (const claim of (claims[property] ?? []).filter((item) => item.rank !== 'deprecated')) {
+    const file = stringValue(claim);
+    if (!file) continue;
+    result.push({
+      file,
+      start: yearFromTime(snakValue(claim.qualifiers?.P580?.[0])?.time) ?? undefined,
+      end: yearFromTime(snakValue(claim.qualifiers?.P582?.[0])?.time) ?? undefined,
+    });
+  }
+  return result;
+}
+
+/** The image whose dates cover the year; otherwise the undated one, otherwise the nearest. */
+export function imageAtYear(images: DatedImage[] | undefined, year: number): string | undefined {
+  if (!images?.length) return undefined;
+  const covering = images.filter(
+    (item) => (item.start === undefined || item.start <= year) && (item.end === undefined || item.end >= year),
+  );
+  if (covering.length) {
+    // The most specific (latest start) wins.
+    return covering.sort((a, b) => (b.start ?? -Infinity) - (a.start ?? -Infinity))[0].file;
+  }
+  const distance = (item: DatedImage): number =>
+    Math.min(Math.abs((item.start ?? year) - year), Math.abs((item.end ?? year) - year));
+  return [...images].sort((a, b) => distance(a) - distance(b))[0].file;
+}
+
 function formatWikidataYear(time: string): string {
   const match = /^([+-])(\d{1,6})-/.exec(time);
   if (!match) return '';
@@ -381,6 +419,8 @@ export async function getWikidata(
     description: entity.descriptions?.en?.value,
     facts,
     image: stringValue(preferredClaims(claims, 'P18')[0]),
+    flags: datedImages(claims, 'P41'),
+    arms: datedImages(claims, 'P94'),
     enwikiTitle: entity.sitelinks?.enwiki?.title,
   };
 
@@ -576,4 +616,231 @@ export async function getLeaders(
   signal?: AbortSignal,
 ): Promise<Leader[]> {
   return leadersAtYear(await getLeaderHistory(qid, signal), year);
+}
+
+
+// ---- Article images (non-map) ---------------------------------------------------
+
+const MAP_LIKE = /(^|[\s_(-])(map|maps|locator|location|distribution|extent|borders?|territor(y|ies)|ecoregions?|biomes?_map|wwf|realm|k[oö]ppen)[\s_.)-]|\.svg(\.png)?$|\.tiff?$|\.gif$|\.webm$|\.ogv$|icon|logo|symbol|stub|commons-|question_book|wiktionary|flag_of|coat_of_arms|diagram|chart|graph|climate/i;
+const mediaCache = new Map<string, string | null>();
+
+/** First real photograph in an article (maps, charts, icons and logos skipped). */
+export async function getArticlePhoto(title: string, signal?: AbortSignal): Promise<string | null> {
+  const key = title.trim().toLowerCase();
+  if (mediaCache.has(key)) return mediaCache.get(key) ?? null;
+  const url = `${WP_REST}/page/media-list/${encodeURIComponent(title.trim().replace(/ /g, '_'))}`;
+  let data: { items?: { title?: string; type?: string; leadImage?: boolean }[] };
+  try {
+    data = await getJson(url, signal);
+  } catch (error) {
+    if (isAbort(error)) throw error;
+    mediaCache.set(key, null);
+    return null;
+  }
+  const items = (data.items ?? []).filter((item) => item.type === 'image' && item.title);
+  const usable = items
+    .map((item) => (item.title as string).replace(/^File:/i, ''))
+    .filter((name) => /\.(jpe?g|png|webp)$/i.test(name) && !MAP_LIKE.test(name));
+  const photo = usable[0] ?? null;
+  mediaCache.set(key, photo);
+  return photo;
+}
+
+/** True when a thumbnail's file name looks like a map, so it can be skipped. */
+export function looksLikeMap(src: string | undefined): boolean {
+  if (!src) return true;
+  const last = src.split('?')[0].split('/').filter(Boolean).pop() ?? '';
+  let name = last;
+  try {
+    name = decodeURIComponent(last);
+  } catch {
+    /* keep raw */
+  }
+  return MAP_LIKE.test(name);
+}
+
+// ---- Infobox --------------------------------------------------------------------
+
+export interface InfoboxRow {
+  label: Node | null;
+  value: Node;
+}
+
+export interface InfoboxSection {
+  title: string;
+  rows: InfoboxRow[];
+}
+
+const infoboxCache = new Map<string, InfoboxSection[] | null>();
+const SKIP_LABELS = /^(flag|coat of arms|motto|anthem|seal|image|map|logo)$/i;
+
+/** Copy a cell into safe DOM: text, line breaks, and links into Wikipedia only. */
+function cleanCell(cell: Element): DocumentFragment {
+  const out = document.createDocumentFragment();
+  const walk = (node: Node, target: Node): void => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      target.appendChild(document.createTextNode(node.textContent ?? ''));
+      return;
+    }
+    if (!(node instanceof Element)) return;
+    const tag = node.tagName;
+    if (['STYLE', 'SCRIPT', 'SUP', 'IMG', 'FIGURE', 'SVG'].includes(tag)) return;
+    if (node.matches('.reference, .noprint, .mw-empty-elt, .nowrap-hidden, .navbar, [style*="display:none"]')) return;
+    if (tag === 'BR') {
+      target.appendChild(document.createElement('br'));
+      return;
+    }
+    if (tag === 'A') {
+      const href = node.getAttribute('href') ?? '';
+      const anchor = document.createElement('a');
+      if (/^\/wiki\/(?!(File|Special|Help|Category|Template|Wikipedia|Talk):)/i.test(href)) {
+        anchor.href = `${WP}${href.split('#')[0]}`;
+        anchor.target = '_blank';
+        anchor.rel = 'noopener noreferrer';
+        for (const child of node.childNodes) walk(child, anchor);
+        if (anchor.textContent?.trim()) target.appendChild(anchor);
+        return;
+      }
+      for (const child of node.childNodes) walk(child, target);
+      return;
+    }
+    const block = tag === 'LI' || tag === 'DIV' || tag === 'P';
+    if (block && target.lastChild && target.lastChild.nodeName !== 'BR') {
+      target.appendChild(document.createElement('br'));
+    }
+    for (const child of node.childNodes) walk(child, target);
+  };
+  for (const child of cell.childNodes) walk(child, out);
+  return out;
+}
+
+const cellText = (cell: Element): string =>
+  (cell.textContent ?? '').replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
+
+/**
+ * The infobox of an article, as sections of label/value rows. Ruler lists and
+ * "preceded by / succeeded by" rows come through as ordinary rows.
+ */
+export async function getInfobox(title: string, signal?: AbortSignal): Promise<InfoboxSection[] | null> {
+  const key = title.trim().toLowerCase();
+  if (!key) return null;
+  if (infoboxCache.has(key)) return infoboxCache.get(key) ?? null;
+  const url = `${WP_API}?action=parse&format=json&origin=*&redirects=1&prop=text&section=0` +
+    `&disableeditsection=1&disablelimitreport=1&disabletoc=1&page=${encodeURIComponent(title.trim().replace(/ /g, '_'))}`;
+  let html = '';
+  try {
+    const data = await getJson<{ parse?: { text?: { '*'?: string } | string } }>(url, signal);
+    const text = data.parse?.text;
+    html = typeof text === 'string' ? text : text?.['*'] ?? '';
+  } catch (error) {
+    if (isAbort(error)) throw error;
+    return null;
+  }
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const box = doc.querySelector('table.infobox');
+  if (!box) {
+    infoboxCache.set(key, null);
+    return null;
+  }
+
+  const sections: InfoboxSection[] = [];
+  let current: InfoboxSection = { title: '', rows: [] };
+  const flush = (): void => {
+    if (current.rows.length) sections.push(current);
+  };
+  for (const row of box.querySelectorAll(':scope > tbody > tr, :scope > tr')) {
+    const th = row.querySelector(':scope > th');
+    const td = row.querySelector(':scope > td');
+    if (th && !td) {
+      const text = cellText(th);
+      if (!text || row.querySelector('.infobox-title')) continue;
+      flush();
+      current = { title: text, rows: [] };
+      continue;
+    }
+    if (th && td) {
+      const label = cellText(th);
+      if (SKIP_LABELS.test(label)) continue;
+      const value = cleanCell(td);
+      if (!value.textContent?.trim()) continue;
+      current.rows.push({ label: cleanCell(th), value });
+      continue;
+    }
+    if (td && !th) {
+      // Full-width cell: a header block or a note; keep text-only ones.
+      if (td.querySelector('img, .infobox-image, .locmap, .ib-settlement-map')) continue;
+      const value = cleanCell(td);
+      if (value.textContent && value.textContent.trim().length > 1) current.rows.push({ label: null, value });
+    }
+  }
+  flush();
+
+  const result = sections.length ? sections.slice(0, 24) : null;
+  infoboxCache.set(key, result);
+  return result;
+}
+
+// ---- Administrative subdivisions -------------------------------------------------
+
+export interface Subdivision {
+  name: string;
+  title: string;
+  start?: number;
+  end?: number;
+  lng?: number;
+  lat?: number;
+}
+
+const subdivisionCache = new Map<string, Subdivision[]>();
+
+/** Subdivisions (P150) of a polity that have English Wikipedia articles. */
+export async function getSubdivisions(qid: string, signal?: AbortSignal): Promise<Subdivision[]> {
+  if (!/^Q\d+$/.test(qid)) return [];
+  const cached = subdivisionCache.get(qid);
+  if (cached) return cached;
+  const query = `SELECT ?sub ?subLabel ?start ?end ?coord ?article WHERE {
+  wd:${qid} p:P150 ?st .
+  ?st ps:P150 ?sub .
+  ?article schema:about ?sub ; schema:isPartOf <https://en.wikipedia.org/> .
+  OPTIONAL { ?st pq:P580 ?start }
+  OPTIONAL { ?st pq:P582 ?end }
+  OPTIONAL { ?sub wdt:P625 ?coord }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+} LIMIT 400`;
+  const url = 'https://query.wikidata.org/sparql?format=json&origin=*&query=' + encodeURIComponent(query);
+  let data: { results?: { bindings?: Record<string, { value?: string } | undefined>[] } };
+  try {
+    data = await getJson(url, signal);
+  } catch (error) {
+    if (isAbort(error)) throw error;
+    return [];
+  }
+  const seen = new Map<string, Subdivision>();
+  for (const row of data.results?.bindings ?? []) {
+    const name = row.subLabel?.value?.trim();
+    const article = row.article?.value;
+    if (!name || !article || /^Q\d+$/.test(name)) continue;
+    const title = decodeURIComponent(article.split('/wiki/')[1] ?? '').replace(/_/g, ' ');
+    if (!title) continue;
+    const point = /Point\(([-\d.eE+]+) ([-\d.eE+]+)\)/.exec(row.coord?.value ?? '');
+    const item: Subdivision = {
+      name,
+      title,
+      start: yearFromTime(row.start?.value) ?? undefined,
+      end: yearFromTime(row.end?.value) ?? undefined,
+      lng: point ? Number.parseFloat(point[1]) : undefined,
+      lat: point ? Number.parseFloat(point[2]) : undefined,
+    };
+    const existing = seen.get(title);
+    if (!existing) seen.set(title, item);
+  }
+  const list = [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+  subdivisionCache.set(qid, list);
+  return list;
+}
+
+export function subdivisionsAtYear(list: Subdivision[], year: number): Subdivision[] {
+  return list.filter(
+    (item) => (item.start === undefined || item.start <= year) && (item.end === undefined || item.end >= year),
+  );
 }

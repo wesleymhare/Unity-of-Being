@@ -34,6 +34,14 @@
 - About 400 stages (was 167): added stages for the Arabian, Kurdish, Sicilian, Occitan, Albanian, Dravidian, Southern California and many other threads, in `data/societies_more_1.py` to `_3.py`.
 - Coverage is thinner for sub-Saharan Africa, the Pacific, Central and South America and Siberia; footprints are rough and many stage links are interpretive.
 
+### Click-through, panel images, infoboxes, subdivisions (3 November 2026)
+- **Societies click = "where you stand".** Clicking finds every identity active at the point by point-in-polygon (not by what is drawn on top), so nested and faint shapes are always reachable at any zoom. The panel lists them as peer chips grouped by scale (local identity, people, wider sphere). Label clicks use the same stack. See `docs/SOCIETIES.md`.
+- **Panel image above the text.** Polities show the flag (Wikidata P41, picked by year; coat of arms P94 as fallback) instead of Wikipedia's usually-map thumbnail. Societies show the article thumbnail (map-like file names skipped, Wikidata image as fallback). Biomes show the first non-map photograph of the ecoregion article, then its WWF biome article, then the Köppen class article.
+- **Wikipedia infobox** below the summary (section 0 of the article via the MediaWiki parse API, rows turned into safe DOM, links kept to Wikipedia only). Ruler lists, succession rows, capital, area, etc. come through as collapsible sections; long ones start collapsed.
+- **Administrative subdivisions** for polities: Wikidata P150 children that have English Wikipedia articles, filtered by start/end dates against the slider year, with a pin that flies to the subdivision when Wikidata has coordinates. Only as good as Wikidata's P150 coverage.
+- Added a Californians people-level identity and widened the 1900+ Anglo-American footprint to the Pacific coast so SoCal has a full stack.
+- Tested with mocked Wikipedia/Wikidata responses (the build sandbox cannot reach them). First live check is on the deployed site.
+
 ## Known rough edges
 - Ecoregions are modern in every year; only the Köppen half of a biome label changes with time.
 - Initial load downloads and parses the 25 MB border GeoJSON: several seconds on slow machines. Fix later with vector tiles (PMTiles) or per-era files.
@@ -45,6 +53,7 @@
 - `public/data/land.geojson` stores Afro-Eurasia in a frame shifted by -360 degrees (MapLibre draws it fine). The Python tools normalise it in `geo_labels.load_land`; the cleaner fix is in `data/build-land.mjs`.
 
 ## Next
+- Check the new panel features live (flag choice, infobox parsing on odd articles, subdivision coverage) and tune the map-image filter in `src/wiki.ts`.
 - Check the Society Wikipedia titles and add more Americas and Oceania entries; consider a second-level split of the broad Indo-European entries.
 - Worldview lens (curated file).
 - Replace the large GeoJSON with vector tiles.

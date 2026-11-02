@@ -27,6 +27,20 @@ Examples the map is built around:
 - Albanians, Kosovo Albanians, Arbëreshë in Italy
 - Tongva, Californios, then modern Southern California
 
+## Where you stand (no centre)
+
+Societies are a sociological map, not a hierarchy. In world-society terms the world
+culture is isomorphic, so people group into "peoples" and common-interest communities
+without any central point of privilege: the Dacians mostly dealt with Dacians even while
+Rome was the polity next door, and a Southern Californian today belongs to Modern
+Southern California whatever state or country draws the border.
+
+So clicking a place does not open "the" society there. It finds **every identity active
+at that point and year** (by geometry, whatever is drawn on top, at any zoom) and opens
+the one at the scale the map is showing, listing the rest as peers grouped by scale:
+local identity, people, wider sphere. Nesting in space is incidental; none of them
+contains or governs the others.
+
 | | Polity | Society |
 |---|---|---|
 | Unit | a state, empire, city-state, chiefdom | a community of belonging at one time |

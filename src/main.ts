@@ -5,10 +5,21 @@ import './style.css';
 import { BiomeModel, CLASSES, GROUPS, climateShift, type EcoMeta, type EcoPatch } from './biomes';
 import { LabelLayer, type LabelProps } from './labels';
 import {
+  getArticlePhoto,
+  getInfobox,
   getLeaderHistory,
+  getSubdivisions,
   getSummary,
   getWikidata,
+  imageAtYear,
   leadersAtYear,
+  looksLikeMap,
+  subdivisionsAtYear,
+  commonsFilePath,
+  commonsPageForImage,
+  commonsPageUrl,
+  type InfoboxSection,
+  type Subdivision,
   searchArticles,
   wikiSearchUrl,
   wikiTitle,
@@ -108,6 +119,7 @@ const pYears = $('p-years');
 const pNote = $('p-note');
 const pOthers = $('p-others');
 const pOthersList = $('p-others-list');
+const pOthersHead = $('p-others-head');
 const pLineage = $('p-lineage');
 const pLineageList = $<HTMLOListElement>('p-lineage-list');
 const pKind = $('p-kind');
@@ -121,6 +133,12 @@ const pLeadersHistory = $('p-leaders-history');
 const pLeadersHistoryList = $<HTMLOListElement>('p-leaders-history-list');
 const pSummary = $<HTMLParagraphElement>('p-summary');
 const pFallback = $('p-fallback');
+const pFigure = $('p-figure');
+const pImage = $<HTMLImageElement>('p-image');
+const pFigureKind = $('p-figure-kind');
+const pFigureLink = $<HTMLAnchorElement>('p-figure-link');
+const pInfobox = $('p-infobox');
+const pSubs = $('p-subs');
 const pFacts = $<HTMLDListElement>('p-facts');
 const pOsm = $('p-osm');
 const pOsmFrame = $<HTMLIFrameElement>('p-osm-frame');
@@ -219,7 +237,11 @@ let societyProps: Props[] = [];
 let biomeModel: BiomeModel | null = null;
 
 const polityLabels = new LabelLayer<Props>(map, (p) => { overlapSet = []; openPanel(p); });
-const societyLabels = new LabelLayer<Props>(map, (p) => { overlapSet = []; openPanel(p); });
+const societyLabels = new LabelLayer<Props>(map, (p) => {
+  const stack = standingAt(p.lx, p.ly, year);
+  overlapSet = stack.some((item) => item.k === p.k) ? stack : [p, ...stack];
+  openPanel(p);
+});
 // Ecoregion patches are often thin strips with long names, so let names overhang them.
 const biomeLabels = new LabelLayer<EcoPatch>(map, (patch) => openBiomePanel(patch.lx, patch.ly), 2.2);
 
@@ -526,12 +548,189 @@ async function loadLeaders(qid: string, panelYear: number, ticket: number): Prom
 
 function scheduleLeaderRefresh(): void {
   if (!panelQid || panel.hidden || activeLens !== 'polities') return;
+  applyPolityFlag();
+  renderSubdivisions();
   const ticket = panelTicket;
   const qid = panelQid;
   if (leaderTimer) window.clearTimeout(leaderTimer);
   leaderTimer = window.setTimeout(() => {
     if (ticket === panelTicket) void loadLeaders(qid, year, ticket);
   }, 220);
+}
+
+// ---- Panel figure, infobox, subdivisions ---------------------------------------
+let panelFacts: WikiFacts | null = null;
+let panelSubs: Subdivision[] = [];
+
+function hideFigure(): void {
+  pFigure.hidden = true;
+  pImage.removeAttribute('src');
+}
+
+function showFigure(src: string, kind: 'flag' | 'photo', label: string, page: string | null, alt: string): void {
+  pFigure.className = `figure ${kind}`;
+  pImage.onerror = hideFigure;
+  pImage.alt = alt;
+  pImage.src = src;
+  pFigureKind.textContent = label;
+  pFigureLink.hidden = !page;
+  if (page) pFigureLink.href = page;
+  pFigure.hidden = false;
+}
+
+/** Polities get a flag (or coat of arms) for the year, not Wikipedia's map thumbnail. */
+function applyPolityFlag(): void {
+  const facts = panelFacts;
+  if (!facts) return;
+  const flag = imageAtYear(facts.flags, year);
+  const arms = flag ? undefined : imageAtYear(facts.arms, year);
+  const file = flag ?? arms;
+  if (!file) {
+    hideFigure();
+    return;
+  }
+  showFigure(commonsFilePath(file, 480), 'flag', flag ? 'Flag' : 'Coat of arms', commonsPageUrl(file), `${pName.textContent ?? ''} ${flag ? 'flag' : 'coat of arms'}`);
+}
+
+function applyArticleImage(summary: WikiSummary | null, facts: WikiFacts | null): void {
+  panelFacts = facts;
+  if (activeLens === 'biomes') return;
+  if (activeLens === 'polities') {
+    applyPolityFlag();
+    return;
+  }
+  const thumb = summary?.thumbnail?.source;
+  if (thumb && !looksLikeMap(thumb)) {
+    showFigure(thumb, 'photo', 'Wikipedia', commonsPageForImage(thumb), pName.textContent ?? '');
+    return;
+  }
+  if (facts?.image && !looksLikeMap(facts.image)) {
+    showFigure(commonsFilePath(facts.image, 640), 'photo', 'Wikidata image', commonsPageUrl(facts.image), pName.textContent ?? '');
+    return;
+  }
+  hideFigure();
+}
+
+async function loadBiomeImage(titles: string[], ticket: number, signal: AbortSignal): Promise<void> {
+  for (const title of titles) {
+    try {
+      const file = await getArticlePhoto(title, signal);
+      if (ticket !== panelTicket) return;
+      if (file) {
+        showFigure(commonsFilePath(file, 640), 'photo', title, commonsPageUrl(file), `${title}`);
+        return;
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+    }
+  }
+}
+
+function fillInfoboxCell(target: HTMLElement, source: Node): void {
+  target.append(source.cloneNode(true));
+}
+
+function renderInfobox(sections: InfoboxSection[] | null): void {
+  pInfobox.replaceChildren();
+  if (!sections?.length) {
+    pInfobox.hidden = true;
+    return;
+  }
+  const head = document.createElement('div');
+  head.className = 'infobox-head';
+  head.textContent = 'From the Wikipedia infobox';
+  pInfobox.append(head);
+  sections.forEach((section, index) => {
+    const details = document.createElement('details');
+    details.open = section.rows.length <= 10 && (index < 4 || section.rows.length <= 4);
+    const summary = document.createElement('summary');
+    summary.textContent = section.title || 'Overview';
+    if (section.rows.length > 4) {
+      const count = document.createElement('span');
+      count.textContent = String(section.rows.length);
+      summary.append(count);
+    }
+    details.append(summary);
+    const list = document.createElement('dl');
+    list.className = 'ib';
+    for (const row of section.rows) {
+      if (row.label) {
+        const dt = document.createElement('dt');
+        fillInfoboxCell(dt, row.label);
+        list.append(dt);
+      }
+      const dd = document.createElement('dd');
+      if (!row.label) dd.className = 'wide';
+      fillInfoboxCell(dd, row.value);
+      list.append(dd);
+    }
+    details.append(list);
+    pInfobox.append(details);
+  });
+  pInfobox.hidden = false;
+}
+
+async function loadInfobox(title: string | null, ticket: number, signal: AbortSignal): Promise<void> {
+  if (!title) return;
+  try {
+    const sections = await getInfobox(title, signal);
+    if (ticket !== panelTicket) return;
+    renderInfobox(sections);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') return;
+  }
+}
+
+function renderSubdivisions(): void {
+  pSubs.replaceChildren();
+  const list = activeLens === 'polities' ? subdivisionsAtYear(panelSubs, year) : [];
+  if (!list.length) {
+    pSubs.hidden = true;
+    return;
+  }
+  const details = document.createElement('details');
+  details.open = list.length <= 14;
+  const summary = document.createElement('summary');
+  summary.textContent = 'Administrative subdivisions';
+  const count = document.createElement('span');
+  count.textContent = `${list.length} with Wikipedia articles`;
+  summary.append(count);
+  details.append(summary);
+  const ul = document.createElement('ul');
+  for (const item of list) {
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.href = wikiUrl(item.title);
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.textContent = item.name;
+    li.append(a);
+    if (item.lng !== undefined && item.lat !== undefined) {
+      const lng = item.lng;
+      const lat = item.lat;
+      const pin = document.createElement('button');
+      pin.type = 'button';
+      pin.textContent = '⌖';
+      pin.title = `Show ${item.name} on the map`;
+      pin.addEventListener('click', () => map.easeTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 5), duration: 700 }));
+      li.append(pin);
+    }
+    ul.append(li);
+  }
+  details.append(ul);
+  pSubs.append(details);
+  pSubs.hidden = false;
+}
+
+async function loadSubdivisions(qid: string, ticket: number, signal: AbortSignal): Promise<void> {
+  try {
+    const list = await getSubdivisions(qid, signal);
+    if (ticket !== panelTicket) return;
+    panelSubs = list;
+    renderSubdivisions();
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') return;
+  }
 }
 
 async function loadPanel(
@@ -552,6 +751,8 @@ async function loadPanel(
       const facts = await factsPromise;
       if (ticket !== panelTicket) return;
       renderFacts(facts, extraFacts);
+      applyArticleImage(summary, facts);
+      void loadInfobox(summary.title, ticket, signal);
       return;
     }
 
@@ -564,11 +765,14 @@ async function loadPanel(
       if (summary) {
         renderSummary(summary);
         renderFacts(facts, extraFacts);
+        applyArticleImage(summary, facts);
+        void loadInfobox(summary.title, ticket, signal);
         return;
       }
     }
 
     renderFacts(facts, extraFacts);
+    applyArticleImage(null, facts);
     const hits = await searchArticles(name, signal);
     if (ticket !== panelTicket) return;
     renderFallback(name, hits);
@@ -594,6 +798,13 @@ function resetPanel(): number {
   pFallback.replaceChildren();
   pFacts.hidden = true;
   pFacts.replaceChildren();
+  hideFigure();
+  pInfobox.hidden = true;
+  pInfobox.replaceChildren();
+  pSubs.hidden = true;
+  pSubs.replaceChildren();
+  panelFacts = null;
+  panelSubs = [];
   pLeaders.hidden = true;
   pLeadersList.replaceChildren();
   pLeadersHistory.hidden = true;
@@ -627,11 +838,101 @@ function updateSelection(): void {
 /** Everything under the last click, so overlapping shapes can all be reached. */
 let overlapSet: Props[] = [];
 
+// ---- Where you stand (societies) -------------------------------------------
+// Societies are not nested like polities. A person stands inside several peer
+// identities at once (a region, a people, a wider sphere) with no centre above
+// them, so every identity active at the clicked point is found by geometry,
+// whatever is drawn on top, how far the map is zoomed, or how faint a shape is.
+interface Footprint {
+  box: [number, number, number, number];
+  polys: number[][][][];
+}
+let societyFootprints: Footprint[] = [];
+
+function buildFootprints(features: MapFeature[]): Footprint[] {
+  return features.map((feature) => {
+    const geometry = feature.geometry as { type?: string; coordinates?: unknown } | null;
+    let polys: number[][][][] = [];
+    if (geometry?.type === 'Polygon') polys = [geometry.coordinates as number[][][]];
+    else if (geometry?.type === 'MultiPolygon') polys = geometry.coordinates as number[][][][];
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const poly of polys) {
+      for (const [x, y] of poly[0] ?? []) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+    return { box: [minX, minY, maxX, maxY], polys };
+  });
+}
+
+function inRing(ring: number[][], x: number, y: number): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/** Every society active in `atYear` whose footprint contains the point, local first. */
+function standingAt(lng: number, lat: number, atYear: number): Props[] {
+  const found: Props[] = [];
+  societyFootprints.forEach((foot, index) => {
+    const p = societyProps[index];
+    if (!p || p.s > atYear || p.e < atYear) return;
+    const [minX, minY, maxX, maxY] = foot.box;
+    if (lng < minX || lng > maxX || lat < minY || lat > maxY) return;
+    for (const poly of foot.polys) {
+      if (!poly[0] || !inRing(poly[0], lng, lat)) continue;
+      let hole = false;
+      for (let r = 1; r < poly.length; r++) {
+        if (inRing(poly[r], lng, lat)) {
+          hole = true;
+          break;
+        }
+      }
+      if (!hole) {
+        found.push(p);
+        return;
+      }
+    }
+  });
+  return found.sort((a, b) => (b.lv ?? 2) - (a.lv ?? 2) || a.sz - b.sz);
+}
+
+/** The identity to open first: the one that matches the scale the map is showing. */
+function pickStanding(stack: Props[]): Props {
+  const local = map.getZoom() >= LOCAL_ZOOM - 0.2;
+  const wanted = local ? 3 : 2;
+  return stack.find((item) => (item.lv ?? 2) === wanted) ??
+    stack.find((item) => (item.lv ?? 2) < wanted) ?? stack[0];
+}
+
+const TIER_NAMES: Record<number, string> = { 3: 'Local identity', 2: 'People', 1: 'Wider sphere' };
+
 function renderOthers(current: Props): void {
   pOthersList.replaceChildren();
   const others = overlapSet.filter((item) => item.k !== current.k);
   pOthers.hidden = others.length === 0;
+  const societies = activeLens === 'societies';
+  pOthersHead.textContent = societies ? 'Where you stand · peer identities' : 'Also here';
+  let tier = -1;
   for (const item of others) {
+    const level = item.lv ?? 2;
+    if (societies && level !== tier) {
+      tier = level;
+      const heading = document.createElement('span');
+      heading.className = 'others-tier';
+      heading.textContent = TIER_NAMES[level] ?? 'Identity';
+      pOthersList.append(heading);
+    }
     const button = document.createElement('button');
     button.type = 'button';
     const dot = document.createElement('i');
@@ -741,6 +1042,7 @@ function openPanel(p: Props): void {
     extraFacts.push({ label: 'Realm', value: p.m });
   }
   if (qid && !societies && !p.g) void loadLeaders(qid, year, ticket);
+  if (qid && !societies) void loadSubdivisions(qid, ticket, controller.signal);
   void loadPanel(rawTitle, qid, name, ticket, controller.signal, extraFacts);
 }
 
@@ -816,6 +1118,12 @@ function openBiomePanel(lng: number, lat: number, movePin = true): void {
 
   showPanel();
   document.title = `${title} · Unity of Being`;
+  const photoTitles = [
+    ...(ecoName ? [ecoName] : []),
+    ...(ecoEntry ? [meta.biomes[ecoEntry[1]]] : []),
+    klass.wiki,
+  ];
+  void loadBiomeImage(photoTitles, ticket, controller.signal);
   if (ecoName) {
     renderFacts(null, rows);
     void loadPanel(ecoName, null, ecoName, ticket, controller.signal, rows);
@@ -1059,6 +1367,7 @@ map.on('load', async () => {
     });
     polityProps = polityFeatures.map((feature) => feature.properties);
     societyProps = societyFeatures.map((feature) => feature.properties);
+    societyFootprints = buildFootprints(societyFeatures);
     buildLineages();
     polityLabels.setFeatures(polityProps);
     societyLabels.setFeatures(societyProps);
@@ -1282,11 +1591,18 @@ map.on('load', async () => {
         openBiomePanel(event.lngLat.lng, event.lngLat.lat);
         return;
       }
-      const fill = fillLayerOf(activeLens);
-      let hits = fill ? map.queryRenderedFeatures(event.point, { layers: [fill] }) : [];
-      if (activeLens === 'societies' && map.getZoom() < LOCAL_ZOOM - 0.2) {
-        hits = hits.filter((hit) => (hit.properties as { lv?: number }).lv !== 3);
+      if (activeLens === 'societies') {
+        const stack = standingAt(event.lngLat.lng, event.lngLat.lat, year);
+        if (!stack.length) {
+          closePanel();
+          return;
+        }
+        overlapSet = stack;
+        openPanel(pickStanding(stack));
+        return;
       }
+      const fill = fillLayerOf(activeLens);
+      const hits = fill ? map.queryRenderedFeatures(event.point, { layers: [fill] }) : [];
       if (!hits.length) {
         closePanel();
         return;

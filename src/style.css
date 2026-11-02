@@ -879,3 +879,88 @@ a { color: var(--brass); }
 .others-list button:hover { background: rgba(255, 255, 255, 0.11); }
 .others-list button i { width: 9px; height: 9px; border-radius: 50%; flex: none; }
 .others-list button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.others-tier {
+  flex-basis: 100%;
+  margin-top: 4px;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+
+/* Panel figure: a flag, or a photograph of the biome or society */
+.figure { margin: 0 0 12px; }
+.figure img {
+  display: block;
+  width: 100%;
+  max-height: 150px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+}
+.figure.photo img { max-height: 190px; object-fit: cover; }
+.figure.flag img { max-height: 96px; width: auto; max-width: 100%; margin: 0 auto; }
+.figure figcaption {
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--faint);
+  text-align: center;
+}
+.figure figcaption a { color: inherit; }
+
+/* Wikipedia infobox */
+.infobox { margin: 0 0 14px; }
+.infobox-head, .subs-head {
+  margin-bottom: 4px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.infobox details {
+  border-top: 1px solid var(--line);
+  padding: 6px 0;
+}
+.infobox details:last-child { border-bottom: 1px solid var(--line); }
+.infobox summary, .subs summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #e8dfcb;
+  list-style: none;
+}
+.infobox summary::-webkit-details-marker, .subs summary::-webkit-details-marker { display: none; }
+.infobox summary::before, .subs summary::before {
+  content: '▸';
+  display: inline-block;
+  width: 14px;
+  color: var(--faint);
+  transition: transform 0.15s;
+}
+.infobox details[open] > summary::before, .subs details[open] > summary::before { transform: rotate(90deg); }
+.infobox summary span, .subs summary span { margin-left: 6px; font-weight: 400; color: var(--faint); font-size: 10.5px; }
+.ib {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 4px 10px;
+  margin: 6px 0 2px 14px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.ib dt { color: var(--faint); font-size: 11px; overflow-wrap: anywhere; }
+.ib dd { margin: 0; color: #ded7c7; overflow-wrap: anywhere; }
+.ib dd.wide { grid-column: 1 / -1; }
+.ib a, .subs a { color: var(--brass-lt); text-decoration: none; }
+.ib a:hover, .subs a:hover { text-decoration: underline; }
+
+.subs { margin: 0 0 14px; }
+.subs ul { list-style: none; margin: 6px 0 2px 14px; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; }
+.subs li { display: inline-flex; gap: 4px; align-items: baseline; }
+.subs li button {
+  border: 0; background: none; padding: 0; cursor: pointer;
+  color: var(--faint); font-size: 11px;
+}
+.subs li button:hover { color: var(--brass-lt); }

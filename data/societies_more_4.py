@@ -88,3 +88,7 @@ def register():
       [blob(-149.5, -17.6, 0.9, 0.5), blob(-139.5, -9.0, 0.5, 0.4)], line='polynesia')
     S('Chamorro', -1500, 2024, 'AN', 'People', 'Chamorro (Austronesian)', 'Chamorros', blob(144.8, 13.5, 0.3, 0.4))
     S('Highlands peoples of New Guinea', -3400, 2024, 'PA', 'People', 'Trans-New Guinea languages', 'Papua New Guinean Highlanders', box(142.0, -7.0, 146.5, -5.0))
+
+    # ---- California (a people-level identity between the nation and SoCal) -------------------
+    S('Californians', 1850, 2024, 'IE', 'People', 'English, Spanish and many others', 'Californians', box(-124.6, 32.4, -114.1, 42.1), lvl=2,
+      note='A state-sized identity of migrants, coasts, mountains and deserts that sits between the nation and places like Southern California.')

@@ -35,6 +35,13 @@ export interface WikiFact {
   value: string;
 }
 
+export interface Leader {
+  name: string;
+  office?: string;
+  start: number;
+  end?: number;
+}
+
 export interface WikiFacts {
   qid: string;
   description?: string;
@@ -78,6 +85,7 @@ interface WikidataEntity {
 const summaryCache = new Map<string, WikiSummary | null>();
 const searchCache = new Map<string, WikiSearchHit[]>();
 const factsCache = new Map<string, WikiFacts | null>();
+const leaderCache = new Map<string, Leader[]>();
 const nf = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 
 /** Convert a stored Wikipedia value (title or a full Wikipedia URL) to a title. */
@@ -378,4 +386,194 @@ export async function getWikidata(
 
   factsCache.set(qid, result);
   return result;
+}
+
+interface SparqlBinding {
+  personLabel?: { value?: string };
+  officeLabel?: { value?: string };
+  start?: { value?: string };
+  end?: { value?: string };
+}
+
+function yearFromTime(time: string | undefined): number | null {
+  if (!time) return null;
+  const match = /^([+-]?)(\d{1,6})-/.exec(time);
+  if (!match) return null;
+  const value = Number.parseInt(match[2], 10);
+  return match[1] === '-' ? -value : value;
+}
+
+export function leadersAtYear(leaders: Leader[], year: number): Leader[] {
+  const active = leaders.filter((leader) => leader.start <= year);
+  const dated = active.filter(
+    (leader) => leader.end !== undefined && leader.end >= year,
+  );
+  let result = dated;
+
+  // Missing end dates are common in historical Wikidata. Only show them when
+  // no explicitly dated reign covers the year, and then only the latest one.
+  if (!result.length) {
+    const open = active.filter((leader) => leader.end === undefined);
+    if (open.length) {
+      const latest = Math.max(...open.map((leader) => leader.start));
+      result = open.filter((leader) => leader.start === latest);
+    }
+  }
+
+  return result
+    .sort((a, b) => a.start - b.start || a.name.localeCompare(b.name))
+    .slice(0, 6);
+}
+
+async function fetchLeadersForOffices(
+  officeIds: string[],
+  signal?: AbortSignal,
+): Promise<Leader[]> {
+  if (!officeIds.length) return [];
+  const values = officeIds.map((id) => `wd:${id}`).join(' ');
+  const query = `SELECT ?person ?personLabel ?officeLabel ?start ?end WHERE {
+  VALUES ?office { ${values} }
+  ?person p:P39 ?statement .
+  ?statement ps:P39 ?office .
+  OPTIONAL { ?statement pq:P580 ?start }
+  OPTIONAL { ?statement pq:P582 ?end }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+} LIMIT 1000`;
+  const url = 'https://query.wikidata.org/sparql?format=json&origin=*&query=' +
+    encodeURIComponent(query);
+  const data = await getJson<{
+    results?: { bindings?: SparqlBinding[] };
+  }>(url, signal);
+
+  const leaders: Leader[] = [];
+  for (const row of data.results?.bindings ?? []) {
+    const name = row.personLabel?.value?.trim();
+    const start = yearFromTime(row.start?.value);
+    if (!name || /^Q\d+$/.test(name) || start === null) continue;
+    leaders.push({
+      name,
+      office: row.officeLabel?.value?.trim() || undefined,
+      start,
+      end: yearFromTime(row.end?.value) ?? undefined,
+    });
+  }
+  return leaders;
+}
+
+async function fetchDirectLeaders(
+  claims: Record<string, WikidataClaim[]>,
+  signal?: AbortSignal,
+): Promise<Leader[]> {
+  const candidates: { id: string; start: number; end?: number; office?: string }[] = [];
+  for (const [property, office] of [
+    ['P35', 'Head of state'],
+    ['P6', 'Head of government'],
+  ] as const) {
+    for (const claim of preferredClaims(claims, property)) {
+      const id = snakValue(claim)?.id;
+      const start = yearFromTime(snakValue(claim.qualifiers?.P580?.[0])?.time);
+      if (!id || start === null) continue;
+      candidates.push({
+        id,
+        start,
+        end: yearFromTime(snakValue(claim.qualifiers?.P582?.[0])?.time) ?? undefined,
+        office,
+      });
+    }
+  }
+  if (!candidates.length) return [];
+
+  const ids = [...new Set(candidates.map((candidate) => candidate.id))].slice(0, 50);
+  const labels = new Map<string, string>();
+  try {
+    const url = `${WD_API}?action=wbgetentities&format=json&origin=*` +
+      `&props=labels&languages=en&ids=${encodeURIComponent(ids.join('|'))}`;
+    const data = await getJson<{
+      entities?: Record<string, { labels?: Record<string, { value?: string }> }>;
+    }>(url, signal);
+    for (const [id, entity] of Object.entries(data.entities ?? {})) {
+      const label = entity.labels?.en?.value ?? entity.labels?.mul?.value;
+      if (label) labels.set(id, label);
+    }
+  } catch (error) {
+    if (isAbort(error)) throw error;
+  }
+
+  return candidates
+    .map((candidate) => ({
+      name: labels.get(candidate.id) ?? candidate.id,
+      office: candidate.office,
+      start: candidate.start,
+      end: candidate.end,
+    }))
+    .filter((leader) => !/^Q\d+$/.test(leader.name));
+}
+
+/**
+ * Full ruler history for a polity. Uses Wikidata's head-of-state office
+ * (P1906) plus dated officeholders (P39), with direct P35/P6 fallbacks for
+ * polities whose current head-of-state statement is not modelled.
+ */
+export async function getLeaderHistory(
+  qid: string,
+  signal?: AbortSignal,
+): Promise<Leader[]> {
+  if (!/^Q\d+$/.test(qid)) return [];
+  const cached = leaderCache.get(qid);
+  if (cached) return cached;
+
+  let leaders: Leader[] = [];
+  try {
+    const url = `${WD_API}?action=wbgetentities&format=json&origin=*&ids=${qid}&props=claims`;
+    const data = await getJson<{
+      entities?: Record<string, WikidataEntity>;
+    }>(url, signal);
+    const claims = data.entities?.[qid]?.claims ?? {};
+    const offices = new Set<string>();
+    for (const claim of preferredClaims(claims, 'P1906')) {
+      const id = snakValue(claim)?.id;
+      if (id && /^Q\d+$/.test(id)) offices.add(id);
+    }
+
+    if (offices.size) {
+      try {
+        leaders = await fetchLeadersForOffices([...offices], signal);
+      } catch (error) {
+        if (isAbort(error)) throw error;
+      }
+    }
+    if (!leaders.length) {
+      try {
+        leaders = await fetchDirectLeaders(claims, signal);
+      } catch (error) {
+        if (isAbort(error)) throw error;
+      }
+    }
+
+    const deduped = new Map<string, Leader>();
+    for (const leader of leaders) {
+      const key = `${leader.name}|${leader.office ?? ''}|${leader.start}`;
+      const existing = deduped.get(key);
+      if (!existing || (leader.end ?? Infinity) > (existing.end ?? Infinity)) {
+        deduped.set(key, leader);
+      }
+    }
+    leaders = [...deduped.values()].sort(
+      (a, b) => a.start - b.start || a.name.localeCompare(b.name),
+    );
+    leaderCache.set(qid, leaders);
+  } catch (error) {
+    if (isAbort(error)) throw error;
+    return [];
+  }
+
+  return leaders;
+}
+
+export async function getLeaders(
+  qid: string,
+  year: number,
+  signal?: AbortSignal,
+): Promise<Leader[]> {
+  return leadersAtYear(await getLeaderHistory(qid, signal), year);
 }

@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "data:download": "node data/download.mjs",
     "data:build": "node data/build-data.mjs",
-    "data:water": "node data/build-water.mjs"
+    "data:water": "node data/build-water.mjs",
+    "data:societies:download": "node data/download-societies.mjs",
+    "data:societies:build": "node data/build-societies.mjs"
   },
   "dependencies": {
     "maplibre-gl": "^6.16.0"

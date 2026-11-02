@@ -3,15 +3,16 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import './style.css';
 import {
-  commonsFilePath,
-  commonsPageForImage,
-  commonsPageUrl,
+  getLeaderHistory,
   getSummary,
   getWikidata,
+  leadersAtYear,
   searchArticles,
   wikiSearchUrl,
   wikiTitle,
   wikiUrl,
+  type Leader,
+  type WikiFact,
   type WikiFacts,
   type WikiSummary,
 } from './wiki';
@@ -49,6 +50,8 @@ interface Props {
   sz: number;
   c: string;
   k: number;
+  src?: string;
+  kind?: string;
 }
 
 interface PolityFeature {
@@ -93,6 +96,8 @@ const num = (key: string, fallback: number): number => {
   return Number.isFinite(value) ? value : fallback;
 };
 let year = clamp(Math.round(num('year', 150)), MIN_YEAR, MAX_YEAR);
+type Lens = 'polities' | 'societies';
+let activeLens: Lens = params.get('lens') === 'societies' ? 'societies' : 'polities';
 let selectedKey = -1;
 let selectedFeature: PolityFeature | null = null;
 
@@ -109,18 +114,24 @@ const loadingProgress = $<HTMLElement>('loading-progress');
 
 const pName = $('p-name');
 const pYears = $('p-years');
+const pKind = $('p-kind');
+const pSource = $('p-source');
+const pFine = $('p-fine');
 const pSwatch = $('p-swatch');
+const pLeaders = $('p-leaders');
+const pLeadersHead = $('p-leaders-head');
+const pLeadersList = $<HTMLUListElement>('p-leaders-list');
+const pLeadersHistory = $('p-leaders-history');
+const pLeadersHistoryList = $<HTMLOListElement>('p-leaders-history-list');
 const pSummary = $<HTMLParagraphElement>('p-summary');
 const pFallback = $('p-fallback');
 const pFacts = $<HTMLDListElement>('p-facts');
-const pFigure = $('p-figure');
-const pImage = $<HTMLImageElement>('p-image');
-const pCaption = $('p-caption');
 const pOsm = $('p-osm');
 const pOsmFrame = $<HTMLIFrameElement>('p-osm-frame');
 const pOsmLink = $<HTMLAnchorElement>('p-osm-link');
 const pLink = $<HTMLAnchorElement>('p-link');
 const pWdLink = $<HTMLAnchorElement>('p-wd-link');
+const lensButtons = [...document.querySelectorAll<HTMLButtonElement>('.lens-btn')];
 
 slider.value = String(year);
 yearLabel.textContent = fmtYear(year);
@@ -155,6 +166,7 @@ map.addControl(new maplibregl.ScaleControl({ maxWidth: 110, unit: 'metric' }), '
 map.touchZoomRotate.disableRotation();
 map.on('error', (event) => console.error('Map error:', event.error));
 
+
 // Keep the canvas in sync when the map container changes size (mobile panels,
 // browser resize, and embedded previews do not always emit a window resize).
 new ResizeObserver(() => {
@@ -172,6 +184,15 @@ const highlightFilter = (
   'all', yearFilter(value), ['==', ['get', 'k'], key],
 ];
 
+function activeFillLayer(): string {
+  return activeLens === 'societies' ? 'society-fill' : 'polity-fill';
+}
+function activeHighlightLayer(): string {
+  return activeLens === 'societies' ? 'society-hl' : 'polity-hl';
+}
+
+let polities: PolityFeature[] = [];
+let societies: PolityFeature[] = [];
 let features: PolityFeature[] = [];
 const markers = new Map<number, LabelMarker>();
 
@@ -253,10 +274,11 @@ function updateLabels(): void {
   const zoom = map.getZoom();
   const pxPerDegree = (512 * Math.pow(2, zoom)) / 360;
   const bounds = map.getBounds();
-  const maxLabels = width < 720 ? 32 : 80;
+  const maxLabels = width < 720 ? 28 : 72;
   const maxWidth = width < 720 ? 132 : 184;
 
   const candidates: { feature: PolityFeature; x: number; y: number; score: number }[] = [];
+  const seenNames = new Set<string>();
   for (const feature of features) {
     const p = feature.properties;
     if (p.s > year || p.e < year) continue;
@@ -282,13 +304,15 @@ function updateLabels(): void {
     if (keep.size >= maxLabels) break;
     const p = candidate.feature.properties;
     const name = cleanName(p.n);
+    if (seenNames.has(name)) continue;
+    seenNames.add(name);
     const font = clamp(9 + Math.log10(Math.max(1, candidate.score)) * 2.1, 11, 16);
     const layout = layoutLabel(name, font, maxWidth);
     const box = {
-      x: candidate.x - (layout.width + 10) / 2,
-      y: candidate.y - (layout.height + 4) / 2,
-      w: layout.width + 10,
-      h: layout.height + 4,
+      x: candidate.x - (layout.width + 14) / 2,
+      y: candidate.y - (layout.height + 8) / 2,
+      w: layout.width + 14,
+      h: layout.height + 8,
     };
     const collides = placed.some((other) => !(
       box.x + box.w < other.x ||
@@ -349,7 +373,7 @@ function writeHash(): void {
     null,
     '',
     `#year=${year}&lng=${center.lng.toFixed(2)}&lat=${center.lat.toFixed(2)}` +
-      `&z=${map.getZoom().toFixed(2)}`,
+      `&z=${map.getZoom().toFixed(2)}&lens=${activeLens}`,
   );
 }
 function scheduleHash(): void {
@@ -372,18 +396,25 @@ function setYear(next: number): void {
     yearRaf = 0;
     slider.value = String(year);
     yearLabel.textContent = fmtYear(year);
-    if (map.getLayer('polity-fill')) {
-      for (const id of ['polity-fill', 'polity-line', 'polity-casing']) {
-        map.setFilter(id, yearFilter(year));
-      }
+    for (const id of [
+      'polity-fill', 'polity-line', 'polity-casing',
+      'society-fill', 'society-line', 'society-casing',
+    ]) {
+      if (map.getLayer(id)) map.setFilter(id, yearFilter(year));
     }
-    if (map.getLayer('polity-hl')) {
+    const highlight = activeHighlightLayer();
+    if (map.getLayer(highlight)) {
       map.setFilter(
-        'polity-hl',
+        highlight,
         selectedKey >= 0 ? highlightFilter(year, selectedKey) : ['==', ['get', 'k'], -1],
       );
     }
+    const otherHighlight = activeLens === 'polities' ? 'society-hl' : 'polity-hl';
+    if (map.getLayer(otherHighlight)) {
+      map.setFilter(otherHighlight, ['==', ['get', 'k'], -1]);
+    }
     updateLabels();
+    if (!panel.hidden && panelQid && activeLens === 'polities') scheduleLeaderRefresh();
     scheduleHash();
   });
 }
@@ -391,32 +422,9 @@ function setYear(next: number): void {
 // ---- Panel ------------------------------------------------------------------
 let panelTicket = 0;
 let panelAbort: AbortController | null = null;
-
-function showImage(
-  name: string,
-  source: string,
-  pageUrl: string | null,
-  credit: string,
-): void {
-  pImage.onerror = () => {
-    pFigure.hidden = true;
-  };
-  pImage.src = source;
-  pImage.alt = `Image related to ${name}`;
-  pCaption.replaceChildren();
-  pCaption.append(document.createTextNode('Image: '));
-  if (pageUrl) {
-    const link = document.createElement('a');
-    link.href = pageUrl;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    link.textContent = credit;
-    pCaption.append(link);
-  } else {
-    pCaption.append(document.createTextNode(credit));
-  }
-  pFigure.hidden = false;
-}
+let panelQid: string | null = null;
+let leaderAbort: AbortController | null = null;
+let leaderTimer = 0;
 
 function renderSummary(name: string, summary: WikiSummary): void {
   pSummary.classList.remove('muted', 'error');
@@ -424,35 +432,22 @@ function renderSummary(name: string, summary: WikiSummary): void {
   pLink.href = summary.url;
   pLink.textContent = 'Read on Wikipedia';
   pLink.title = summary.title;
-
-  const image = summary.thumbnail?.source ?? summary.originalimage?.source;
-  if (image) {
-    showImage(name, image, commonsPageForImage(image), 'Wikimedia Commons');
-  }
 }
 
-function renderFacts(facts: WikiFacts): void {
+function renderFacts(facts: WikiFacts | null, extraFacts: WikiFact[] = []): void {
+  const rows = [...extraFacts, ...(facts?.facts ?? [])];
   pFacts.replaceChildren();
-  for (const fact of facts.facts) {
+  for (const fact of rows) {
     const dt = document.createElement('dt');
     dt.textContent = fact.label;
     const dd = document.createElement('dd');
     dd.textContent = fact.value;
     pFacts.append(dt, dd);
   }
-  pFacts.hidden = facts.facts.length === 0;
+  pFacts.hidden = rows.length === 0;
 
-  pWdLink.hidden = false;
-  pWdLink.href = `https://www.wikidata.org/wiki/${facts.qid}`;
-
-  if (pFigure.hidden && facts.image) {
-    showImage(
-      cleanName(currentName),
-      commonsFilePath(facts.image, 720),
-      commonsPageUrl(facts.image),
-      'Wikimedia Commons',
-    );
-  }
+  pWdLink.hidden = !facts;
+  if (facts) pWdLink.href = `https://www.wikidata.org/wiki/${facts.qid}`;
 }
 
 function renderFallback(
@@ -461,9 +456,10 @@ function renderFallback(
 ): void {
   pSummary.classList.remove('error');
   pSummary.classList.add('muted');
+  const label = activeLens === 'societies' ? 'society' : 'polity';
   pSummary.textContent = hits.length
-    ? 'No single Wikipedia article matches this polity. Closest matches are below.'
-    : 'No single Wikipedia article matches this polity.';
+    ? `No single Wikipedia article matches this ${label}. Closest matches are below.`
+    : `No single Wikipedia article matches this ${label}.`;
 
   pFallback.replaceChildren();
   if (hits.length) {
@@ -515,7 +511,97 @@ function renderOsm(p: Props): void {
   pOsm.hidden = false;
 }
 
-let currentName = '';
+function fmtReign(leader: Leader): string {
+  const start = fmtYear(leader.start);
+  return leader.end === undefined ? `from ${start}` : `${start} – ${fmtYear(leader.end)}`;
+}
+
+function leaderKey(leader: Leader): string {
+  return `${leader.name}|${leader.office ?? ''}|${leader.start}`;
+}
+
+function renderLeaders(leaders: Leader[], panelYear: number, history: Leader[]): void {
+  pLeadersList.replaceChildren();
+  pLeadersHistoryList.replaceChildren();
+  pLeadersHistory.hidden = true;
+
+  if (leaders.length) {
+    pLeadersHead.textContent =
+      `${leaders.length === 1 ? 'Ruler' : 'Rulers'} in ${fmtYear(panelYear)}`;
+    for (const leader of leaders) {
+      const item = document.createElement('li');
+      const name = document.createElement('strong');
+      name.textContent = leader.name;
+      const meta = document.createElement('span');
+      meta.textContent = [leader.office, `r. ${fmtReign(leader)}`].filter(Boolean).join(' · ');
+      item.append(name, meta);
+      pLeadersList.append(item);
+    }
+  } else {
+    pLeadersHead.textContent = `Reigns around ${fmtYear(panelYear)}`;
+  }
+
+  const dated = history
+    .filter((leader) => leader.end !== undefined)
+    .sort((a, b) => a.start - b.start || a.name.localeCompare(b.name));
+  if (dated.length) {
+    const currentKeys = new Set(leaders.map(leaderKey));
+    let index = dated.findIndex((leader) => currentKeys.has(leaderKey(leader)));
+    if (index < 0) {
+      index = dated.findIndex((leader) => leader.start > panelYear);
+      if (index < 0) index = dated.length - 1;
+    }
+    const first = Math.max(0, index - 2);
+    for (const leader of dated.slice(first, first + 6)) {
+      const item = document.createElement('li');
+      if (currentKeys.has(leaderKey(leader))) item.classList.add('current');
+      const name = document.createElement('span');
+      name.className = 'ruler-name';
+      name.textContent = leader.name;
+      const years = document.createElement('span');
+      years.className = 'ruler-years';
+      years.textContent = fmtReign(leader);
+      item.append(name, years);
+      pLeadersHistoryList.append(item);
+    }
+    pLeadersHistory.hidden = false;
+  }
+
+  pLeaders.hidden = !leaders.length && pLeadersHistory.hidden;
+}
+
+async function loadLeaders(
+  qid: string,
+  panelYear: number,
+  ticket: number,
+): Promise<void> {
+  if (activeLens !== 'polities' || ticket !== panelTicket) {
+    pLeaders.hidden = true;
+    return;
+  }
+  leaderAbort?.abort();
+  const controller = new AbortController();
+  leaderAbort = controller;
+  try {
+    const history = await getLeaderHistory(qid, controller.signal);
+    if (ticket !== panelTicket || controller.signal.aborted) return;
+    renderLeaders(leadersAtYear(history, panelYear), panelYear, history);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') return;
+    console.error(error);
+    if (ticket === panelTicket) pLeaders.hidden = true;
+  }
+}
+
+function scheduleLeaderRefresh(): void {
+  if (!panelQid || panel.hidden || activeLens !== 'polities') return;
+  const ticket = panelTicket;
+  const qid = panelQid;
+  if (leaderTimer) window.clearTimeout(leaderTimer);
+  leaderTimer = window.setTimeout(() => {
+    if (ticket === panelTicket) void loadLeaders(qid, year, ticket);
+  }, 220);
+}
 
 async function loadPanel(
   rawTitle: string | null,
@@ -523,6 +609,7 @@ async function loadPanel(
   name: string,
   ticket: number,
   signal: AbortSignal,
+  extraFacts: WikiFact[] = [],
 ): Promise<void> {
   try {
     const factsPromise = qid ? getWikidata(qid, signal) : Promise.resolve(null);
@@ -533,7 +620,7 @@ async function loadPanel(
       renderSummary(name, summary);
       const facts = await factsPromise;
       if (ticket !== panelTicket) return;
-      if (facts) renderFacts(facts);
+      renderFacts(facts, extraFacts);
       return;
     }
 
@@ -545,12 +632,12 @@ async function loadPanel(
       if (ticket !== panelTicket) return;
       if (summary) {
         renderSummary(name, summary);
-        renderFacts(facts);
+        renderFacts(facts, extraFacts);
         return;
       }
     }
 
-    if (facts) renderFacts(facts);
+    renderFacts(facts, extraFacts);
     const hits = await searchArticles(name, signal);
     if (ticket !== panelTicket) return;
     renderFallback(name, hits);
@@ -560,7 +647,7 @@ async function loadPanel(
     console.error(error);
     pSummary.classList.remove('muted');
     pSummary.classList.add('error');
-    pSummary.textContent = 'Could not reach Wikipedia. You can still search for this polity.';
+    pSummary.textContent = 'Could not reach Wikipedia. You can still search for this entry.';
     pFallback.hidden = true;
     pLink.href = wikiSearchUrl(name);
     pLink.textContent = 'Search Wikipedia';
@@ -578,9 +665,9 @@ function openPanel(p: Props): void {
   const rawTitle = wikiTitle(p.w);
   const qid = /^Q\d+$/.test(p.q) ? p.q : null;
 
-  currentName = p.n;
   selectedKey = p.k;
   selectedFeature = features[p.k] ?? null;
+  panelQid = qid;
   panelTicket++;
   panelAbort?.abort();
   const controller = new AbortController();
@@ -590,6 +677,11 @@ function openPanel(p: Props): void {
   pName.textContent = name;
   pName.title = name;
   pYears.textContent = fmtRange(p.s, p.e);
+  pKind.textContent = activeLens === 'societies' ? 'Society' : 'Polity';
+  pSource.textContent = activeLens === 'societies' ? 'Glottography' : 'Cliopatria';
+  pFine.textContent = activeLens === 'societies'
+    ? 'Areas: Glottography / Asher & Moseley 2007 (CC BY 4.0), approximate language footprints · Named examples are curated · Text: Wikipedia (CC BY-SA) · Modern map: OpenStreetMap (ODbL)'
+    : 'Text: Wikipedia (CC BY-SA) · Facts: Wikidata (CC0) · Modern map: OpenStreetMap (ODbL)';
   pSwatch.style.background = p.c;
   pSummary.textContent = 'Loading Wikipedia…';
   pSummary.classList.remove('muted', 'error');
@@ -597,9 +689,10 @@ function openPanel(p: Props): void {
   pFallback.replaceChildren();
   pFacts.hidden = true;
   pFacts.replaceChildren();
-  pFigure.hidden = true;
-  pImage.removeAttribute('src');
-  pCaption.textContent = '';
+  pLeaders.hidden = true;
+  pLeadersList.replaceChildren();
+  pLeadersHistory.hidden = true;
+  pLeadersHistoryList.replaceChildren();
   pOsm.hidden = true;
   pOsmFrame.src = 'about:blank';
   pOsmLink.href = '#';
@@ -615,12 +708,16 @@ function openPanel(p: Props): void {
   });
   document.title = `${name} · Unity of Being`;
 
-  if (map.getLayer('polity-hl')) {
-    map.setFilter('polity-hl', highlightFilter(year, selectedKey));
+  if (map.getLayer(activeHighlightLayer())) {
+    map.setFilter(activeHighlightLayer(), highlightFilter(year, selectedKey));
   }
   updateSelection();
   renderOsm(p);
-  void loadPanel(rawTitle, qid, name, ticket, controller.signal);
+  const extraFacts: WikiFact[] = activeLens === 'societies' && p.kind
+    ? [{ label: 'Type', value: p.kind }]
+    : [];
+  if (qid && activeLens === 'polities') void loadLeaders(qid, year, ticket);
+  void loadPanel(rawTitle, qid, name, ticket, controller.signal, extraFacts);
 }
 
 function closePanel(): void {
@@ -629,14 +726,63 @@ function closePanel(): void {
   panelAbort?.abort();
   panelAbort = null;
   panel.hidden = true;
+  panelQid = null;
+  leaderAbort?.abort();
+  leaderAbort = null;
+  pLeaders.hidden = true;
+  pLeadersHistory.hidden = true;
   pOsmFrame.src = 'about:blank';
   selectedKey = -1;
   selectedFeature = null;
-  if (map.getLayer('polity-hl')) {
-    map.setFilter('polity-hl', ['==', ['get', 'k'], -1]);
+  if (map.getLayer(activeHighlightLayer())) {
+    map.setFilter(activeHighlightLayer(), ['==', ['get', 'k'], -1]);
   }
   document.title = 'Unity of Being';
   updateSelection();
+}
+
+function clearMarkers(): void {
+  for (const item of markers.values()) item.marker.remove();
+  markers.clear();
+}
+
+function setLensVisibility(): void {
+  const polityVisibility = activeLens === 'polities' ? 'visible' : 'none';
+  const societyVisibility = activeLens === 'societies' ? 'visible' : 'none';
+  for (const id of ['polity-fill', 'polity-casing', 'polity-line', 'polity-hl']) {
+    if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', polityVisibility);
+  }
+  for (const id of ['society-fill', 'society-casing', 'society-line', 'society-hl']) {
+    if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', societyVisibility);
+  }
+}
+
+function updateLensButtons(): void {
+  for (const button of lensButtons) {
+    const active = button.dataset.lens === activeLens;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-pressed', String(active));
+  }
+}
+
+function setLens(next: Lens): void {
+  if (next === activeLens) return;
+  if (next === 'societies' && !societies.length) return;
+  activeLens = next;
+  features = next === 'societies' ? societies : polities;
+  closePanel();
+  panelQid = null;
+  selectedKey = -1;
+  selectedFeature = null;
+  clearMarkers();
+  setLensVisibility();
+  updateLensButtons();
+  setYear(year);
+  scheduleHash();
+}
+
+for (const button of lensButtons) {
+  button.addEventListener('click', () => setLens(button.dataset.lens as Lens));
 }
 
 $('panel-close').addEventListener('click', closePanel);
@@ -710,8 +856,9 @@ async function getJson(
 }
 
 let loadingDone = false;
+let dataReady = false;
 function finishLoading(): void {
-  if (loadingDone || !map.isSourceLoaded('polities')) return;
+  if (loadingDone || !dataReady) return;
   loadingDone = true;
   loading.classList.add('hide');
   window.setTimeout(() => {
@@ -725,12 +872,12 @@ function failLoading(message: string): void {
 }
 
 function checkSources(): void {
-  if (map.isSourceLoaded('polities') && map.isSourceLoaded('land')) finishLoading();
+  if (dataReady) finishLoading();
 }
 
 map.on('load', async () => {
   try {
-    const [land, polities, rivers, lakes] = await Promise.all([
+    const [land, polityData, societyData, rivers, lakes] = await Promise.all([
       getJson(`${BASE}data/land.geojson`),
       getJson(`${BASE}data/polities.geojson`, (loaded, total) => {
         const megabytes = loaded / 1048576;
@@ -744,6 +891,10 @@ map.on('load', async () => {
           loadingProgress.style.width = '100%';
         }
       }),
+      getJson(`${BASE}data/societies.geojson`).catch((error) => {
+        console.error('Societies data:', error);
+        return null;
+      }),
       getJson(`${BASE}data/rivers.geojson`).catch(() => null),
       getJson(`${BASE}data/lakes.geojson`).catch(() => null),
     ]);
@@ -751,17 +902,39 @@ map.on('load', async () => {
     loadingText.textContent = 'Building map…';
     loadingProgress.style.width = '100%';
 
-    const data = polities as Polities;
-    features = data.features;
-    features.forEach((feature, index) => {
+    polities = (polityData as Polities).features;
+    societies = (societyData as Polities | null)?.features ?? [];
+    polities.forEach((feature, index) => {
       feature.properties.k = index;
       feature.properties.c = PALETTE[hash(feature.properties.n) % PALETTE.length];
     });
+    societies.forEach((feature, index) => {
+      feature.properties.k = index;
+      if (!feature.properties.c) {
+        feature.properties.c = PALETTE[hash(feature.properties.n) % PALETTE.length];
+      }
+    });
+    if (activeLens === 'societies' && !societies.length) activeLens = 'polities';
+    features = activeLens === 'societies' ? societies : polities;
+    if (!societies.length) {
+      const button = lensButtons.find((item) => item.dataset.lens === 'societies');
+      if (button) {
+        button.disabled = true;
+        button.title = 'Societies data unavailable';
+      }
+    }
 
     map.on('sourcedata', checkSources);
 
     map.addSource('land', { type: 'geojson', data: land });
-    map.addSource('polities', { type: 'geojson', data: polities });
+    map.addSource('polities', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: polities },
+    });
+    map.addSource('societies', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: societies },
+    });
     map.addLayer({
       id: 'land-fill',
       type: 'fill',
@@ -774,6 +947,7 @@ map.on('load', async () => {
       source: 'polities',
       filter: yearFilter(year),
       paint: { 'fill-color': ['get', 'c'], 'fill-opacity': 0.82 },
+      layout: { visibility: activeLens === 'polities' ? 'visible' : 'none' },
     });
     map.addLayer({
       id: 'land-coast',
@@ -854,8 +1028,64 @@ map.on('load', async () => {
       layout: { 'line-join': 'round' },
     });
 
+    map.addLayer({
+      id: 'society-fill',
+      type: 'fill',
+      source: 'societies',
+      filter: yearFilter(year),
+      paint: { 'fill-color': ['get', 'c'], 'fill-opacity': 0.48 },
+      layout: { visibility: activeLens === 'societies' ? 'visible' : 'none' },
+    });
+    map.addLayer({
+      id: 'society-casing',
+      type: 'line',
+      source: 'societies',
+      filter: yearFilter(year),
+      paint: {
+        'line-color': '#201811',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.9, 4, 1.4, 9, 2.4],
+        'line-opacity': 0.34,
+      },
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round',
+        visibility: activeLens === 'societies' ? 'visible' : 'none',
+      },
+    });
+    map.addLayer({
+      id: 'society-line',
+      type: 'line',
+      source: 'societies',
+      filter: yearFilter(year),
+      paint: {
+        'line-color': '#2a2118',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.35, 4, 0.65, 9, 1.3],
+        'line-opacity': 0.68,
+      },
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round',
+        visibility: activeLens === 'societies' ? 'visible' : 'none',
+      },
+    });
+    map.addLayer({
+      id: 'society-hl',
+      type: 'line',
+      source: 'societies',
+      filter: ['==', ['get', 'k'], -1],
+      paint: {
+        'line-color': '#f6e7b8',
+        'line-width': 2.2,
+        'line-opacity': 0.95,
+      },
+      layout: {
+        'line-join': 'round',
+        visibility: activeLens === 'societies' ? 'visible' : 'none',
+      },
+    });
+
     map.on('click', (event) => {
-      const hits = map.queryRenderedFeatures(event.point, { layers: ['polity-fill'] });
+      const hits = map.queryRenderedFeatures(event.point, { layers: [activeFillLayer()] });
       if (!hits.length) {
         closePanel();
         return;
@@ -863,12 +1093,16 @@ map.on('load', async () => {
       const properties = hits[hits.length - 1].properties as unknown as Props;
       if (typeof properties.k === 'number') openPanel(properties);
     });
-    map.on('mousemove', 'polity-fill', () => {
-      map.getCanvas().style.cursor = 'pointer';
-    });
-    map.on('mouseleave', 'polity-fill', () => {
-      map.getCanvas().style.cursor = '';
-    });
+    for (const layer of ['polity-fill', 'society-fill']) {
+      map.on('mousemove', layer, () => {
+        if (layer === activeFillLayer()) map.getCanvas().style.cursor = 'pointer';
+      });
+      map.on('mouseleave', layer, () => {
+        if (layer === activeFillLayer()) map.getCanvas().style.cursor = '';
+      });
+    }
+    map.on('move', scheduleLabels);
+    map.on('zoom', scheduleLabels);
     map.on('moveend', () => {
       scheduleLabels();
       scheduleHash();
@@ -879,10 +1113,14 @@ map.on('load', async () => {
     });
     map.on('resize', scheduleLabels);
 
+    updateLensButtons();
+    setLensVisibility();
     setYear(year);
     scheduleLabels();
+    dataReady = true;
     checkSources();
     map.once('idle', finishLoading);
+    window.setTimeout(finishLoading, 1200);
     window.setTimeout(() => {
       if (!loadingDone && !map.isSourceLoaded('polities')) {
         loadingText.textContent = 'Still building the map…';

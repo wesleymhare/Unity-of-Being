@@ -8,29 +8,31 @@
   <meta name="theme-color" content="#161d24">
   <link rel="icon" href="data:,">
   <link rel="preconnect" href="https://en.wikipedia.org">
-  <link rel="preconnect" href="https://upload.wikimedia.org">
   <link rel="preconnect" href="https://www.wikidata.org">
 </head>
 <body>
   <header id="topbar">
     <div class="brand">Unity of Being</div>
-    <div class="lens" aria-label="Current view">Polities</div>
+    <div class="lens-switch" role="group" aria-label="Map lens">
+      <button type="button" class="lens-btn is-active" data-lens="polities" aria-pressed="true">Polities</button>
+      <button type="button" class="lens-btn" data-lens="societies" aria-pressed="false">Societies</button>
+    </div>
     <div class="era">3400 BCE – 2024 CE</div>
   </header>
 
-  <div id="map" role="application" aria-label="Map of historical polities"></div>
+  <div id="map" role="application" aria-label="Map of historical polities and societies"></div>
 
   <div id="loading" role="status" aria-live="polite">
     <div id="loading-text">Loading map data…</div>
     <div class="loading-bar" aria-hidden="true"><i id="loading-progress"></i></div>
   </div>
 
-  <aside id="panel" hidden aria-live="polite" aria-label="Polity details">
+  <aside id="panel" hidden aria-live="polite" aria-label="Feature details">
     <div class="panel-top">
       <div class="kicker">
         <span id="p-swatch" class="swatch" aria-hidden="true"></span>
-        <span>Polity</span>
-        <span class="kicker-src">Cliopatria</span>
+        <span id="p-kind">Polity</span>
+        <span id="p-source" class="kicker-src">Cliopatria</span>
       </div>
       <button id="panel-close" type="button" aria-label="Close panel">×</button>
     </div>
@@ -39,10 +41,14 @@
     <div id="p-years" class="meta"></div>
 
     <div class="panel-body">
-      <figure id="p-figure" hidden>
-        <img id="p-image" alt="" loading="lazy" decoding="async">
-        <figcaption id="p-caption"></figcaption>
-      </figure>
+      <div id="p-leaders" class="leaders" hidden>
+        <div class="leaders-head" id="p-leaders-head">Ruler</div>
+        <ul id="p-leaders-list"></ul>
+        <div id="p-leaders-history" class="leaders-history" hidden>
+          <div class="leaders-subhead">Reign sequence</div>
+          <ol id="p-leaders-history-list"></ol>
+        </div>
+      </div>
 
       <p id="p-summary" class="summary" aria-live="polite"></p>
       <div id="p-fallback" class="fallback" hidden></div>
@@ -62,7 +68,7 @@
         <a id="p-wd-link" href="#" target="_blank" rel="noopener noreferrer" hidden>Wikidata</a>
       </div>
 
-      <p class="fine">Text: Wikipedia (CC BY-SA) · Facts: Wikidata (CC0) · Modern map: OpenStreetMap (ODbL)</p>
+      <p id="p-fine" class="fine">Text: Wikipedia (CC BY-SA) · Facts: Wikidata (CC0) · Modern map: OpenStreetMap (ODbL)</p>
     </div>
   </aside>
 
@@ -89,9 +95,10 @@
     </div>
     <div class="credits">
       Borders &amp; dates: <a href="https://github.com/Seshat-Global-History-Databank/cliopatria" target="_blank" rel="noopener noreferrer">Cliopatria</a> (Seshat, CC BY 4.0) ·
+      Societies: <a href="https://github.com/Glottography/asher2007world" target="_blank" rel="noopener noreferrer">Glottography / Asher &amp; Moseley 2007</a> (CC BY 4.0) ·
       Coastlines, rivers &amp; lakes: Natural Earth (public domain) ·
-      Text: Wikipedia (CC BY-SA) · Facts: Wikidata (CC0) · Modern map: OpenStreetMap (ODbL).
-      Borders are one scholarly reading and often disputed.
+      Text: Wikipedia (CC BY-SA) · Facts &amp; rulers: Wikidata (CC0) · Modern map: OpenStreetMap (ODbL).
+      Borders and society areas are scholarly approximations and often disputed.
     </div>
   </footer>
 

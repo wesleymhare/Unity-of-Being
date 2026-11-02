@@ -180,6 +180,7 @@ export class LabelLayer<T extends LabelProps> {
     interface Candidate { f: T; x: number; y: number; score: number; rank: number }
     const candidates: Candidate[] = [];
     for (const f of this.active) {
+      if (!Number.isFinite(f.lx) || !Number.isFinite(f.ly) || !Number.isFinite(f.sz)) continue;
       const score = f.sz * ppd;
       const isSelected = f.k === this.selectedKey;
       if (score < 26 && !isSelected) continue;

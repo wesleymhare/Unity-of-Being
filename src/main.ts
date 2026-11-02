@@ -89,6 +89,8 @@ const panel = $('panel');
 const loading = $('loading');
 const loadingText = $('loading-text');
 const loadingProgress = $<HTMLElement>('loading-progress');
+const mapVeil = $('map-veil');
+const mapVeilText = $('map-veil-text');
 const legend = $('legend');
 const legendTitle = $('legend-title');
 const legendBody = $('legend-body');
@@ -779,6 +781,10 @@ function setLens(next: Lens): void {
   if (next === 'biomes' && !biomeModel) return;
   closePanel();
   activeLens = next;
+  const source = activeSourceId();
+  if (map.getSource(source) && !map.isSourceLoaded(source)) {
+    showVeil(next === 'societies' ? 'Drawing societies…' : next === 'biomes' ? 'Drawing climate…' : 'Drawing borders…');
+  }
   polityLabels.clear();
   societyLabels.clear();
   setLensVisibility();
@@ -875,20 +881,38 @@ function finishLoading(): void {
   if (loadingDone || !dataReady) return;
   loadingDone = true;
   loading.classList.add('hide');
+  mapVeil.hidden = true;
   window.setTimeout(() => {
     loading.hidden = true;
   }, 260);
 }
 function failLoading(message: string): void {
+  mapVeil.hidden = false;
+  mapVeilText.textContent = message;
   loadingText.textContent = message;
   loading.classList.add('error');
   loadingProgress.style.width = '0%';
 }
 
+function activeSourceId(): string {
+  return activeLens === 'polities' ? 'polities' : activeLens === 'societies' ? 'societies' : 'ocean';
+}
+
+/** Show the veil while a lens that has not drawn yet is being tiled. */
+function showVeil(message: string): void {
+  loadingDone = false;
+  loading.hidden = false;
+  loading.classList.remove('hide', 'error');
+  loadingText.textContent = message;
+  loadingProgress.style.width = '100%';
+  mapVeil.hidden = false;
+  mapVeilText.textContent = message;
+}
+
 /** Hide the loader once the active lens has real pixels to show. */
 function checkSources(): void {
   if (!dataReady || loadingDone) return;
-  const source = activeLens === 'polities' ? 'polities' : activeLens === 'societies' ? 'societies' : 'ocean';
+  const source = activeSourceId();
   if (map.getSource(source) && map.isSourceLoaded(source)) finishLoading();
 }
 

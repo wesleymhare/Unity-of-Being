@@ -25,6 +25,11 @@
 - Biomes now use the Köppen hue with a per-ecoregion lightness shade (six shades, graph-coloured so neighbours differ). See `docs/BIOMES.md`, section Colour.
 - Realistic climate through time is still **blocked on network access**: the coding sandbox cannot reach the climate dataset hosts (checked worldclim.org, envidat.ch, chelsa-climate.org, zenodo.org, NOAA, PANGAEA). Plan is in `docs/PLAN-REALISTIC-CLIMATE.md`.
 
+### Societies made temporal (3 November 2026)
+- A society is now a dated **stage** in a **lineage**, at three levels (broad sphere, people, local identity). The panel shows "This society through time" and jumps between stages. Local identities fade in when zoomed in. See `docs/SOCIETIES.md`.
+- About 400 stages (was 167): added stages for the Arabian, Kurdish, Sicilian, Occitan, Albanian, Dravidian, Southern California and many other threads, in `data/societies_more_1.py` to `_3.py`.
+- Coverage is thinner for sub-Saharan Africa, the Pacific, Central and South America and Siberia; footprints are rough and many stage links are interpretive.
+
 ## Known rough edges
 - Ecoregions are modern in every year; only the Köppen half of a biome label changes with time.
 - Initial load downloads and parses the 25 MB border GeoJSON: several seconds on slow machines. Fix later with vector tiles (PMTiles) or per-era files.

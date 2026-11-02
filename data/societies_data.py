@@ -475,5 +475,5 @@ add('French Canadians', 1608, 2024, 'IE', 'People', 'Indo-European (Romance: Fre
 # ---- Later batches (stages in time, local identities) ------------------------
 import importlib  # noqa: E402
 
-for _module in ('societies_more_1',):
+for _module in ('societies_more_1', 'societies_more_2', 'societies_more_3'):
     importlib.import_module(_module).register()

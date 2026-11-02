@@ -203,13 +203,30 @@ playBtn.addEventListener('click', () => {
   requestAnimationFrame(tick);
 });
 
+async function getJson(url: string, onProgress?: (mb: number) => void): Promise<any> {
+  const res = await fetch(url);
+  if (!res.ok || !res.body) throw new Error(`${url}: ${res.status}`);
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let got = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    got += value.length;
+    onProgress?.(got / 1048576);
+  }
+  return JSON.parse(await new Blob(chunks as BlobPart[]).text());
+}
+
 // ---- Data -------------------------------------------------------------------
 map.on('load', async () => {
   try {
     const [land, polities] = await Promise.all([
-      fetch(`${BASE}data/land.geojson`).then((r) => r.json()),
-      fetch(`${BASE}data/polities.geojson`).then((r) => r.json()),
+      getJson(`${BASE}data/land.geojson`),
+      getJson(`${BASE}data/polities.geojson`, (mb) => (loading.textContent = `Downloading borders… ${mb.toFixed(1)} MB`)),
     ]);
+    loading.textContent = 'Building map…';
     features = polities.features;
     features.forEach((f, i) => {
       f.properties.k = i;
@@ -249,11 +266,14 @@ map.on('load', async () => {
     map.on('zoomend', updateLabels);
     map.on('moveend', writeHash);
 
-    map.once('idle', () => loading.classList.add('hide'));
+    const done = (): void => loading.classList.add('hide');
+    map.once('idle', done);
+    map.on('sourcedata', () => { if (map.isSourceLoaded('polities')) done(); });
+    setTimeout(done, 20000);
     setYear(year);
     updateLabels();
   } catch (err) {
-    loading.textContent = 'Could not load map data. Please reload.';
+    loading.textContent = `Could not load map data (${(err as Error).message}). Please reload.`;
     console.error(err);
   }
 });

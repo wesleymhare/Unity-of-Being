@@ -25,6 +25,10 @@
 - Biomes now use the Köppen hue with a per-ecoregion lightness shade (six shades, graph-coloured so neighbours differ). See `docs/BIOMES.md`, section Colour.
 - Realistic climate through time is still **blocked on network access**: the coding sandbox cannot reach the climate dataset hosts (checked worldclim.org, envidat.ch, chelsa-climate.org, zenodo.org, NOAA, PANGAEA). Plan is in `docs/PLAN-REALISTIC-CLIMATE.md`.
 
+### Biome time model and overlap clicking (3 November 2026)
+- Biomes through time now use a **regional event model** instead of a latitude slide: temperature scaled by region plus eight rainfall events (African Humid Period, 4.2 ka drought, Late Bronze Age drought, monsoon changes, Medieval Southwest megadrought, Classic Maya drought, wetter Mediterranean). See `docs/BIOMES.md`. Still rough, not a reconstruction.
+- Clicking where several societies or polities overlap opens the top one and lists the rest as "Also here" chips in the panel.
+
 ### Societies made temporal (3 November 2026)
 - A society is now a dated **stage** in a **lineage**, at three levels (broad sphere, people, local identity). The panel shows "This society through time" and jumps between stages. Local identities fade in when zoomed in. See `docs/SOCIETIES.md`.
 - About 400 stages (was 167): added stages for the Arabian, Kurdish, Sicilian, Occitan, Albanian, Dravidian, Southern California and many other threads, in `data/societies_more_1.py` to `_3.py`.

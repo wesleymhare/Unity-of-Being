@@ -59,40 +59,43 @@ The work is redone, debounced, only when the climate state changes (about 0.1 se
 
 ## How the past is drawn
 
-There is no global gridded reconstruction behind this. The map for any year is the
-modern map moved by two small, smooth adjustments (`src/biomes.ts`):
+There is no global gridded reconstruction behind this yet (the data-based plan is in
+`docs/PLAN-REALISTIC-CLIMATE.md` and waits on network access to the climate datasets).
+Until then the map for any year is the modern map **resampled from a different place**:
+each cell takes the class the modern map has at an offset position. The offset is computed
+on 0.5 degree blocks (`src/biomes.ts`) and has two parts.
 
-1. **Warm and cold swings**, in degrees of latitude. In a warmer age a place gets
-   the climate that lies that many degrees nearer the equator today; in a colder
-   age, nearer the pole. The effect fades out in the tropics (below 15 degrees),
-   where temperature barely separates Köppen classes. Roughly 1.25 degrees of
-   latitude is about 1 °C.
-2. **African Humid Period.** Until about 3000 BCE the Sahara, Arabia and the Thar
-   were wetter. Dry classes in that belt take the class found up to 8 degrees
-   further south today. The signal fades to nothing by about 1000 BCE.
+1. **Temperature.** A global warm/cold series, in degrees of latitude (about 1.25 degrees
+   per °C), scaled by region: about 1.5 times stronger over the North Atlantic and Europe,
+   stronger toward the Arctic, half as strong in the Southern Hemisphere, and absent in the
+   tropics (below 15 degrees) where temperature barely separates Köppen classes. An extra
+   early-Holocene warmth applies north of about 45 degrees until about 1000 BCE.
+2. **Regional events**, each with its own area, direction and timeline (`REGIONS`):
 
-| Years | Climate age | Warm shift (deg. of latitude) |
-|---|---|---|
-| 3400 to 2500 BCE | Mid-Holocene warmth, African Humid Period ending | +1.3 to +0.9 |
-| 2500 to 1000 BCE | Late Holocene drying | +0.9 to +0.1 |
-| 1000 to 250 BCE | Iron Age cool phase | about −0.4 to +0.3 |
-| 250 BCE to 400 CE | Roman Warm Period | up to +0.7 |
-| 400 to 900 CE | Late Antique cold phase | about −0.5 |
-| 900 to 1300 CE | Medieval Climate Anomaly | up to +0.8 |
-| 1300 to 1850 CE | Little Ice Age | down to −1.2 |
-| 1850 to 1975 CE | Industrial-era warming | −0.6 to 0 |
-| 1975 to 2024 CE | Modern reference, then recent warming | 0 to +0.5 |
+| Event | Where | When (peak) | Effect |
+|---|---|---|---|
+| African Humid Period | Sahara, Sahel, Arabia | until about 3000 BCE, gone by 600 BCE | wetter: classes shift north |
+| Stronger Indian monsoon | Thar, Indus | until about 2500 BCE | wetter |
+| Stronger East Asian monsoon | northern China, Mongolia | until about 2000 BCE | wetter |
+| 4.2 ka drought | Mesopotamia, Levant, Iran | about 2200 to 1900 BCE | drier |
+| Late Bronze Age drought | Anatolia, eastern Mediterranean | about 1200 BCE | drier |
+| Wetter Mediterranean | Mediterranean | Little Ice Age, peak about 1650 CE | wetter |
+| Medieval megadrought | American Southwest and Plains | about 1150 to 1300 CE | drier |
+| Classic Maya drought | Yucatán and the Maya lowlands | about 800 to 1000 CE | drier |
 
-The keyframes live in `KEYFRAMES` in `src/biomes.ts`; change them there.
+The global series: mid-Holocene warmth to 2500 BCE, cool phase about 750 BCE, Roman Warm
+Period about 1 CE, Late Antique cold phase about 550 CE, Medieval Climate Anomaly about
+1050 CE, Little Ice Age about 1650 CE, then industrial-era warming. Edit the keyframes
+and regions in `src/biomes.ts`.
 
 ## Limits (read before trusting it)
 
 - **Ecoregions are modern.** They are drawn with today's borders and names in every
   year; only the Köppen class half of each label changes with time. Real ecoregions
   also shifted over the millennia, and none of that is modelled.
-- This shows direction and rough size of climate change, not a reconstruction. Real swings
-  were regional, not a clean latitude shift. The Medieval Climate Anomaly and Little Ice
-  Age, for example, were not synchronous worldwide.
+- This shows the direction, place and rough size of well-known climate events, not a
+  reconstruction. Class borders can be wrong by hundreds of kilometres, and many regional
+  events (for example monsoon changes in Africa south of the Sahel, or the Andes) are not modelled.
 - Mountains, monsoon strength, ocean currents, sea level and coastlines are not
   adjusted. Rainfall changes outside the Africa–Arabia–Thar belt are not modelled.
 - The 1/12 degree grid (about 9 km) is coarse for small ecoregions; the smallest get

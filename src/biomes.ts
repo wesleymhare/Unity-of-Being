@@ -92,43 +92,81 @@ export const CLASSES: (KoppenClass | null)[] = [
 }
 
 // ---- Climate through time --------------------------------------------------
-interface Keyframe { year: number; warm: number; humid: number }
+//
+// There is no global gridded reconstruction behind this (see
+// docs/PLAN-REALISTIC-CLIMATE.md for the data-based plan). The map for any year is the
+// modern map *resampled from a different place*: each cell takes the class that
+// the modern map has at an offset position. The offset has two parts:
+//
+//  1. Temperature: a global warm/cold series (in degrees of latitude, about 1.25
+//     degrees of latitude per °C) scaled by region: stronger in the North Atlantic
+//     and Europe and in the Arctic, weaker in the Southern Hemisphere, and absent
+//     in the tropics. A high-latitude Northern Hemisphere extra gives the early
+//     Holocene warm period.
+//  2. Regional events: rainfall changes with their own area, direction and
+//     timeline, taken from well-documented palaeoclimate history (the African
+//     Humid Period, the 4.2 ka drought, the Late Bronze Age drought, a stronger
+//     Asian monsoon, the Medieval megadrought in the American Southwest, the Classic
+//     Maya drought, a wetter Mediterranean in the Little Ice Age).
+//
+// All of it is rough: it shows the direction, place and rough size of events.
+// Class borders can be wrong by hundreds of kilometres.
 
-// `warm` is in degrees of latitude (positive = warmer than the 1951–2000
-// reference). About 1.25 degrees of latitude is roughly 1 °C. Values follow the
-// general shape of Holocene temperature reconstructions and are deliberately
-// small and smooth.
+interface Keyframe { year: number; warm: number }
+
+// Global warm (+) or cold (-) in degrees of latitude relative to 1951-2000.
 const KEYFRAMES: Keyframe[] = [
-  { year: -3400, warm: 1.3, humid: 0.85 },
-  { year: -3000, warm: 1.1, humid: 0.65 },
-  { year: -2500, warm: 0.9, humid: 0.42 },
-  { year: -2000, warm: 0.8, humid: 0.26 },
-  { year: -1500, warm: 0.6, humid: 0.14 },
-  { year: -1000, warm: 0.1, humid: 0.05 },
-  { year: -750, warm: -0.4, humid: 0 },
-  { year: -500, warm: -0.2, humid: 0 },
-  { year: -250, warm: 0.3, humid: 0 },
-  { year: 1, warm: 0.7, humid: 0 },
-  { year: 200, warm: 0.6, humid: 0 },
-  { year: 400, warm: 0.2, humid: 0 },
-  { year: 550, warm: -0.5, humid: 0 },
-  { year: 700, warm: -0.2, humid: 0 },
-  { year: 900, warm: 0.4, humid: 0 },
-  { year: 1050, warm: 0.8, humid: 0 },
-  { year: 1200, warm: 0.6, humid: 0 },
-  { year: 1300, warm: 0.2, humid: 0 },
-  { year: 1400, warm: -0.3, humid: 0 },
-  { year: 1550, warm: -0.9, humid: 0 },
-  { year: 1650, warm: -1.2, humid: 0 },
-  { year: 1750, warm: -1.0, humid: 0 },
-  { year: 1850, warm: -0.6, humid: 0 },
-  { year: 1900, warm: -0.3, humid: 0 },
-  { year: 1975, warm: 0, humid: 0 },
-  { year: 2024, warm: 0.5, humid: 0 },
+  { year: -3400, warm: 0.9 }, { year: -3000, warm: 0.8 }, { year: -2500, warm: 0.6 },
+  { year: -2000, warm: 0.5 }, { year: -1500, warm: 0.4 }, { year: -1000, warm: 0.0 },
+  { year: -750, warm: -0.4 }, { year: -500, warm: -0.2 }, { year: -250, warm: 0.3 },
+  { year: 1, warm: 0.6 }, { year: 200, warm: 0.5 }, { year: 400, warm: 0.1 },
+  { year: 550, warm: -0.5 }, { year: 700, warm: -0.2 }, { year: 900, warm: 0.3 },
+  { year: 1050, warm: 0.6 }, { year: 1200, warm: 0.5 }, { year: 1300, warm: 0.1 },
+  { year: 1400, warm: -0.3 }, { year: 1550, warm: -0.8 }, { year: 1650, warm: -1.0 },
+  { year: 1750, warm: -0.8 }, { year: 1850, warm: -0.5 }, { year: 1900, warm: -0.3 },
+  { year: 1975, warm: 0 }, { year: 2024, warm: 0.5 },
+];
+
+// Extra warmth at high northern latitudes in the early Holocene (degrees of latitude).
+const HIGH_LAT_EXTRA: [number, number][] = [[-3400, 1.0], [-2500, 0.7], [-1800, 0.3], [-1000, 0]];
+
+interface Region {
+  id: string;
+  /** Shown when the event is active. */
+  label: string;
+  lon: number;
+  lat: number;
+  /** Radii in degrees. */
+  rx: number;
+  ry: number;
+  /** At full strength, each cell takes the modern class from this far east and north (degrees). */
+  dx: number;
+  dy: number;
+  /** [year, strength 0 to 1] keyframes. */
+  curve: [number, number][];
+}
+
+const REGIONS: Region[] = [
+  { id: 'ahp-africa', label: 'African Humid Period: wetter Sahara and Arabia', lon: 22, lat: 21, rx: 46, ry: 11, dx: 0, dy: -11,
+    curve: [[-3400, 0.85], [-3000, 0.62], [-2600, 0.4], [-2250, 0.14], [-1800, 0.14], [-1200, 0.06], [-600, 0]] },
+  { id: 'ahp-thar', label: 'Stronger Indian monsoon: wetter Thar and Indus', lon: 71, lat: 26, rx: 11, ry: 7, dx: 5, dy: -5,
+    curve: [[-3400, 0.8], [-2600, 0.6], [-2250, 0.2], [-1800, 0.3], [-1200, 0.1], [-600, 0]] },
+  { id: 'monsoon-china', label: 'Stronger East Asian monsoon: wetter northern China and Mongolia', lon: 108, lat: 40, rx: 24, ry: 9, dx: 4, dy: -4,
+    curve: [[-3400, 0.65], [-2500, 0.5], [-2100, 0.25], [-1500, 0.3], [-1000, 0.12], [-300, 0]] },
+  { id: 'drought-4200', label: '4.2 ka drought: drier Mesopotamia, Levant and Iran', lon: 42, lat: 34, rx: 24, ry: 8, dx: 0, dy: -4,
+    curve: [[-2400, 0], [-2200, 0.9], [-2000, 0.85], [-1900, 0.45], [-1700, 0]] },
+  { id: 'drought-lba', label: 'Late Bronze Age drought: drier Anatolia and the eastern Mediterranean', lon: 33, lat: 37, rx: 14, ry: 6, dx: 0, dy: -3,
+    curve: [[-1300, 0], [-1200, 0.75], [-1100, 0.5], [-1000, 0]] },
+  { id: 'wet-lia-med', label: 'Wetter Mediterranean', lon: 14, lat: 40, rx: 28, ry: 6, dx: 0, dy: 2.5,
+    curve: [[1400, 0], [1550, 0.5], [1650, 1], [1800, 0.5], [1860, 0]] },
+  { id: 'drought-sw', label: 'Megadrought in the American Southwest and Plains', lon: -106, lat: 37, rx: 18, ry: 8, dx: -3, dy: -4,
+    curve: [[850, 0], [1000, 0.5], [1150, 0.9], [1300, 0.9], [1380, 0.3], [1450, 0]] },
+  { id: 'drought-maya', label: 'Classic Maya drought', lon: -90, lat: 18, rx: 6, ry: 4, dx: -3, dy: 3,
+    curve: [[740, 0], [800, 0.5], [900, 0.95], [1000, 0.9], [1100, 0.3], [1200, 0]] },
 ];
 
 const ERAS: { to: number; label: string }[] = [
-  { to: -2500, label: 'Mid-Holocene warmth and the African Humid Period' },
+  { to: -2500, label: 'Mid-Holocene warmth' },
   { to: -1000, label: 'Late Holocene drying' },
   { to: -250, label: 'Iron Age cool phase' },
   { to: 400, label: 'Roman Warm Period' },
@@ -139,35 +177,42 @@ const ERAS: { to: number; label: string }[] = [
   { to: 9999, label: 'Modern reference period' },
 ];
 
+function curveAt(curve: [number, number][], year: number): number {
+  if (year <= curve[0][0]) return curve[0][1];
+  for (let i = 0; i < curve.length - 1; i++) {
+    const [y0, v0] = curve[i];
+    const [y1, v1] = curve[i + 1];
+    if (year <= y1) {
+      const t = (year - y0) / (y1 - y0);
+      return v0 + (v1 - v0) * (t * t * (3 - 2 * t));
+    }
+  }
+  return curve[curve.length - 1][1];
+}
+
 export interface ClimateShift {
+  /** Global warm (+) or cold (-) in degrees of latitude. */
   warm: number;
-  humid: number;
+  /** Era name. */
   era: string;
+  /** Strength (0 to 1) of every regional event, in REGIONS order. */
+  strengths: number[];
+  /** Labels of the regional events that are noticeably active. */
+  events: string[];
 }
 
 export function climateShift(year: number): ClimateShift {
-  let a = KEYFRAMES[0];
-  let b = KEYFRAMES[KEYFRAMES.length - 1];
-  for (let i = 0; i < KEYFRAMES.length - 1; i++) {
-    if (year >= KEYFRAMES[i].year && year <= KEYFRAMES[i + 1].year) {
-      a = KEYFRAMES[i];
-      b = KEYFRAMES[i + 1];
-      break;
-    }
-  }
-  const t = b.year === a.year ? 0 : Math.min(1, Math.max(0, (year - a.year) / (b.year - a.year)));
-  const smooth = t * t * (3 - 2 * t);
+  const warm = curveAt(KEYFRAMES.map((k): [number, number] => [k.year, k.warm]), year);
+  const strengths = REGIONS.map((region) => curveAt(region.curve, year));
+  const events = REGIONS.filter((_, i) => strengths[i] > 0.25).map((region) => region.label);
   const era = (ERAS.find((e) => year < e.to) ?? ERAS[ERAS.length - 1]).label;
-  return {
-    warm: a.warm + (b.warm - a.warm) * smooth,
-    humid: a.humid + (b.humid - a.humid) * smooth,
-    era,
-  };
+  return { warm, era, strengths, events };
 }
 
 // ---- Grid ------------------------------------------------------------------
 const CELLS_PER_DEGREE = 12;
-const HUMID_REACH_DEGREES = 8;
+/** Cells per side of the blocks the climate offset is computed on (0.5 degree). */
+const BLOCK = 6;
 const CANVAS_SIZE = 2048;
 const MERCATOR_LIMIT = 85.0511287798;
 const MIN_PATCH_CELLS = 10;
@@ -176,6 +221,17 @@ const smoothstep = (edge0: number, edge1: number, x: number): number => {
   const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
   return t * t * (3 - 2 * t);
 };
+
+/** Soft elliptical weight (1 at the centre, 0 at and beyond the edge), wrapping around the date line. */
+function ellipseWeight(lon: number, lat: number, cx: number, cy: number, rx: number, ry: number): number {
+  let dx = lon - cx;
+  if (dx > 180) dx -= 360;
+  else if (dx < -180) dx += 360;
+  const d2 = (dx / rx) ** 2 + ((lat - cy) / ry) ** 2;
+  if (d2 >= 1) return 0;
+  const f = 1 - d2;
+  return f * f;
+}
 
 /** Names and groupings of the ecoregions, from public/data/ecoregions.json. */
 export interface EcoMeta {
@@ -268,9 +324,13 @@ export class BiomeModel {
   private readonly cls: Uint8Array;
   private readonly rowOfY = new Int32Array(CANVAS_SIZE);
   private readonly colOfX = new Int32Array(CANVAS_SIZE);
-  private readonly bandOfRow: Float32Array;
-  private readonly warmOfRow: Float32Array;
-  private readonly lonFactor: Float32Array;
+  /** Per 0.5-degree block: latitude, temperature scale, high-latitude weight, and each region's weight. */
+  private readonly blockLat: Float32Array;
+  private readonly blockTemp: Float32Array;
+  private readonly blockHigh: Float32Array;
+  private readonly blockRegion: Float32Array[];
+  private readonly rowShift: Int16Array;
+  private readonly colShift: Int16Array;
   private lastKey = '';
 
   constructor(koppen: ArrayBuffer, ecoregions: ArrayBuffer, meta: EcoMeta) {
@@ -313,17 +373,33 @@ export class BiomeModel {
       this.colOfX[x] = Math.min(this.width - 1, Math.floor(((x + 0.5) / CANVAS_SIZE) * this.width));
     }
 
-    // Per-row and per-column weights for the climate shifts.
-    this.bandOfRow = new Float32Array(this.height);
-    this.warmOfRow = new Float32Array(this.height);
-    for (let r = 0; r < this.height; r++) {
-      const lat = 90 - (r + 0.5) / CELLS_PER_DEGREE;
-      this.warmOfRow[r] = BiomeModel.warmWeight(lat);
-      this.bandOfRow[r] = BiomeModel.humidBand(lat);
-    }
-    this.lonFactor = new Float32Array(this.width);
-    for (let c = 0; c < this.width; c++) {
-      this.lonFactor[c] = BiomeModel.humidLon(-180 + (c + 0.5) / CELLS_PER_DEGREE);
+    // Per-block weights for the temperature scaling and the regional events.
+    const bw = Math.floor(this.width / BLOCK);
+    const bh = Math.floor(this.height / BLOCK);
+    this.blockLat = new Float32Array(bw * bh);
+    this.blockTemp = new Float32Array(bw * bh);
+    this.blockHigh = new Float32Array(bw * bh);
+    this.blockRegion = REGIONS.map(() => new Float32Array(bw * bh));
+    this.rowShift = new Int16Array(bw * bh);
+    this.colShift = new Int16Array(bw * bh);
+    for (let by = 0; by < bh; by++) {
+      const lat = 90 - ((by + 0.5) * BLOCK) / CELLS_PER_DEGREE;
+      for (let bx = 0; bx < bw; bx++) {
+        const lon = -180 + ((bx + 0.5) * BLOCK) / CELLS_PER_DEGREE;
+        const i = by * bw + bx;
+        this.blockLat[i] = lat;
+        // Temperature: none in the tropics, half as strong in the south, stronger over the
+        // North Atlantic and Europe and in the Arctic.
+        const warmW = smoothstep(15, 35, Math.abs(lat));
+        const hemi = lat >= 0 ? 0.8 : 0.4;
+        const atlantic = lat > 0 ? ellipseWeight(lon, lat, -8, 56, 50, 22) : 0;
+        const arctic = lat > 0 ? smoothstep(55, 75, lat) : 0;
+        this.blockTemp[i] = warmW * hemi * (1 + 0.5 * atlantic + 0.4 * arctic);
+        this.blockHigh[i] = lat > 0 ? smoothstep(45, 65, lat) : 0;
+        REGIONS.forEach((region, r) => {
+          this.blockRegion[r][i] = ellipseWeight(lon, lat, region.lon, region.lat, region.rx, region.ry);
+        });
+      }
     }
   }
 
@@ -402,60 +478,68 @@ export class BiomeModel {
     return Math.min(this.height - 1, Math.max(0, Math.floor((90 - lat) * CELLS_PER_DEGREE)));
   }
 
-  /** Weight (0 to 1) of the warm/cold swing at a latitude: none in the tropics. */
-  private static warmWeight(lat: number): number {
-    return smoothstep(15, 35, Math.abs(lat));
-  }
-
-  /** Latitude part of the African Humid Period belt weight. */
-  private static humidBand(lat: number): number {
-    return smoothstep(8, 15, lat) * (1 - smoothstep(30, 36, lat));
-  }
-
-  /** Longitude part of the African Humid Period belt weight (Africa, Arabia, the Thar). */
-  private static humidLon(lng: number): number {
-    const east = 1 - 0.65 * smoothstep(62, 80, lng) - 0.35 * smoothstep(80, 90, lng);
-    return Math.max(0, east) * smoothstep(-26, -18, lng);
-  }
-
   /**
    * Work out the Köppen class of every cell for a year. Returns false when the
    * climate state is the same as last time (so nothing needs redrawing).
    */
   update(year: number): boolean {
     const shift = climateShift(year);
-    const key = `${Math.round(shift.warm * 8)}|${Math.round(shift.humid * 40)}`;
+    const high = curveAt(HIGH_LAT_EXTRA, year);
+    const key = `${Math.round(shift.warm * 10)}|${Math.round(high * 10)}|${shift.strengths.map((v) => Math.round(v * 20)).join(',')}`;
     if (key === this.lastKey) return false;
     this.lastKey = key;
 
-    const { grid, cls, width, height, warmOfRow, bandOfRow, lonFactor } = this;
-    const warmRowsBase = shift.warm * CELLS_PER_DEGREE;
-    const humidRowsBase = shift.humid * HUMID_REACH_DEGREES * CELLS_PER_DEGREE;
+    const { grid, cls, width, height, blockLat, blockTemp, blockHigh, blockRegion, rowShift, colShift } = this;
+    const bw = Math.floor(width / BLOCK);
+    const bh = Math.floor(height / BLOCK);
+    const active = REGIONS.map((_, r) => r).filter((r) => shift.strengths[r] > 0.02);
 
-    for (let row = 0; row < height; row++) {
-      const warm = warmRowsBase * warmOfRow[row] * (row < height / 2 ? 1 : -1);
-      const band = humidRowsBase !== 0 ? humidRowsBase * bandOfRow[row] : 0;
-      const offset = row * width;
-      if (warm === 0 && band === 0) {
-        cls.set(grid.subarray(offset, offset + width), offset);
-        continue;
+    // Offset (in cells) of the place each block takes its class from.
+    for (let i = 0; i < bw * bh; i++) {
+      const lat = blockLat[i];
+      const warm = shift.warm * blockTemp[i] + high * blockHigh[i];
+      let dyDeg = lat >= 0 ? -warm : warm; // warmer: take the class from nearer the equator
+      let dxDeg = 0;
+      for (const r of active) {
+        const weight = shift.strengths[r] * blockRegion[r][i];
+        if (weight < 0.003) continue;
+        dyDeg += weight * REGIONS[r].dy;
+        dxDeg += weight * REGIONS[r].dx;
       }
-      for (let col = 0; col < width; col++) {
-        const base = grid[offset + col];
-        if (base === 0) {
-          cls[offset + col] = 0;
-          continue;
+      rowShift[i] = Math.round(-dyDeg * CELLS_PER_DEGREE); // rows grow southward
+      colShift[i] = Math.round(dxDeg * CELLS_PER_DEGREE);
+    }
+
+    for (let by = 0; by < bh; by++) {
+      for (let bx = 0; bx < bw; bx++) {
+        const i = by * bw + bx;
+        const rs = rowShift[i];
+        const cs = colShift[i];
+        for (let r = 0; r < BLOCK; r++) {
+          const row = by * BLOCK + r;
+          const offset = row * width;
+          for (let c = 0; c < BLOCK; c++) {
+            const col = bx * BLOCK + c;
+            const base = grid[offset + col];
+            if (base === 0 || (rs === 0 && cs === 0)) {
+              cls[offset + col] = base;
+              continue;
+            }
+            let movedRow = row + rs;
+            if (movedRow < 0) movedRow = 0;
+            else if (movedRow >= height) movedRow = height - 1;
+            let movedCol = col + cs;
+            if (movedCol < 0) movedCol += width;
+            else if (movedCol >= width) movedCol -= width;
+            let value = grid[movedRow * width + movedCol];
+            if (value === 0) {
+              // Landed in the sea: try half the distance, then keep the modern class.
+              const halfRow = Math.min(height - 1, Math.max(0, row + (rs >> 1)));
+              value = grid[halfRow * width + col] || base;
+            }
+            cls[offset + col] = value;
+          }
         }
-        const rows = band !== 0 ? warm + band * lonFactor[col] : warm;
-        let moved = row + Math.round(rows);
-        if (moved < 0) moved = 0;
-        else if (moved >= height) moved = height - 1;
-        let value = grid[moved * width + col];
-        if (value === 0) {
-          moved = row + Math.round(rows * 0.5);
-          value = grid[Math.min(height - 1, Math.max(0, moved)) * width + col] || base;
-        }
-        cls[offset + col] = value;
       }
     }
     return true;

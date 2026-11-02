@@ -106,6 +106,8 @@ const legendToggle = $<HTMLButtonElement>('legend-toggle');
 const pName = $('p-name');
 const pYears = $('p-years');
 const pNote = $('p-note');
+const pOthers = $('p-others');
+const pOthersList = $('p-others-list');
 const pLineage = $('p-lineage');
 const pLineageList = $<HTMLOListElement>('p-lineage-list');
 const pKind = $('p-kind');
@@ -216,8 +218,8 @@ let polityProps: Props[] = [];
 let societyProps: Props[] = [];
 let biomeModel: BiomeModel | null = null;
 
-const polityLabels = new LabelLayer<Props>(map, (p) => openPanel(p));
-const societyLabels = new LabelLayer<Props>(map, (p) => openPanel(p));
+const polityLabels = new LabelLayer<Props>(map, (p) => { overlapSet = []; openPanel(p); });
+const societyLabels = new LabelLayer<Props>(map, (p) => { overlapSet = []; openPanel(p); });
 // Ecoregion patches are often thin strips with long names, so let names overhang them.
 const biomeLabels = new LabelLayer<EcoPatch>(map, (patch) => openBiomePanel(patch.lx, patch.ly), 2.2);
 
@@ -253,9 +255,7 @@ function renderEraNote(): void {
   if (activeLens !== 'biomes') return;
   const shift = climateShift(year);
   eraNote.textContent =
-    `${shift.era}. Climate moved ${signed(shift.warm)}° of latitude` +
-    (shift.humid > 0.02 ? `, Sahara and Arabia ${Math.round(shift.humid * 100)}% wetter` : '') +
-    '. Schematic.';
+    `${shift.era}.${shift.events.length ? ` ${shift.events.join('; ')}.` : ''} Rough regional model, not a reconstruction.`;
 }
 
 function renderLegend(): void {
@@ -606,6 +606,7 @@ function resetPanel(): number {
   pSummary.classList.remove('muted', 'error');
   pNote.hidden = true;
   pLineage.hidden = true;
+  pOthers.hidden = true;
   return panelTicket;
 }
 
@@ -621,6 +622,27 @@ function showPanel(): void {
 function updateSelection(): void {
   polityLabels.setSelected(selectedKey);
   societyLabels.setSelected(selectedKey);
+}
+
+/** Everything under the last click, so overlapping shapes can all be reached. */
+let overlapSet: Props[] = [];
+
+function renderOthers(current: Props): void {
+  pOthersList.replaceChildren();
+  const others = overlapSet.filter((item) => item.k !== current.k);
+  pOthers.hidden = others.length === 0;
+  for (const item of others) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    const dot = document.createElement('i');
+    dot.style.background = item.c;
+    const label = document.createElement('span');
+    label.textContent = `${item.n} · ${fmtRange(item.s, item.e)}`;
+    button.title = label.textContent;
+    button.append(dot, label);
+    button.addEventListener('click', () => openPanel(item));
+    pOthersList.append(button);
+  }
 }
 
 let lineages = new Map<string, Props[]>();
@@ -663,6 +685,7 @@ function renderLineage(p: Props): void {
         const mid = Math.round(clamp((Math.max(stage.s, MIN_YEAR) + Math.min(stage.e, MAX_YEAR)) / 2, MIN_YEAR, MAX_YEAR));
         setYear(mid);
         map.easeTo({ center: [stage.lx, stage.ly], duration: 700 });
+        overlapSet = [];
         openPanel(stage);
       });
     }
@@ -701,6 +724,7 @@ function openPanel(p: Props): void {
 
   showPanel();
   renderLineage(p);
+  renderOthers(p);
   document.title = `${name} · Unity of Being`;
 
   const highlight = highlightLayerOf(activeLens);
@@ -772,7 +796,6 @@ function openBiomePanel(lng: number, lat: number, movePin = true): void {
   pLink.href = ecoName ? wikiSearchUrl(ecoName) : wikiUrl(klass.wiki);
   pLink.textContent = ecoName ? 'Search Wikipedia' : 'Read on Wikipedia';
 
-  const wetter = shift.humid > 0.02 ? `, Sahara and Arabia ${Math.round(shift.humid * 100)}% wetter` : '';
   const rows: WikiFact[] = [];
   if (ecoEntry) {
     rows.push({ label: 'Ecoregion', value: ecoEntry[0] });
@@ -784,7 +807,7 @@ function openBiomePanel(lng: number, lat: number, movePin = true): void {
     { label: 'Temperature', value: klass.temp },
     { label: 'Rainfall', value: klass.rain },
     { label: 'Vegetation', value: klass.veg },
-    { label: 'Climate age', value: `${shift.era}: ${signed(shift.warm)}° of latitude${wetter}` },
+    { label: 'Climate age', value: shift.events.length ? `${shift.era}. ${shift.events.join('; ')}` : shift.era },
     {
       label: 'Position',
       value: `${Math.abs(lat).toFixed(1)}° ${lat >= 0 ? 'N' : 'S'}, ${Math.abs(lng).toFixed(1)}° ${lng >= 0 ? 'E' : 'W'}`,
@@ -813,6 +836,7 @@ function closePanel(): void {
   panelAbort?.abort();
   panelAbort = null;
   panel.hidden = true;
+  overlapSet = [];
   panelQid = null;
   leaderAbort?.abort();
   leaderAbort = null;
@@ -1260,17 +1284,26 @@ map.on('load', async () => {
       }
       const fill = fillLayerOf(activeLens);
       let hits = fill ? map.queryRenderedFeatures(event.point, { layers: [fill] }) : [];
-      if (activeLens === 'societies' && map.getZoom() < LOCAL_ZOOM + 0.5) {
+      if (activeLens === 'societies' && map.getZoom() < LOCAL_ZOOM - 0.2) {
         hits = hits.filter((hit) => (hit.properties as { lv?: number }).lv !== 3);
       }
       if (!hits.length) {
         closePanel();
         return;
       }
-      // Smaller shapes are drawn last, so the last hit is the one on top.
-      const key = (hits[hits.length - 1].properties as { k?: number }).k;
-      const props = typeof key === 'number' ? lensProps(activeLens)[key] : undefined;
-      if (props) openPanel(props);
+      // Smaller shapes are drawn last, so the last hit is the one on top. Keep every
+      // distinct shape under the click so overlapped ones can still be opened.
+      const all = lensProps(activeLens);
+      const seen = new Set<number>();
+      const stack: Props[] = [];
+      for (let i = hits.length - 1; i >= 0; i--) {
+        const key = (hits[i].properties as { k?: number }).k;
+        if (typeof key !== 'number' || seen.has(key) || !all[key]) continue;
+        seen.add(key);
+        stack.push(all[key]);
+      }
+      overlapSet = stack;
+      if (stack.length) openPanel(stack[0]);
     });
     for (const lens of ['polities', 'societies'] as Lens[]) {
       const layer = fillLayerOf(lens) as string;

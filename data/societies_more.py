@@ -67,7 +67,7 @@ net('Ancient Tea Horse Road', TRADE, 600, 1950, 'Ancient Tea Horse Road',
     routes=[R([(100.97, 22.8), (100.2, 25.6), (100.2, 26.9), (99.7, 28.5), (97.0, 29.2), (91.1, 29.65)]), R([(103.0, 30.0), (102.0, 30.05), (97.2, 30.5), (91.1, 29.65)])],
     nodes=[("Pu'er", 100.97, 22.8), ('Dali', 100.2, 25.6), ('Lijiang', 100.2, 26.9), ("Ya'an", 103.0, 30.0), ('Kangding', 102.0, 30.05), ('Lhasa', 91.1, 29.65, 'major')])
 
-net('Overseas Chinese networks', COMM, 1600, 2024, 'Overseas Chinese',
+net('Overseas Chinese networks', COMM, 1600, 2026, 'Overseas Chinese',
     'Clan, dialect and guild associations linking Fujian and Guangdong to the ports of Southeast Asia and beyond.',
     routes=[R([(118.1, 24.5), (120.98, 14.6)], sea=True), R([(118.1, 24.5), (106.85, -6.2)], sea=True), R([(118.1, 24.5), (103.8, 1.27), (100.5, 13.75)], sea=True), R([(113.3, 23.1), (150.0, 30.0), (179.9, 35.0)], sea=True), R([(-179.9, 35.0), (-122.4, 37.8)], sea=True)],
     nodes=[('Xiamen', 118.1, 24.5, 'major'), ('Manila', 120.98, 14.6), ('Batavia', 106.85, -6.2), ('Singapore', 103.8, 1.27, 'major'), ('Bangkok', 100.5, 13.75)])
@@ -83,12 +83,12 @@ net('Opium trade to China', TRADE, 1773, 1910, 'Opium trade',
     routes=[R([(85.14, 25.6), (88.36, 22.57)]), R([(88.36, 22.57), (98.0, 8.0), (103.8, 1.27), (113.8, 22.4)], sea=True), R([(72.83, 18.97), (80.0, 7.0), (103.8, 1.27)], sea=True)],
     nodes=[('Patna', 85.14, 25.6), ('Calcutta', 88.36, 22.57, 'major'), ('Lintin Island', 113.8, 22.4, 'major'), ('Bombay', 72.83, 18.97)])
 
-net('Trans-Siberian Railway', LOGI, 1891, 2024, 'Trans-Siberian Railway',
+net('Trans-Siberian Railway', LOGI, 1891, 2026, 'Trans-Siberian Railway',
     'The rail spine of the Russian east, 9,000 km from Moscow to the Pacific, with later branches to Mongolia and China.',
     routes=[R([(37.6, 55.75), (60.6, 56.84), (82.9, 55.0), (104.3, 52.3), (113.5, 52.03), (131.9, 43.1)])],
     nodes=[('Moscow', 37.6, 55.75, 'major'), ('Yekaterinburg', 60.6, 56.84), ('Novosibirsk', 82.9, 55.0), ('Irkutsk', 104.3, 52.3), ('Chita', 113.5, 52.03), ('Vladivostok', 131.9, 43.1, 'major')])
 
-net('Container shipping network', COMPANY, 1956, 2024, 'Containerization',
+net('Container shipping network', COMPANY, 1956, 2026, 'Containerization',
     'The standardised box and a few dozen hub ports now carry most manufactured trade between East Asia, Europe and North America.',
     routes=[R([(121.5, 31.2), (103.8, 1.27), (79.85, 6.9), (55.03, 25.0), (43.0, 12.6), (32.55, 29.97), (15.0, 35.0), (4.48, 51.92)], sea=True),
             R([(121.5, 31.2), (150.0, 38.0), (179.9, 40.0)], sea=True), R([(-179.9, 40.0), (-150.0, 38.0), (-118.27, 33.74)], sea=True),
@@ -124,12 +124,12 @@ net('Submarine telegraph cables', LOGI, 1858, 1950, 'Submarine communications ca
     nodes=[('Valentia (Ireland)', -10.3, 51.9, 'major'), ("Heart's Content", -53.4, 47.9), ('Alexandria', 29.9, 31.2), ('Aden', 45.0, 12.8), ('Bombay', 72.83, 18.97, 'major'),
            ('Singapore', 103.8, 1.27, 'major'), ('Hong Kong', 114.2, 22.3), ('Darwin', 130.8, -12.5), ('Sydney', 151.2, -33.9)])
 
-net('International Red Cross and Red Crescent Movement', NGO, 1863, 2024, 'International Red Cross and Red Crescent Movement',
+net('International Red Cross and Red Crescent Movement', NGO, 1863, 2026, 'International Red Cross and Red Crescent Movement',
     'A federation of national societies and the neutral ICRC in Geneva, carrying relief and protection into war and disaster zones.',
     routes=[R([(6.14, 46.2), (28.98, 41.0)]), R([(6.14, 46.2), (36.8, -1.29)]), R([(6.14, 46.2), (77.2, 28.6)]), R([(6.14, 46.2), (-77.04, 38.9)], sea=True), R([(6.14, 46.2), (151.2, -33.9)], sea=True)],
     nodes=[('Geneva (ICRC)', 6.14, 46.2, 'major'), ('Istanbul', 28.98, 41.0), ('Nairobi', 36.8, -1.29), ('New Delhi', 77.2, 28.6), ('Washington', -77.04, 38.9), ('Sydney', 151.2, -33.9)])
 
-net('United Nations system', NGO, 1945, 2024, 'United Nations System',
+net('United Nations system', NGO, 1945, 2026, 'United Nations System',
     'A treaty organisation of member states with headquarters, agencies, peacekeeping and humanitarian operations across the world.',
     routes=[R([(-73.97, 40.75), (6.14, 46.2)], sea=True), R([(6.14, 46.2), (16.37, 48.2)]), R([(6.14, 46.2), (36.8, -1.29)]), R([(6.14, 46.2), (38.76, 9.03)]), R([(6.14, 46.2), (100.5, 13.75)])],
     nodes=[('New York (HQ)', -73.97, 40.75, 'major'), ('Geneva', 6.14, 46.2, 'major'), ('Vienna', 16.37, 48.2), ('Nairobi', 36.8, -1.29, 'major'), ('Addis Ababa', 38.76, 9.03), ('Bangkok', 100.5, 13.75)])
@@ -168,7 +168,7 @@ net('Latin Christendom (the medieval Church)', RELIG, 600, 1520, 'Western Christ
             R([(12.5, 41.9), (4.8, 43.67), (-0.58, 44.84), (-8.54, 42.88)]), R([(6.96, 50.94), (16.86, 48.11), (19.9, 50.06)])],
     nodes=[('Rome', 12.5, 41.9, 'major'), ('Avignon', 4.8, 43.95), ('Cluny', 4.66, 46.43), ('Paris', 2.35, 48.85), ('Canterbury', 1.08, 51.28), ('Cologne', 6.96, 50.94), ('Santiago de Compostela', -8.54, 42.88), ('Kraków', 19.9, 50.06)])
 
-net('Catholic Church worldwide', RELIG, 1521, 2024, 'Catholic Church',
+net('Catholic Church worldwide', RELIG, 1521, 2026, 'Catholic Church',
     'A global hierarchy of dioceses, parishes, orders, schools and hospitals, with the Holy See at Rome and the Jesuit and mendicant missions carrying it across the world.',
     zones=[Z(countries=['Spain', 'Portugal', 'Italy', 'France', 'Ireland', 'Poland', 'Austria', 'Belgium', 'Croatia', 'Slovenia', 'Slovakia', 'Lithuania', 'Malta', 'Hungary',
                         'Mexico', 'Guatemala', 'Honduras', 'El Salvador', 'Nicaragua', 'Costa Rica', 'Panama', 'Cuba', 'Dominican Republic', 'Colombia', 'Venezuela', 'Ecuador', 'Peru',
@@ -176,7 +176,7 @@ net('Catholic Church worldwide', RELIG, 1521, 2024, 'Catholic Church',
     routes=[R([(12.5, 41.9), (-9.14, 38.7), (-38.5, -12.97)], sea=True), R([(12.5, 41.9), (-3.7, 40.4), (-99.13, 19.43)], sea=True), R([(12.5, 41.9), (15.3, -4.3)]), R([(12.5, 41.9), (120.98, 14.6)], sea=True)],
     nodes=[('Rome (Holy See)', 12.5, 41.9, 'major'), ('Mexico City', -99.13, 19.43), ('São Paulo', -46.63, -23.55), ('Kinshasa', 15.3, -4.3), ('Manila', 120.98, 14.6)])
 
-net('Orthodox Christendom', RELIG, 330, 2024, 'Eastern Orthodox Church',
+net('Orthodox Christendom', RELIG, 330, 2026, 'Eastern Orthodox Church',
     'A communion of self-governing churches, with patriarchates at Constantinople, Antioch, Alexandria, Jerusalem and Moscow, tying together the Balkans, Rus\', Georgia and Ethiopia.',
     zones=[Z(countries=['Greece', 'Cyprus', 'Bulgaria', 'Serbia', 'Montenegro', 'North Macedonia', 'Romania', 'Moldova', 'Ukraine', 'Belarus', 'Russia', 'Georgia'])],
     routes=[R([(28.98, 41.0), (30.52, 50.45), (37.6, 55.75)]), R([(28.98, 41.0), (22.94, 40.64), (20.46, 44.8)])],
@@ -199,7 +199,7 @@ net('Russian-American Company', COMPANY, 1799, 1867, 'Russian-American Company',
     routes=[R([(158.65, 53.0), (-179.9, 52.0)], sea=True), R([(179.9, 52.0), (-152.4, 57.8), (-135.3, 57.05), (-123.2, 38.5)], sea=True)],
     nodes=[('Petropavlovsk', 158.65, 53.0), ('Kodiak', -152.4, 57.8), ('Novo-Arkhangelsk (Sitka)', -135.3, 57.05, 'major'), ('Fort Ross', -123.2, 38.5)])
 
-net('NATO', NGO, 1949, 2024, 'NATO',
+net('NATO', NGO, 1949, 2026, 'NATO',
     'A collective-defence alliance with an integrated command, shared standards, bases and pre-positioned logistics across North America and Europe.',
     zones=[Z(countries=['United States of America', 'Canada', 'United Kingdom', 'France', 'Germany', 'Italy', 'Spain', 'Portugal', 'Belgium', 'Netherlands', 'Luxembourg', 'Denmark', 'Norway',
                         'Iceland', 'Greece', 'Turkey', 'Poland', 'Czechia', 'Hungary', 'Romania', 'Bulgaria', 'Slovakia', 'Slovenia', 'Croatia', 'Albania', 'Montenegro', 'North Macedonia',
@@ -214,7 +214,7 @@ net('Warsaw Pact and Soviet bloc', NGO, 1955, 1991, 'Warsaw Pact',
     routes=[R([(37.6, 55.75), (27.5, 53.9), (21.0, 52.2), (13.4, 52.5)]), R([(37.6, 55.75), (30.52, 50.45), (19.04, 47.5)])],
     nodes=[('Moscow', 37.6, 55.75, 'major'), ('Warsaw', 21.0, 52.2), ('Berlin', 13.4, 52.5), ('Budapest', 19.04, 47.5)])
 
-net('European Union', NGO, 1993, 2024, 'European Union',
+net('European Union', NGO, 1993, 2026, 'European Union',
     'A union of states with a single market, shared law, common borders and trans-European transport, energy and payment networks.',
     zones=[Z(countries=['France', 'Germany', 'Italy', 'Spain', 'Portugal', 'Belgium', 'Netherlands', 'Luxembourg', 'Ireland', 'Denmark', 'Sweden', 'Finland', 'Austria', 'Greece', 'Poland', 'Czechia',
                         'Slovakia', 'Hungary', 'Slovenia', 'Croatia', 'Romania', 'Bulgaria', 'Estonia', 'Latvia', 'Lithuania', 'Malta', 'Cyprus'])],

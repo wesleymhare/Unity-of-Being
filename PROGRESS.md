@@ -55,6 +55,19 @@
 ### Fast switching fix (3 November 2026)
 - Switching lenses or dragging the year quickly could leave stale labels from the old lens, a stuck loading veil, or a janky map. Fixes: label layers of inactive lenses are disabled (they cancel queued frames and never redraw); the loading veil's fade-out can no longer hide a newer veil, and the veil clears on `idle`; year changes re-filter at most every 70 ms (the last value always lands). Stress-tested with 24 rapid lens+year switches and slider scrubbing.
 
+### 3 November 2026: last decade, water, Societies colour, placeholders
+- **Timeline now runs to 2026.** The old "present" marker (2024) was moved to 2026 in the data sources and built files.
+- **2016-2026 is the de jure world** (`data/build-modern-polities.py`, Natural Earth 1:50m): no rebel or occupied zones, Palestine = West Bank + Gaza, Crimea/Donetsk/Luhansk = Ukraine, Golan = Syria, Western Sahara restored, renames by year. Cliopatria is cut at 2015. See `docs/POLITIES.md`.
+- **Caspian Sea added** (it was missing in every lens: the base land polygon fills it in and Natural Earth's lake file has none). The Aral Sea, Lake Chad, Lake Texcoco and Lop Nur now change with the year (`data/build-water-extra.py`).
+- **Societies are coloured by sphere/group**, not kind, with symbols: line = logistical route, dot = hub, crossed swords = frontier or conflict, handshake = trade or syncretism zone (42 marks).
+- **Placeholders (nothing built behind them):** a left-pointing triangle at the start of the timeline for deep time before 3400 BCE (continental drift, ice ages), a **Tiles** button for the Tier 2 tile view, and an **Edit** button for worldbuilding, to the left of Help.
+
+## Planned
+- Deep time before 3400 BCE (continental drift, ice ages, sea level).
+- Tier 2 tile view; Tier 3 hex dioramas.
+- Edit mode for worldbuilding.
+- A sharper definition of Societies (open).
+
 ## Known rough edges
 - Ecoregions are modern in every year; only the Köppen half of a biome label changes with time.
 - Initial load downloads and parses the 25 MB border GeoJSON: several seconds on slow machines. Fix later with vector tiles (PMTiles) or per-era files.

@@ -35,3 +35,11 @@ for (const { url, dir } of WATER) {
 }
 
 console.log('Done. Files are in data/raw/. Next: npm run data:build');
+
+// Natural Earth 1:50m countries (public domain) for the 2016 onward de jure map
+// (data/build-modern-polities.py). Served from the Natural Earth GitHub mirror.
+mkdirSync('data/raw/ne', { recursive: true });
+console.log('Downloading Natural Earth countries (about 3 MB)...');
+const ne = await fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson');
+if (!ne.ok) throw new Error(`Download failed: ${ne.status} ne_50m_admin_0_countries`);
+writeFileSync('data/raw/ne/ne_50m_admin_0_countries.geojson', Buffer.from(await ne.arrayBuffer()));

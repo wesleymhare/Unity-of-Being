@@ -43,8 +43,26 @@ landowner, a school system). The legend lets you switch kinds on and off.
 Clicking a hub, route or area opens the network; the panel lists its main hubs and, where several
 networks overlap, the others as "Networks here" chips.
 
+## Colour and symbols
+**Colour is the sphere of influence or group, not the kind of network.** Latin Christendom is one
+colour and Orthodox Christendom another; the Chinese tributary system, the Grand Canal and the
+Overseas Chinese share a colour; the Hanseatic League and the Varangian routes share one. Kind
+(trade network, company, church...) is still stored and shown as the "Type" fact in the panel. The
+legend lists the spheres present in the year shown and filters them on click. Spheres live in
+`data/societies_groups.py` (`GROUPS`, `GROUP_OF`); a network with no sphere stops the build.
+
+Symbols on the map:
+- **Line**: a logistical network (a route, solid on land, dashed at sea).
+- **Dot**: a hub (a city, port, post or base); larger dots are the main hubs.
+- **Crossed swords**: a frontier or conflict zone.
+- **Handshake**: a trade or syncretism zone, a place where peoples, faiths or goods met and blended.
+- **Dashed area**: a zone of de facto control or presence.
+
+Marks (swords and handshakes) are listed in `MARKS` in `data/societies_groups.py`, each with its
+network, place, position and years.
+
 ## Data
-`data/societies_data.py` and `data/societies_more.py` (curated; add with `net(...)`, give areas
+`data/societies_data.py`, `data/societies_more.py` and `data/societies_groups.py` (curated; add with `net(...)`, give areas
 with `Z(poly=...)`, `Z(countries=[...])` or `Z([(lng, lat), ...])`, or add to an existing network with
 `add_zone(name, ...)`) → `python3 data/build-societies.py` (or `npm run data:societies`) →
 `public/data/societies.geojson` (elements plus `entities` and `labels` arrays). The builder reads

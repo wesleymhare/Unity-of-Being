@@ -124,7 +124,7 @@ const KEYFRAMES: Keyframe[] = [
   { year: 1050, warm: 0.6 }, { year: 1200, warm: 0.5 }, { year: 1300, warm: 0.1 },
   { year: 1400, warm: -0.3 }, { year: 1550, warm: -0.8 }, { year: 1650, warm: -1.0 },
   { year: 1750, warm: -0.8 }, { year: 1850, warm: -0.5 }, { year: 1900, warm: -0.3 },
-  { year: 1975, warm: 0 }, { year: 2024, warm: 0.5 },
+  { year: 1975, warm: 0 }, { year: 2026, warm: 0.5 },
 ];
 
 // Extra warmth at high northern latitudes in the early Holocene (degrees of latitude).

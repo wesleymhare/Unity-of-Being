@@ -32,10 +32,14 @@ if (r.status !== 0) throw new Error('mapshaper failed');
 
 // Clean the shapes: drop Cliopatria's overlapping group shapes, add label anchors and
 // colours. Needs Python 3 with shapely and numpy (see data/requirements.txt).
-const clean = spawnSync('python3', ['data/clean-polities.py', TMP, 'public/data/polities.geojson'], {
+const clean = spawnSync('python3', ['data/clean-polities.py', TMP, 'data/raw/polities.cleaned.geojson'], {
   stdio: 'inherit',
 });
 if (clean.status !== 0) throw new Error('data/clean-polities.py failed');
+
+// 2016 onward: the current de jure map instead of Cliopatria's de facto last years.
+const modern = spawnSync('python3', ['data/build-modern-polities.py'], { stdio: 'inherit' });
+if (modern.status !== 0) throw new Error('data/build-modern-polities.py failed');
 console.log(`polities.geojson: ${(statSync('public/data/polities.geojson').size / 1e6).toFixed(1)} MB`);
 
 // ---- Land (Natural Earth, public domain) -----------------------------------

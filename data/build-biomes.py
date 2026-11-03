@@ -159,7 +159,9 @@ print(f"ecoregion-lines.geojson: {os.path.getsize('public/data/ecoregion-lines.g
 # ---- Open sea polygon = world rectangle minus land ----------------------------
 land = load_land('public/data/land.geojson')
 world = box(-180, -85.06, 180, 85.06)
-ocean = shapely.set_precision(world.difference(land), 0.01)
+# The base land polygon fills in the Caspian Sea; carve it back out (data/build-water-extra.py).
+caspian = shapely.union_all([shape(f['geometry']) for f in json.load(open('data/caspian.geojson'))['features']])
+ocean = shapely.set_precision(world.difference(land).union(caspian), 0.01)
 with open('public/data/ocean.geojson', 'w') as fh:
     json.dump({'type': 'FeatureCollection',
                'features': [{'type': 'Feature', 'properties': {}, 'geometry': mapping(ocean)}]},

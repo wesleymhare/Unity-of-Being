@@ -3,7 +3,7 @@
 
 Output: a FeatureCollection of drawn elements (routes, zones, nodes), each tagged with the
 index `k` of its entity, plus two extra top-level arrays used by the app:
-    entities  one record per network (name, kind, years, colour, anchor, hubs, note, wiki)
+    entities  one record per network (name, kind, sphere/group, years, colour, anchor, hubs, note, wiki)
     labels    label items: one title per entity and one per hub
 See docs/SOCIETIES.md.
 
@@ -11,6 +11,7 @@ Usage:  python3 data/build-societies.py
 """
 import json
 import math
+import os
 import sys
 
 sys.path.insert(0, 'data')
@@ -22,10 +23,11 @@ from shapely.ops import unary_union  # noqa: E402
 
 from geo_labels import label_anchor, polygons, tidy  # noqa: E402
 from societies_data import ENTITIES, KINDS  # noqa: E402
+from societies_groups import GROUP_OF, GROUPS, MARKS  # noqa: E402
 
 DST = 'public/data/societies.geojson'
 NE0 = 'data/raw/ne/ne_10m_admin_0_countries.geojson'
-POLITIES_IN = 'public/data/polities.geojson'
+POLITIES_IN = 'data/raw/polities.cleaned.geojson' if os.path.exists('data/raw/polities.cleaned.geojson') else 'public/data/polities.geojson'
 SIMPLIFY = 0.12
 _polities = None
 _countries = None
@@ -103,9 +105,13 @@ def main():
     entities = []
     labels = []
     next_label = NODE_LABEL_BASE
+    marks_used = set()
 
     for k, ent in enumerate(ENTITIES):
-        colour = KINDS[ent['kind']]
+        group = GROUP_OF.get(ent['name'])
+        if group is None:
+            raise SystemExit(f"no sphere/group for network {ent['name']!r} in data/societies_groups.py")
+        colour = GROUPS[group][0]
         s, e = ent['s'], ent['e']
         xs, ys = [], []
 
@@ -179,6 +185,18 @@ def main():
             features.append({'type': 'Feature', 'properties': props,
                              'geometry': {'type': 'Point', 'coordinates': [round(x, 3), round(y, 3)]}})
 
+        mark_defs = []
+        for (owner, mname, mx, my, mic, ms, me) in MARKS:
+            if owner != ent['name']:
+                continue
+            xs.append(mx)
+            ys.append(my)
+            mark_defs.append((mname, mx, my, mic))
+            features.append({'type': 'Feature',
+                             'properties': {'k': k, 'c': colour, 's': ms, 'e': me, 't': 'm', 'ic': mic, 'nm': mname},
+                             'geometry': {'type': 'Point', 'coordinates': [round(mx, 3), round(my, 3)]}})
+            marks_used.add((owner, mname))
+
         extent = max(max(xs) - min(xs), max(ys) - min(ys)) if xs else 1.0
         title_sz = None
         if longest:
@@ -191,7 +209,7 @@ def main():
         # hubs, major first, are what the panel lists
         major_first = [n[0] for n in node_defs if n[3]] + [n[0] for n in node_defs if not n[3]]
         entities.append({
-            'k': k, 'n': ent['name'], 'kind': ent['kind'], 's': s, 'e': e, 'c': colour,
+            'k': k, 'n': ent['name'], 'kind': ent['kind'], 'grp': group, 's': s, 'e': e, 'c': colour,
             'w': ent['wiki'], 'q': '', 'nt': ent['note'],
             'lx': round(lx, 3), 'ly': round(ly, 3), 'sz': round(max(0.8, min(40.0, title_sz or extent * 0.4)), 2),
             'hubs': ', '.join(major_first),
@@ -211,9 +229,23 @@ def main():
                 'cw': 6, 'ch': 2.5, 'oy': 11, 'lcls': 'net-hub' + (' major' if major else ''), 'ent': k,
             })
             next_label += 1
+        # mark labels (small, shown when zoomed in)
+        for (owner, mname, mx, my, mic, ms, me) in MARKS:
+            if owner != ent['name']:
+                continue
+            labels.append({
+                'k': next_label, 'n': mname, 's': ms, 'e': me, 'c': colour, 'w': ent['wiki'], 'q': '',
+                'lx': round(mx, 3), 'ly': round(my, 3), 'sz': 1.5,
+                'cw': 6, 'ch': 2.5, 'oy': 14, 'lcls': 'net-hub mark', 'ent': k,
+            })
+            next_label += 1
+
+    unused = [(o, n) for (o, n, *_rest) in MARKS if (o, n) not in marks_used]
+    if unused:
+        raise SystemExit(f'marks for unknown networks: {unused}')
 
     out = {'type': 'FeatureCollection', 'features': features, 'entities': entities, 'labels': labels,
-           'kinds': KINDS}
+           'groups': {name: colour for name, (colour, _about) in GROUPS.items()}, 'kinds': KINDS}
     with open(DST, 'w') as fh:
         json.dump(out, fh, separators=(',', ':'), ensure_ascii=False)
     print(f'{DST}: {len(ENTITIES)} networks, {len(features)} elements, {len(labels)} labels, '

@@ -1053,3 +1053,92 @@ a { color: var(--brass); }
   cursor: pointer;
   text-decoration: underline;
 }
+
+/* ---- Placeholders: deep time, tile view, edit ---------------------------- */
+.top-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px dashed rgba(210, 173, 100, 0.45);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font: 700 10px/1 system-ui, sans-serif;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.top-btn:hover, .top-btn[aria-pressed="true"] { color: var(--brass-lt); background: rgba(210, 173, 100, 0.14); }
+.top-ico { font-size: 13px; letter-spacing: 0; }
+.era + .top-btn { margin-left: 0; }
+
+.scrub { display: flex; align-items: flex-start; gap: 10px; }
+.scrub-track { position: relative; flex: 1 1 auto; min-width: 0; }
+.deep-btn {
+  flex: none;
+  width: 22px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: var(--brass);
+  opacity: 0.55;
+  clip-path: polygon(100% 0, 0 50%, 100% 100%);
+  cursor: pointer;
+}
+.deep-btn:hover, .deep-btn[aria-pressed="true"] { opacity: 1; background: var(--brass-lt); }
+
+.soon {
+  position: fixed;
+  top: 66px;
+  right: 14px;
+  z-index: 41;
+  width: min(340px, calc(100vw - 28px));
+}
+.soon[hidden] { display: none; }
+.soon-card {
+  padding: 12px 14px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(22, 29, 36, 0.98);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  color: #ded7c7;
+}
+.soon-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.soon-head button { border: 0; background: none; color: var(--faint); font-size: 22px; line-height: 1; cursor: pointer; }
+.soon-tag {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(210, 173, 100, 0.18);
+  color: var(--brass-lt);
+  font: 700 9px/1.4 system-ui, sans-serif;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+.soon-card h3 { margin: 0 0 6px; font: 700 16px Georgia, serif; color: #f1e8d3; }
+.soon-card p { margin: 0 0 8px; font-size: 12.5px; line-height: 1.5; }
+.soon-card .soon-fine { margin: 0; font-size: 11px; color: var(--faint); }
+@media (max-width: 760px) {
+  .top-txt { display: none; }
+  .top-btn { padding: 0 8px; }
+  .soon { top: 58px; right: 8px; }
+}
+
+/* Societies legend key and symbols */
+.legend-key {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.legend-key span { display: inline-flex; align-items: center; gap: 6px; }
+.legend-key .mk { width: 16px; height: 16px; color: #f4ecd8; flex: none; }
+.legend-key .k-line { width: 16px; height: 0; border-top: 3px solid #d9a441; border-radius: 2px; flex: none; }
+.legend-key .k-dot { width: 9px; height: 9px; margin: 0 3px; border-radius: 50%; background: #d9a441; border: 1.5px solid #1d1710; flex: none; }

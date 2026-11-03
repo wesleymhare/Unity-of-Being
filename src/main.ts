@@ -38,7 +38,7 @@ const LOCAL_ZOOM = 3.6;
 /** Hub label keys start here; network keys are small indexes. */
 const SOC_HUB_K = 10_000;
 const MIN_YEAR = -3400;
-const MAX_YEAR = 2024;
+const MAX_YEAR = 2026;
 
 /** Properties of one polity, realm group or civilization (see data/*.py). */
 interface Props extends LabelProps {
@@ -65,6 +65,8 @@ interface Props extends LabelProps {
   /** Societies: the network a hub label belongs to, and its main hubs as text. */
   ent?: number;
   hubs?: string;
+  /** Societies: the sphere or group a network belongs to (sets its colour). */
+  grp?: string;
 }
 
 interface MapFeature {
@@ -78,6 +80,7 @@ interface SocietyData {
   features: MapFeature[];
   entities: Props[];
   labels: Props[];
+  groups: Record<string, string>;
   kinds: Record<string, string>;
 }
 
@@ -94,6 +97,24 @@ const fmtYear = (value: number): string =>
 
 const fmtRange = (start: number, end: number): string =>
   start === end ? fmtYear(start) : `${fmtYear(start)} – ${fmtYear(end)}`;
+
+/** Societies symbols: crossed swords (frontier or conflict) and a handshake (trade or syncretism). */
+const MARK_SVG = {
+  c: '<svg class="mk" viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4 19 18M19 4 5 18M14.4 17.6l4.2-4.2M9.6 17.6 5.4 13.4"/></g></svg>',
+  x: '<svg class="mk" viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7.5h4v9H2zM18 7.5h4v9h-4zM6 9l5-1.5 3 1.5 4-.5M6 15l4 2.5 2-1.5 2 1.5 4-2.5M10 12l2 1.5M12.5 11.5l1.8 1.5"/></g></svg>',
+};
+
+function svgImage(svg: string, size: number): Promise<HTMLImageElement> {
+  const text = svg
+    .replace('class="mk"', `xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"`)
+    .replace(/currentColor/g, '#ffffff');
+  const img = new Image(size, size);
+  return new Promise((resolve, reject) => {
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(text)}`;
+  });
+}
 
 const signed = (value: number): string =>
   `${value < 0 ? '−' : '+'}${Math.abs(value).toFixed(1)}`;
@@ -172,9 +193,50 @@ function setHelp(open: boolean): void {
 }
 helpBtn.addEventListener('click', (event) => {
   event.stopPropagation();
+  if (helpBox.hidden) $('soon').hidden = true;
   setHelp(helpBox.hidden === true);
 });
 $('help-close').addEventListener('click', () => setHelp(false));
+
+// Placeholders for planned features: deep time, tile view (Tier 2) and edit mode.
+const SOON: Record<string, { title: string; body: string }> = {
+  deep: {
+    title: 'Deep time: Earth before civilization',
+    body: 'A planned view for everything before 3400 BCE: drifting continents, ice ages and sea level, the spread of life and the first humans, on a slider that reaches back millions of years.',
+  },
+  tiles: {
+    title: 'Tile view (Tier 2)',
+    body: 'A planned zoom from the political map down to terrain and tiles for the place and year you are looking at: relief, settlements and, later, tile and hex dioramas.',
+  },
+  edit: {
+    title: 'Edit mode: worldbuilding',
+    body: 'A planned mode for drawing and changing polities, civilizations, societies and biomes, keeping your own timelines and, later, sharing them.',
+  },
+};
+const soonBox = $('soon');
+const soonButtons = [...document.querySelectorAll<HTMLButtonElement>('.soon-btn')];
+function setSoon(key: string | null): void {
+  const entry = key ? SOON[key] : null;
+  soonBox.hidden = !entry;
+  for (const button of soonButtons) button.setAttribute('aria-pressed', String(button.dataset.soon === key));
+  if (!entry) return;
+  $('soon-title').textContent = entry.title;
+  $('soon-body').textContent = entry.body;
+  setHelp(false);
+}
+for (const button of soonButtons) {
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    setSoon(button.getAttribute('aria-pressed') === 'true' ? null : (button.dataset.soon ?? null));
+  });
+}
+$('soon-close').addEventListener('click', () => setSoon(null));
+document.addEventListener('click', (event) => {
+  if (!soonBox.hidden && !soonBox.contains(event.target as Node)) setSoon(null);
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !soonBox.hidden) setSoon(null);
+});
 document.addEventListener('click', (event) => {
   if (!helpBox.hidden && !helpBox.contains(event.target as Node)) setHelp(false);
 });
@@ -238,6 +300,13 @@ const realmFilter = (value: number): Filter => ['all', yearFilter(value), ['has'
 const highlightFilter = (value: number, key: number): Filter => [
   'all', yearFilter(value), ['==', ['get', 'k'], key],
 ];
+/** Lakes may carry their own years (the Aral Sea shrank, Lake Texcoco was drained). */
+const lakeFilter = (value: number): Filter => [
+  'all',
+  ['<=', ['coalesce', ['get', 's'], -9999], value],
+  ['>=', ['coalesce', ['get', 'e'], 9999], value],
+];
+
 /** Opacity that is `full` everywhere, except local identities (level 3), which fade in with zoom. */
 const localFade = (full: number): maplibregl.ExpressionSpecification => [
   'interpolate', ['linear'], ['zoom'],
@@ -259,6 +328,8 @@ const socFilter = (value: number, type: string, ...extra: Filter[]): Filter => {
 };
 
 const YEAR_FILTERS: Record<string, (value: number) => Filter> = {
+  'lake-fill': lakeFilter,
+  'lake-line': lakeFilter,
   'polity-fill': leafFilter,
   'polity-line': leafFilter,
   'polity-realm-casing': realmFilter,
@@ -274,12 +345,14 @@ const YEAR_FILTERS: Record<string, (value: number) => Filter> = {
   'soc-route': (value) => socFilter(value, 'r', ['!', ['has', 'sea']]),
   'soc-route-sea': (value) => socFilter(value, 'r', ['has', 'sea']),
   'soc-node': (value) => socFilter(value, 'n'),
+  'soc-mark-badge': (value) => socFilter(value, 'm'),
+  'soc-mark': (value) => socFilter(value, 'm'),
 };
 
 const LENS_LAYERS: Record<Lens, string[]> = {
   polities: ['polity-fill', 'polity-line', 'polity-realm-casing', 'polity-realm-line', 'polity-hl', 'sub-fill', 'sub-line', 'sub-hl'],
   civilizations: ['civilization-fill', 'civilization-casing', 'civilization-line', 'civilization-hl'],
-  societies: ['soc-zone-fill', 'soc-zone-line', 'soc-route-casing', 'soc-route', 'soc-route-sea', 'soc-node', 'soc-hl-route', 'soc-hl-zone', 'soc-hl-node'],
+  societies: ['soc-zone-fill', 'soc-zone-line', 'soc-route-casing', 'soc-route', 'soc-route-sea', 'soc-node', 'soc-mark-badge', 'soc-mark', 'soc-hl-route', 'soc-hl-zone', 'soc-hl-node'],
   biomes: ['biome-raster', 'eco-lines', 'ocean-mask'],
 };
 
@@ -380,15 +453,15 @@ function renderLegend(): void {
   legend.hidden = false;
 
   if (activeLens === 'societies') {
-    legendTitle.textContent = 'Kinds · click to filter';
+    legendTitle.textContent = 'Spheres and groups · click to filter';
     const present = new Map<string, { colour: string; count: number }>();
     for (const p of societyProps) {
-      if (p.s > year || p.e < year || !p.kind) continue;
-      const entry = present.get(p.kind);
+      if (p.s > year || p.e < year || !p.grp) continue;
+      const entry = present.get(p.grp);
       if (entry) entry.count++;
-      else present.set(p.kind, { colour: p.c, count: 1 });
+      else present.set(p.grp, { colour: p.c, count: 1 });
     }
-    // Hidden kinds stay listed (dimmed) even when none is active this year.
+    // Hidden groups stay listed (dimmed) even when none is active this year.
     for (const kind of hiddenKinds) if (!present.has(kind)) present.set(kind, { colour: socKinds[kind] ?? '#888', count: 0 });
     for (const [name, { colour, count }] of [...present].sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))) {
       const row = document.createElement('button');
@@ -409,7 +482,7 @@ function renderLegend(): void {
       const all = document.createElement('button');
       all.type = 'button';
       all.className = 'legend-all';
-      all.textContent = 'Show all kinds';
+      all.textContent = 'Show all groups';
       all.addEventListener('click', () => {
         hiddenKinds.clear();
         applySocietyKinds();
@@ -417,6 +490,14 @@ function renderLegend(): void {
       legendBody.append(all);
     }
     if (!present.size) legendBody.textContent = 'No networks are mapped for this year.';
+    const key = document.createElement('div');
+    key.className = 'legend-key';
+    key.innerHTML =
+      '<span><i class="k-line"></i>logistical route</span>' +
+      '<span><i class="k-dot"></i>hub</span>' +
+      `<span>${MARK_SVG.c}frontier or conflict</span>` +
+      `<span>${MARK_SVG.x}trade or syncretism</span>`;
+    legendBody.append(key);
     return;
   }
 
@@ -1224,12 +1305,14 @@ function openPanel(p: Props): void {
 
   const extraFacts: WikiFact[] = [];
   if (societies) {
+    if (p.grp) extraFacts.push({ label: 'Sphere', value: p.grp });
     if (p.kind) extraFacts.push({ label: 'Type', value: p.kind });
     if (p.hubs) {
       const list = p.hubs.split(', ');
       extraFacts.push({ label: 'Connects', value: list.slice(0, 10).join(', ') + (list.length > 10 ? ' …' : '') });
     }
   } else if (civilizations) {
+    if (p.grp) extraFacts.push({ label: 'Sphere', value: p.grp });
     if (p.kind) extraFacts.push({ label: 'Type', value: p.kind });
     if (p.fam) extraFacts.push({ label: 'Languages', value: p.fam });
     if (p.fg) extraFacts.push({ label: 'Family group', value: p.fg });
@@ -1596,7 +1679,7 @@ map.on('load', async () => {
     civilizationProps = civilizationFeatures.map((feature) => feature.properties);
     civilizationFootprints = buildFootprints(civilizationFeatures);
     societyProps = societyData?.entities ?? [];
-    socKinds = societyData?.kinds ?? {};
+    socKinds = societyData?.groups ?? societyData?.kinds ?? {};
     societyLabels.setFeatures(societyData?.labels ?? []);
     buildLineages();
     polityLabels.setFeatures(polityProps);
@@ -1626,6 +1709,13 @@ map.on('load', async () => {
 
     map.on('sourcedata', checkSources);
     map.on('idle', checkSources);
+
+    try {
+      map.addImage('mark-c', await svgImage(MARK_SVG.c, 48), { pixelRatio: 2 });
+      map.addImage('mark-x', await svgImage(MARK_SVG.x, 48), { pixelRatio: 2 });
+    } catch (error) {
+      console.error('Societies symbols:', error);
+    }
 
     map.addSource('land', { type: 'geojson', data: land as GeoData });
     map.addSource('polities', {
@@ -1726,12 +1816,14 @@ map.on('load', async () => {
         id: 'lake-fill',
         type: 'fill',
         source: 'lakes',
+        filter: lakeFilter(year),
         paint: { 'fill-color': '#35505f', 'fill-opacity': 0.95 },
       });
       map.addLayer({
         id: 'lake-line',
         type: 'line',
         source: 'lakes',
+        filter: lakeFilter(year),
         paint: { 'line-color': '#6f5f3d', 'line-width': 0.6, 'line-opacity': 0.6 },
       });
     }
@@ -1905,6 +1997,24 @@ map.on('load', async () => {
       layout: { visibility: visible('societies') },
     });
     map.addLayer({
+      id: 'soc-mark-badge', type: 'circle', source: 'societies', filter: socYear('m'),
+      paint: {
+        'circle-color': '#1d1710',
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, 8, 6, 12],
+        'circle-stroke-color': ['get', 'c'], 'circle-stroke-width': 2.2,
+      },
+      layout: { visibility: visible('societies') },
+    });
+    map.addLayer({
+      id: 'soc-mark', type: 'symbol', source: 'societies', filter: socYear('m'),
+      layout: {
+        'icon-image': ['case', ['==', ['get', 'ic'], 'c'], 'mark-c', 'mark-x'],
+        'icon-size': ['interpolate', ['linear'], ['zoom'], 1, 0.55, 6, 0.85],
+        'icon-allow-overlap': true, 'icon-ignore-placement': true,
+        visibility: visible('societies'),
+      },
+    });
+    map.addLayer({
       id: 'soc-hl-zone', type: 'line', source: 'societies', filter: NO_FEATURE,
       paint: { 'line-color': '#f6e7b8', 'line-width': 2.6, 'line-opacity': 0.95 },
       layout: { 'line-join': 'round', visibility: visible('societies') },
@@ -1944,10 +2054,10 @@ map.on('load', async () => {
           [event.point.x - pad, event.point.y - pad], [event.point.x + pad, event.point.y + pad],
         ];
         const found = map.queryRenderedFeatures(box, {
-          layers: ['soc-node', 'soc-route', 'soc-route-sea', 'soc-zone-fill'],
+          layers: ['soc-mark', 'soc-node', 'soc-route', 'soc-route-sea', 'soc-zone-fill'],
         });
         // Nodes first, then routes, then zones; one entry per network.
-        const rank: Record<string, number> = { n: 0, r: 1, z: 2 };
+        const rank: Record<string, number> = { m: 0, n: 0, r: 1, z: 2 };
         found.sort((a, b) => rank[(a.properties as { t: string }).t] - rank[(b.properties as { t: string }).t]);
         const stack: Props[] = [];
         for (const hit of found) {

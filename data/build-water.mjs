@@ -34,6 +34,10 @@ run([
   '-o', 'public/data/lakes.geojson', 'format=geojson', 'precision=0.01',
 ]);
 
+// Caspian Sea, historic Aral/Chad/Texcoco/Lop Nur and the lake years (needs Python and shapely).
+const extra = spawnSync('python3', ['data/build-water-extra.py'], { stdio: 'inherit' });
+if (extra.status !== 0) throw new Error('data/build-water-extra.py failed');
+
 const kb = (file) => (statSync(file).size / 1024).toFixed(0);
 console.log(`rivers.geojson: ${kb('public/data/rivers.geojson')} KB`);
 console.log(`lakes.geojson: ${kb('public/data/lakes.geojson')} KB`);

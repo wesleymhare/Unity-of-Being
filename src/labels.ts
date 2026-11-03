@@ -1,6 +1,6 @@
 import * as maplibregl from 'maplibre-gl';
 
-/** The fields the label engine needs from a polity or society feature. */
+/** The fields the label engine needs from a polity or civilization feature. */
 export interface LabelProps {
   n: string;
   s: number;
@@ -16,6 +16,9 @@ export interface LabelProps {
   /** Realm group (label only, never filled). */
   g?: number;
   k: number;
+  /** Pixel offset of the label above or below its anchor, and an extra CSS class. */
+  oy?: number;
+  lcls?: string;
 }
 
 interface Placed {
@@ -258,7 +261,7 @@ export class LabelLayer<T extends LabelProps> {
       const pad = 5;
       const box = {
         x: c.x - layout.width / 2 - pad,
-        y: c.y - layout.height / 2 - pad,
+        y: c.y + (f.oy ?? 0) - layout.height / 2 - pad,
         w: layout.width + pad * 2,
         h: layout.height + pad * 2,
       };
@@ -296,7 +299,7 @@ export class LabelLayer<T extends LabelProps> {
     }
 
     const el = document.createElement('div');
-    el.className = realm ? 'poly-label realm' : 'poly-label';
+    el.className = (realm ? 'poly-label realm' : 'poly-label') + (f.lcls ? ` ${f.lcls}` : '');
     el.textContent = layout.lines.join('\n');
     el.title = f.n;
     el.style.fontSize = `${font}px`;
@@ -306,7 +309,7 @@ export class LabelLayer<T extends LabelProps> {
       event.stopPropagation();
       this.onClick(f);
     });
-    const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+    const marker = new maplibregl.Marker({ element: el, anchor: 'center', offset: [0, f.oy ?? 0] })
       .setLngLat([f.lx, f.ly])
       .addTo(this.map);
     this.placed.set(f.k, { marker, el, sig });

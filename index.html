@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Unity of Being</title>
-  <meta name="description" content="An interactive map of human history: polities, societies and biomes across time.">
+  <meta name="description" content="An interactive map of human history: polities, civilizations, societies and biomes across time.">
   <meta name="theme-color" content="#161d24">
   <link rel="icon" href="data:,">
   <link rel="preconnect" href="https://en.wikipedia.org">
@@ -15,6 +15,7 @@
     <div class="brand">Unity of Being</div>
     <div class="lens-switch" role="group" aria-label="Map lens">
       <button type="button" class="lens-btn is-active" data-lens="polities" aria-pressed="true">Polities</button>
+      <button type="button" class="lens-btn" data-lens="civilizations" aria-pressed="false">Civilizations</button>
       <button type="button" class="lens-btn" data-lens="societies" aria-pressed="false">Societies</button>
       <button type="button" class="lens-btn" data-lens="biomes" aria-pressed="false">Biomes</button>
     </div>
@@ -22,7 +23,7 @@
     <button id="help-btn" class="help-btn" type="button" aria-label="Help and sources" aria-expanded="false" aria-controls="help">?</button>
   </header>
 
-  <div id="map" role="application" aria-label="Map of historical polities, societies and biomes"></div>
+  <div id="map" role="application" aria-label="Map of historical polities, civilizations, societies and biomes"></div>
 
   <div id="loading" role="status" aria-live="polite">
     <div id="loading-text">Loading map data…</div>
@@ -83,7 +84,7 @@
       <div id="p-subs" class="subs" hidden></div>
 
       <div id="p-lineage" class="lineage" hidden>
-        <div class="lineage-head">This society through time</div>
+        <div class="lineage-head">This civilization through time</div>
         <ol id="p-lineage-list"></ol>
       </div>
 
@@ -114,16 +115,17 @@
     <div class="help-body">
       <h3>Using it</h3>
       <ul>
-        <li><b>Polities</b> are states and empires (who governs). <b>Societies</b> are peoples and shared identities (who you belong to). <b>Biomes</b> are climate and ecoregions.</li>
+        <li><b>Polities</b> are states and empires (who governs). <b>Civilizations</b> are peoples and shared cultural identities (who you belong to). <b>Societies</b> are the de facto networks that actually hold things together: trade routes, logistics systems, companies, factions, parties and communities. <b>Biomes</b> are climate and ecoregions.</li>
         <li>Drag the year slider or press play. Click any area for its Wikipedia summary, infobox and facts.</li>
         <li>Zoom in to see the provinces inside big polities and local identities inside peoples.</li>
-        <li>In Societies, a click lists every identity you stand inside; none sits above the others.</li>
+        <li>In Civilizations, a click lists every identity you stand inside; none sits above the others.</li>
       </ul>
       <h3>Sources</h3>
       <ul class="sources">
         <li><b>Borders &amp; dates:</b> <a href="https://github.com/Seshat-Global-History-Databank/cliopatria" target="_blank" rel="noopener noreferrer">Cliopatria</a> (Seshat, CC BY 4.0)</li>
         <li><b>Provinces:</b> hand-built from <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener noreferrer">Natural Earth</a> modern boundaries (public domain); see <a href="https://github.com/wesleymhare/Unity-of-Being/blob/main/docs/SUBDIVISIONS.md" target="_blank" rel="noopener noreferrer">how</a></li>
-        <li><b>Societies:</b> curated (<a href="https://github.com/wesleymhare/Unity-of-Being/blob/main/docs/SOCIETIES.md" target="_blank" rel="noopener noreferrer">what counts</a>)</li>
+        <li><b>Civilizations:</b> curated (<a href="https://github.com/wesleymhare/Unity-of-Being/blob/main/docs/CIVILIZATIONS.md" target="_blank" rel="noopener noreferrer">what counts</a>)</li>
+        <li><b>Societies:</b> curated and schematic (<a href="https://github.com/wesleymhare/Unity-of-Being/blob/main/docs/SOCIETIES.md" target="_blank" rel="noopener noreferrer">what counts</a>)</li>
         <li><b>Climate:</b> <a href="https://doi.org/10.1127/metz/2016/0816" target="_blank" rel="noopener noreferrer">Köppen–Geiger, Rubel et al.</a>, shifted through time (schematic)</li>
         <li><b>Ecoregions:</b> <a href="https://doi.org/10.1093/biosci/bix014" target="_blank" rel="noopener noreferrer">RESOLVE 2017, Dinerstein et al.</a> (CC BY 4.0, after WWF)</li>
         <li><b>Coastlines, rivers &amp; lakes:</b> Natural Earth (public domain)</li>
@@ -131,7 +133,7 @@
         <li><b>Facts, flags &amp; rulers:</b> Wikidata (CC0)</li>
         <li><b>Modern map:</b> OpenStreetMap (ODbL)</li>
       </ul>
-      <p class="help-fine">Borders, province and society areas and past climates are approximations and often disputed.</p>
+      <p class="help-fine">Borders, province and civilization areas and past climates are approximations and often disputed.</p>
     </div>
   </aside>
 

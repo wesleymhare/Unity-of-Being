@@ -1,5 +1,7 @@
 # Plan: renaming Societies and adding a new Societies lens
 
+**Status: done (3 November 2026).** The rename is complete, and the new Societies lens exists with ~40 curated networks (see `docs/SOCIETIES.md`). The notes below are kept as the original plan.
+
 Status: **planned, not started** (parked on 2 November 2026, per Wes).
 
 ## The idea

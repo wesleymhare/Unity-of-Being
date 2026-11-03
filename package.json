@@ -10,6 +10,7 @@
     "data:download": "node data/download.mjs",
     "data:build": "node data/build-data.mjs",
     "data:water": "node data/build-water.mjs",
+    "data:civilizations": "python3 data/build-civilizations.py",
     "data:societies": "python3 data/build-societies.py",
     "data:biomes:download": "node data/download-biomes.mjs",
     "data:biomes:build": "python3 data/build-biomes.py"

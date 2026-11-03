@@ -1,16 +1,16 @@
-"""Societies batch 1: Near East, Arabia, Kurds, the Mediterranean, the Balkans,
+"""Civilizations batch 1: Near East, Arabia, Kurds, the Mediterranean, the Balkans,
 France, South Asia and Southern California.
 
 Every entry is a *stage in time*. Stages that continue one another share a `line`.
 lvl 2 = a people; lvl 3 = a regional or local identity (shown when zoomed in).
-Footprints are coarse and soft (see docs/SOCIETIES.md).
+Footprints are coarse and soft (see docs/CIVILIZATIONS.md).
 """
-from societies_data import SOCIETIES, add, blob, box  # noqa: F401
+from civilizations_data import CIVILIZATIONS, add, blob, box  # noqa: F401
 
 
 def register():
     # The old single-polygon Arabs and Kurds entries are replaced by finer stages below.
-    SOCIETIES[:] = [e for e in SOCIETIES if e['name'] not in ('Arabs', 'Kurds')]
+    CIVILIZATIONS[:] = [e for e in CIVILIZATIONS if e['name'] not in ('Arabs', 'Kurds')]
 
     # ---- Afro-Asiatic roots ----------------------------------------------------
     add('Proto-Afro-Asiatic speakers', -3400, -3000, 'AA', 'Language area',
@@ -31,7 +31,7 @@ def register():
         'Pre-Islamic Arabia', [[35.0, 29.8], [38.0, 32.0], [44.0, 32.4], [48.0, 29.5], [51.5, 24.5], [55.5, 24.0],
                               [53.0, 20.0], [44.5, 18.0], [40.0, 20.5], [36.5, 26.0]],
         line='arabian', note='Tribal Arabia of oasis towns, caravan routes and desert tribes before Islam: Nabataeans, Lakhmids, Ghassanids, Quraysh.')
-    add('Early Arab-Islamic society', 633, 1000, 'AA', 'People', 'Afro-Asiatic (Arabic)',
+    add('Early Arab-Islamic civilization', 633, 1000, 'AA', 'People', 'Afro-Asiatic (Arabic)',
         'Early Muslim conquests', [
             [[35.0, 29.8], [38.0, 33.0], [44.0, 33.5], [48.0, 30.0], [55.5, 24.0], [53.0, 20.0], [44.5, 15.0], [40.0, 20.5]],
             [[34.5, 36.8], [41.0, 37.0], [44.0, 36.0], [48.0, 31.5], [44.0, 33.0], [38.0, 33.0], [35.0, 31.0]],
@@ -66,10 +66,10 @@ def register():
     # ---- Levant, Egypt, Mesopotamia -------------------------------------------
     add('Samaritans and Judeans', -586, 135, 'AA', 'People', 'Afro-Asiatic (Hebrew, Aramaic)', 'Second Temple Judaism',
         [[34.6, 32.8], [35.9, 32.8], [35.6, 31.0], [34.8, 31.0]], lvl=3, line='judean',
-        note='Jewish society around Jerusalem under Persian, Greek and Roman rule, ending with the Bar Kokhba revolt.')
+        note='Jewish civilization around Jerusalem under Persian, Greek and Roman rule, ending with the Bar Kokhba revolt.')
     add('Syriac Christians and Mesopotamian Arameans', 100, 1300, 'AA', 'People', 'Afro-Asiatic (Syriac, Aramaic)', 'Syriac Christianity',
         [[37.0, 37.5], [43.5, 37.5], [46.0, 35.0], [45.0, 32.5], [41.0, 34.0], [38.0, 35.0]], lvl=3, line='assyrian-christian',
-        note='A Christian, Aramaic-speaking society between the Roman and Persian worlds.')
+        note='A Christian, Aramaic-speaking civilization between the Roman and Persian worlds.')
     add('Copts', 300, 2024, 'AA', 'People', 'Afro-Asiatic (Coptic liturgy; Egyptian Arabic)', 'Copts',
         [[29.5, 31.0], [32.5, 30.0], [32.8, 25.0], [31.5, 24.0], [30.5, 27.0]], lvl=3,
         note='Egyptian Christians who kept the Coptic Church and the last stage of the ancient Egyptian language.')

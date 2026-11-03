@@ -578,7 +578,7 @@ export class BiomeModel {
   /**
    * One patch per connected area of a single (ecoregion, Köppen class) pair in the
    * current climate state, each with a label anchor and the free width and height
-   * there (degrees as drawn on a Mercator map), like the polity and society labels.
+   * there (degrees as drawn on a Mercator map), like the polity and civilization labels.
    */
   patches(): EcoPatch[] {
     const { cls, eco, width, height, meta } = this;

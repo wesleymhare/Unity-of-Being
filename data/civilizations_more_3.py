@@ -1,8 +1,8 @@
-"""Societies batch 3: Africa, the Americas, Oceania and the diasporas.
+"""Civilizations batch 3: Africa, the Americas, Oceania and the diasporas.
 
 Defaults are lvl 3 (regional or local identity). Pass lvl=2 for a people.
 """
-from societies_data import add, blob, box  # noqa: F401
+from civilizations_data import add, blob, box  # noqa: F401
 
 
 def S(name, s, e, fam, kind, lang, wiki, poly, lvl=3, line=None, note='', clip=True):
@@ -11,7 +11,7 @@ def S(name, s, e, fam, kind, lang, wiki, poly, lvl=3, line=None, note='', clip=T
 
 def register():
     # ---- North Africa --------------------------------------------------------------
-    S('Carthaginians (Punic society)', -814, -146, 'AA', 'People', 'Punic (Phoenician)', 'Carthage',
+    S('Carthaginians (Punic civilization)', -814, -146, 'AA', 'People', 'Punic (Phoenician)', 'Carthage',
       [[8.0, 36.0], [11.8, 37.3], [11.5, 34.0], [9.0, 33.5]], line='punic',
       note='Phoenician-descended traders of Carthage and its western Mediterranean colonies.')
     S('Romanised North Africans', -145, 640, 'AA', 'People', 'Latin, Punic, Berber', 'Roman Africa',
@@ -44,7 +44,7 @@ def register():
 
     # ---- Southern Africa ----------------------------------------------------------------
     S('Great Zimbabwe and early Shona', 900, 1499, 'NC', 'Civilization', 'Shona (Bantu)', 'Great Zimbabwe', box(28.0, -22.5, 33.0, -17.0), line='shona',
-      note='Gold-trading stone-city society of the Zimbabwe plateau.')
+      note='Gold-trading stone-city civilization of the Zimbabwe plateau.')
     S('Shona', 1500, 2024, 'NC', 'People', 'Shona (Bantu)', 'Shona people', box(28.0, -22.5, 33.0, -16.5), line='shona')
     S('Zulu and Nguni', 1600, 2024, 'NC', 'People', 'Zulu, Xhosa (Nguni Bantu)', 'Zulu people', box(26.0, -34.0, 32.5, -26.5), lvl=2)
     S('Sotho and Tswana', 1400, 2024, 'NC', 'People', 'Sotho-Tswana (Bantu)', 'Sotho people', box(24.0, -30.5, 29.5, -22.0))
@@ -58,11 +58,11 @@ def register():
       [box(-91.5, 19.0, -87.0, 21.6), box(-92.0, 14.4, -90.0, 16.0)], line='maya')
     S('Maya today', 1525, 2024, 'MA', 'People', 'Mayan languages; Spanish', 'Maya peoples', box(-92.5, 14.0, -87.5, 21.5), line='maya')
     S('Mexica (Aztecs) and the Triple Alliance', 1300, 1521, 'MA', 'People', 'Nahuatl', 'Aztecs', blob(-98.8, 19.4, 1.5, 1.1), line='nahua',
-      note='The Nahuatl-speaking society of the Valley of Mexico whose capital was Tenochtitlan.')
+      note='The Nahuatl-speaking civilization of the Valley of Mexico whose capital was Tenochtitlan.')
     S('Purépecha', 1300, 2024, 'IS', 'People', 'Purépecha (isolate)', 'Purépecha', blob(-101.8, 19.6, 1.0, 0.6))
     S('New Spain: Mestizo and Indigenous Mexico', 1522, 1820, 'IE', 'People', 'Spanish, Nahuatl, many languages', 'New Spain',
       [[-110.0, 24.0], [-105.0, 29.0], [-97.0, 26.0], [-97.7, 21.0], [-96.0, 18.0], [-91.0, 18.2], [-88.5, 15.8], [-92.0, 14.5], [-105.0, 20.0]],
-      line='mexico', note='A caste society that blended Spanish, Indigenous and African peoples.')
+      line='mexico', note='A caste civilization that blended Spanish, Indigenous and African peoples.')
     S('Mexicans', 1821, 2024, 'IE', 'People', 'Spanish and Indigenous languages', 'Mexicans',
       [[-117.0, 32.5], [-110.0, 31.3], [-103.0, 29.0], [-97.2, 25.9], [-97.7, 21.0], [-96.0, 18.0], [-91.0, 18.2], [-87.0, 21.4],
        [-88.5, 15.8], [-92.0, 14.5], [-105.0, 20.0], [-112.0, 28.0]], lvl=2, line='mexico')
@@ -70,7 +70,7 @@ def register():
     # ---- Americas: Andes and South America ------------------------------------------------
     S('Inca (Tawantinsuyu)', 1438, 1533, 'AD', 'Civilization', 'Quechua', 'Inca Empire',
       [[-79.0, 1.5], [-75.5, 0.0], [-68.0, -14.0], [-66.0, -22.0], [-68.5, -31.0], [-71.5, -34.0], [-71.0, -20.0], [-76.0, -12.0], [-80.0, -3.0]],
-      lvl=2, line='andes', note='A road-linked highland society of many ethnic groups under Quechua-speaking Inca rule.')
+      lvl=2, line='andes', note='A road-linked highland civilization of many ethnic groups under Quechua-speaking Inca rule.')
     S('Chimú', 900, 1470, 'AD', 'Civilization', 'Muchik (Chimu)', 'Chimú culture', box(-80.5, -9.5, -77.5, -5.5))
     S('Muisca', 600, 1540, 'AD', 'People', 'Chibcha (Muysccubun)', 'Muisca', box(-74.5, 4.5, -72.6, 6.6))
     S('Gauchos and Pampas', 1700, 1900, 'IE', 'People', 'Spanish', 'Gaucho', box(-65.5, -39.5, -57.5, -30.0))
@@ -118,7 +118,7 @@ def register():
     S('Yolngu (Arnhem Land)', -3400, 2024, 'PA', 'People', 'Yolŋu Matha (Pama-Nyungan)', 'Yolngu', box(134.0, -14.5, 137.0, -11.5))
     S('Noongar', -3400, 2024, 'PA', 'People', 'Noongar (Pama-Nyungan)', 'Noongar', box(115.0, -35.2, 119.5, -30.0))
     S('Kulin nation', -3400, 2024, 'PA', 'People', 'Kulin languages (Pama-Nyungan)', 'Kulin', box(143.0, -38.6, 146.8, -36.0))
-    S('New Zealanders (Pākehā and Māori society)', 1840, 2024, 'IE', 'People', 'English and Māori', 'New Zealanders', box(166.0, -47.5, 178.8, -34.2))
+    S('New Zealanders (Pākehā and Māori civilization)', 1840, 2024, 'IE', 'People', 'English and Māori', 'New Zealanders', box(166.0, -47.5, 178.8, -34.2))
 
     # ---- Overseas Chinese and Indian diasporas ----------------------------------------------------
     S('Overseas Chinese of Nanyang', 1400, 2024, 'ST', 'People', 'Hokkien, Teochew, Cantonese, Hakka and local languages',

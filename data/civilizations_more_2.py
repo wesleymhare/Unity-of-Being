@@ -1,9 +1,9 @@
-"""Societies batch 2: Europe, the Caucasus and steppe, Iran and Central Asia,
+"""Civilizations batch 2: Europe, the Caucasus and steppe, Iran and Central Asia,
 South Asia, East and Southeast Asia. Stages in time and local identities.
 
 Defaults here are lvl 3 (regional or local identity). Pass lvl=2 for a people.
 """
-from societies_data import add, blob, box  # noqa: F401
+from civilizations_data import add, blob, box  # noqa: F401
 
 
 def S(name, s, e, fam, kind, lang, wiki, poly, lvl=3, line=None, note='', clip=True):
@@ -36,7 +36,7 @@ def register():
     S('Corsicans', 1100, 2024, 'IE', 'People', 'Corsican (Italo-Romance)', 'Corsicans', blob(9.1, 42.15, 0.35, 0.85))
     S('Franks and Gallo-Romans', 476, 899, 'IE', 'People', 'Old French, Frankish, Latin', 'Franks',
       [[-1.8, 47.0], [2.0, 51.0], [8.0, 50.8], [7.5, 47.5], [3.0, 44.5]], line='france',
-      note='The merged Frankish and Gallo-Roman society that became France and western Germany.')
+      note='The merged Frankish and Gallo-Roman civilization that became France and western Germany.')
     S('Dutch and Flemings', 1000, 2024, 'IE', 'People', 'Dutch (Germanic)', 'Dutch people', box(2.8, 50.6, 7.2, 53.6), lvl=2)
     S('Frisians', -500, 2024, 'IE', 'People', 'Frisian (Germanic)', 'Frisians', box(4.5, 52.8, 8.9, 53.8))
     S('Swiss', 1291, 2024, 'IE', 'People', 'Alemannic German, French, Italian, Romansh', 'Swiss people', box(6.0, 45.9, 10.4, 47.7))
@@ -52,7 +52,7 @@ def register():
     S('Hispano-Romans and Visigoths', 409, 710, 'IE', 'People', 'Latin, Gothic', 'Visigothic Kingdom', box(-9.3, 36.0, 3.2, 43.7), line='iberia-medieval')
     S('Andalusis (Muslim Iberia)', 711, 1491, 'AA', 'People', 'Andalusi Arabic, Mozarabic, Berber', 'Al-Andalus',
       [[-9.0, 37.0], [-5.0, 41.0], [0.5, 41.0], [0.3, 38.5], [-2.0, 36.7], [-7.5, 36.8]], line='iberia-medieval',
-      note='Arabic-speaking Muslim, Christian and Jewish society of the south and centre of the peninsula.')
+      note='Arabic-speaking Muslim, Christian and Jewish civilization of the south and centre of the peninsula.')
     S('Castilians', 900, 2024, 'IE', 'People', 'Castilian Spanish', 'Castilians', box(-6.8, 38.5, -1.5, 43.2))
     S('Catalans and Valencians', 800, 2024, 'IE', 'People', 'Catalan', 'Catalans', [[0.2, 42.6], [3.3, 42.5], [0.2, 38.7], [-0.5, 39.0], [0.0, 40.8]])
     S('Galicians and Portuguese', 600, 2024, 'IE', 'People', 'Galician-Portuguese', 'Galicians', box(-9.5, 36.9, -6.2, 43.8))
@@ -66,7 +66,7 @@ def register():
     S('Lombards and Piedmontese', 568, 2024, 'IE', 'People', 'Lombard, Piedmontese (Romance)', 'Lombards', box(6.8, 44.4, 10.6, 46.0))
     S('Neapolitans and southern Italians', 1000, 2024, 'IE', 'People', 'Neapolitan (Romance)', 'Neapolitans', [[13.5, 41.8], [16.5, 41.6], [18.4, 40.4], [16.0, 38.0], [14.0, 40.0]])
     S('Maltese', 1090, 2024, 'AA', 'People', 'Maltese (Arabic-derived Semitic)', 'Maltese people', blob(14.4, 35.9, 0.25, 0.15),
-      note='A Semitic language written in Latin letters, in a Catholic, Mediterranean society.')
+      note='A Semitic language written in Latin letters, in a Catholic, Mediterranean civilization.')
     S('Greeks of Magna Graecia and Anatolia', -800, -100, 'IE', 'People', 'Greek', 'Magna Graecia',
       [box(14.8, 37.8, 18.0, 40.8), box(26.0, 36.5, 28.5, 40.5)], line='greek-colonies')
 
@@ -125,14 +125,14 @@ def register():
     # ---- South Asia ----------------------------------------------------------------
     S('Vedic peoples', -1500, -501, 'IE', 'People', 'Vedic Sanskrit', 'Vedic period', box(70.0, 27.0, 83.0, 33.5), lvl=2, line='indo-aryan',
       note='Early Indo-Aryan speakers of the Punjab and upper Gangetic plain whose hymns became the Vedas.')
-    S('Gangetic Buddhist-Hindu society', -500, 299, 'IE', 'Civilization', 'Sanskrit, Prakrits, Pali', 'History of India',
+    S('Gangetic Buddhist-Hindu civilization', -500, 299, 'IE', 'Civilization', 'Sanskrit, Prakrits, Pali', 'History of India',
       box(78.0, 23.5, 88.5, 28.5), lvl=2, line='indo-aryan',
       note='The age of the Buddha, the Mauryas and the great epics: cities, trade guilds and rival schools of thought.')
-    S('Classical Hindu society', 300, 699, 'IE', 'Civilization', 'Sanskrit, Prakrits', 'Gupta Empire',
+    S('Classical Hindu civilization', 300, 699, 'IE', 'Civilization', 'Sanskrit, Prakrits', 'Gupta Empire',
       box(72.0, 21.0, 88.5, 29.0), lvl=2, line='indo-aryan', note='Gupta-age temple building, Sanskrit literature, mathematics and law.')
     S('Rajputs and medieval Hindu kingdoms', 700, 1199, 'IE', 'People', 'Apabhramsha, early Hindi, Gujarati', 'Rajput',
       box(69.5, 22.0, 78.5, 30.5), lvl=3, line='indo-aryan')
-    S('Hindustani-speaking Indo-Muslim society', 1200, 1856, 'IE', 'People', 'Hindustani (Persianate Hindi-Urdu)', 'Hindustani language',
+    S('Hindustani-speaking Indo-Muslim civilization', 1200, 1856, 'IE', 'People', 'Hindustani (Persianate Hindi-Urdu)', 'Hindustani language',
       box(74.5, 23.5, 86.5, 30.5), lvl=2, line='indo-aryan',
       note='Delhi and its sultanates and Mughals: a Persian-using court, Hindu and Muslim subjects, and the birth of Urdu.')
     S('Hindi-Urdu belt of India and Pakistan', 1857, 2024, 'IE', 'People', 'Hindi, Urdu, Punjabi and others', 'Hindi Belt',
@@ -178,4 +178,4 @@ def register():
     S('Visayans', 900, 2024, 'AN', 'People', 'Cebuano, Hiligaynon, Waray', 'Visayans', box(121.8, 9.5, 126.0, 12.0))
     S('Moros of Mindanao and Sulu', 1300, 2024, 'AN', 'People', 'Maguindanao, Tausug (Austronesian)', 'Moro people', box(119.5, 5.5, 125.5, 8.8))
     S('Angkorian Khmer', 802, 1430, 'SE', 'Civilization', 'Old and Middle Khmer', 'Khmer Empire', box(102.5, 11.8, 106.5, 15.2), line='khmer',
-      note='Temple-city society of Angkor, with Hindu and then Buddhist state ritual.')
+      note='Temple-city civilization of Angkor, with Hindu and then Buddhist state ritual.')

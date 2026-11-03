@@ -1,479 +1,343 @@
-"""Curated Societies for the Societies lens. See docs/SOCIETIES.md for what counts.
+"""Societies: de facto networks of control, exchange and affiliation (see docs/SOCIETIES.md).
 
-Each entry is a people, culture or language community, not a state. Footprints
-are coarse polygons of [longitude, latitude] points. They are trimmed to the
-coastline by data/build-societies.py unless `clip=False` (island groups).
+A Society here is not a people (that is a Civilization) and not a legal state (that is a
+Polity). It is who actually moves things and holds things together, whatever the legal map
+says: trade networks, logistics and communications systems, companies, factions and parties,
+diasporas and communities, pilgrimage systems, clandestine networks.
 
-add(name, start, end, family, kind, languages, wikipedia_title, polygon, clip=True,
-    lvl=2, line=None, note='')
-`polygon` is one ring, or a list of rings for a split footprint. Years are CE
-(negative = BCE).
-
-A society is a *stage in time*: "who you belong to" in a place and period. Stages
-that continue one another share a `line` (lineage id), so the panel can walk from
-Proto-Dravidian to Sangam Tamil to modern Tamil. `lvl` is the scale of the
-affinity: 1 broad sphere, 2 people (default), 3 local or regional identity
-(shown only when zoomed in). `note` is one line on what holds the people together.
-Helpers: box(west, south, east, north) and blob(lon, lat, rx, ry, rot=0) make
-quick rough footprints.
+Each entity is drawn from three kinds of element:
+    routes   lines between hubs (land or sea)           R([(lng, lat), ...], sea=False)
+    nodes    hubs: cities, ports, posts, bases           ('Name', lng, lat) or ('Name', lng, lat, 'major')
+    zones    areas of de facto presence or control       Z([(lng, lat), ...])
+Any element can carry its own years (s=, e=); otherwise it uses the entity's.
+Coordinates are approximate; routes are schematic, not surveyed.
 """
 import math
 
-FAMILIES = {
-    'IE': ('Indo-European', '#5b86c9'),
-    'AA': ('Afro-Asiatic', '#d98a3d'),
-    'ST': ('Sino-Tibetan', '#c2574f'),
-    'AN': ('Austronesian', '#3fa0a0'),
-    'NC': ('Niger-Congo', '#5fa05f'),
-    'NS': ('Nilo-Saharan and Khoe-San', '#a8a14a'),
-    'UR': ('Uralic and Siberian', '#8b78bd'),
-    'TM': ('Turkic, Mongolic and Tungusic', '#cdb050'),
-    'DR': ('Dravidian and Munda', '#c46f8d'),
-    'SE': ('Mainland Southeast Asian', '#8fb04f'),
-    'JK': ('Japonic and Koreanic', '#5aa8cc'),
-    'IS': ('Isolates and lost languages', '#8a929a'),
-    'MA': ('Mesoamerican', '#a8704f'),
-    'AD': ('Andean and Amazonian', '#b8956a'),
-    'NA': ('Native North American', '#9a6fa4'),
-    'PA': ('Papuan and Australian', '#a65a5a'),
+KINDS = {
+    'Trade network': '#e0a63a',
+    'Company or maritime system': '#5b95d6',
+    'Communications and logistics': '#52bcd0',
+    'Faction or party': '#d9645c',
+    'Community or diaspora': '#a982d6',
+    'Pilgrimage': '#6fc47e',
+    'Clandestine network': '#d8d4c8',
 }
 
-SOCIETIES = []
+ENTITIES = []
 
 
-def add(name, start, end, family, kind, languages, wiki, polygon, clip=True,
-        lvl=2, line=None, note=''):
-    rings = polygon if isinstance(polygon[0][0], (list, tuple)) else [polygon]
-    SOCIETIES.append({
-        'name': name, 's': start, 'e': end, 'family': family, 'kind': kind,
-        'languages': languages, 'wiki': wiki, 'rings': rings, 'clip': clip,
-        'lvl': lvl, 'line': line, 'note': note,
+def R(pts, sea=False, s=None, e=None):
+    return {'pts': pts, 'sea': sea, 'e': e, 's': s}
+
+
+def Z(pts, s=None, e=None):
+    return {'pts': pts, 's': s, 'e': e}
+
+
+def blob(lon, lat, rx, ry, n=14):
+    return [[round(lon + rx * math.cos(2 * math.pi * i / n), 2),
+             round(lat + ry * math.sin(2 * math.pi * i / n), 2)] for i in range(n)]
+
+
+def net(name, kind, s, e, wiki, note, routes=(), nodes=(), zones=()):
+    assert kind in KINDS, kind
+    ENTITIES.append({
+        'name': name, 'kind': kind, 's': s, 'e': e, 'wiki': wiki, 'note': note,
+        'routes': list(routes), 'nodes': list(nodes), 'zones': list(zones),
     })
 
 
-def box(w, s, e, n):
-    """A rectangle as one ring."""
-    return [[w, s], [e, s], [e, n], [w, n]]
+# ---- Earliest networks ------------------------------------------------------------------------------
+net('Uruk expansion', 'Trade network', -3400, -3100, 'Uruk period',
+    'Southern Mesopotamian colonies and trading posts planted far up the rivers and across the highlands, '
+    'the first long-distance urban network.',
+    routes=[R([(45.64, 31.32), (45.0, 33.0), (43.0, 35.0), (40.0, 36.0), (38.1, 36.1)]),
+            R([(45.64, 31.32), (47.0, 32.4), (48.1, 34.4)])],
+    nodes=[('Uruk', 45.64, 31.32, 'major'), ('Habuba Kabira', 38.1, 36.1), ('Godin Tepe', 48.1, 34.4), ('Susa', 48.25, 32.19)])
 
+net('Indus–Mesopotamia trade (Meluhha)', 'Trade network', -2600, -1900, 'Indus–Mesopotamia relations',
+    'Carnelian, lapis, copper and timber carried by sea between the Indus cities, Oman, Bahrain (Dilmun) and Ur.',
+    routes=[R([(68.1, 27.3), (66.5, 25.2), (62.0, 24.8), (58.0, 24.6), (56.3, 25.6), (50.55, 26.2), (48.5, 29.5), (47.0, 30.5)], sea=True),
+            R([(72.25, 22.5), (69.5, 22.0), (66.0, 24.0), (62.0, 24.8)], sea=True)],
+    nodes=[('Mohenjo-daro', 68.1, 27.3, 'major'), ('Lothal', 72.25, 22.5), ('Dilmun (Bahrain)', 50.55, 26.2), ('Magan (Oman)', 56.5, 23.6), ('Ur', 46.1, 30.96, 'major')])
 
-def blob(lon, lat, rx, ry, rot=0, n=14):
-    """An ellipse (radii in degrees, rotated by `rot` degrees) as one ring."""
-    a = math.radians(rot)
-    out = []
-    for i in range(n):
-        t = 2 * math.pi * i / n
-        x, y = rx * math.cos(t), ry * math.sin(t)
-        out.append([round(lon + x * math.cos(a) - y * math.sin(a), 2),
-                    round(lat + x * math.sin(a) + y * math.cos(a), 2)])
-    return out
+net('Old Assyrian merchant colonies', 'Community or diaspora', -1950, -1750, 'Kültepe',
+    'Assyrian merchants from Assur ran tin and textile caravans to a chain of trading quarters (karum) in Anatolia.',
+    routes=[R([(43.26, 35.46), (40.5, 37.3), (38.5, 37.9), (35.64, 38.85)])],
+    nodes=[('Assur', 43.26, 35.46, 'major'), ('Kanesh (Kültepe)', 35.64, 38.85, 'major'), ('Purushanda', 33.6, 38.3), ('Hattusa', 34.6, 40.0)])
 
+net('Phoenician and Carthaginian network', 'Trade network', -1200, -146, 'Phoenicia',
+    'Tyrian and later Carthaginian ports strung across the Mediterranean to the Atlantic coast of Iberia and Morocco.',
+    routes=[R([(35.2, 33.27), (33.63, 34.92), (27.0, 35.4), (18.0, 35.6), (14.5, 35.9), (10.32, 36.85), (5.0, 37.2), (-2.0, 36.5), (-6.29, 36.53)], sea=True),
+            R([(10.32, 36.85), (12.5, 37.87)], sea=True), R([(10.32, 36.85), (9.0, 38.99), (1.43, 38.9), (-0.98, 37.6)], sea=True),
+            R([(-6.29, 36.53), (-8.5, 33.5), (-9.77, 31.5)], sea=True)],
+    nodes=[('Tyre', 35.2, 33.27, 'major'), ('Kition', 33.63, 34.92), ('Carthage', 10.32, 36.85, 'major'), ('Motya', 12.5, 37.87),
+           ('Nora', 9.0, 38.99), ('Ibiza', 1.43, 38.9), ('Gadir (Cádiz)', -6.29, 36.53, 'major'), ('Mogador', -9.77, 31.5)])
 
-# ---- Near East and Egypt ----------------------------------------------------
-add('Sumerians', -3400, -1900, 'IS', 'People', 'Sumerian (language isolate)', 'Sumer',
-    [[44.0, 32.8], [46.0, 33.3], [48.0, 32.3], [48.6, 30.2], [47.3, 29.0], [45.0, 30.0], [44.0, 31.2]])
-add('Akkadians and Babylonians', -2400, -539, 'AA', 'People', 'Afro-Asiatic (East Semitic: Akkadian)', 'Babylonia',
-    [[42.5, 34.8], [45.5, 35.0], [47.8, 33.5], [46.6, 32.0], [44.0, 31.6], [42.6, 33.0]])
-add('Assyrians', -2500, 2024, 'AA', 'People', 'Afro-Asiatic (Akkadian, later Aramaic)', 'Assyrian people',
-    [[41.2, 37.6], [44.4, 37.5], [44.8, 35.6], [43.0, 34.6], [41.6, 35.5]])
-add('Elamites', -3200, -539, 'IS', 'People', 'Elamite (language isolate)', 'Elam',
-    [[47.6, 33.6], [50.2, 34.0], [52.6, 31.6], [53.2, 29.6], [50.6, 28.4], [48.6, 30.4]])
-add('Ancient Egyptians', -3400, 639, 'AA', 'Civilization', 'Afro-Asiatic (Egyptian, later Coptic)', 'Ancient Egypt',
-    [[29.2, 31.8], [32.5, 31.5], [34.4, 28.0], [33.2, 24.2], [33.8, 22.0], [31.2, 21.8], [30.0, 25.0], [29.0, 29.0]])
-add('Egyptians', 640, 2024, 'AA', 'People', 'Afro-Asiatic (Egyptian Arabic; Coptic in liturgy)', 'Egyptians',
-    [[29.2, 31.8], [32.5, 31.5], [34.4, 28.0], [33.2, 24.2], [33.8, 22.0], [31.2, 21.8], [30.0, 25.0], [29.0, 29.0]])
-add('Nubians', -3000, 2024, 'NS', 'People', 'Nilo-Saharan (Nubian languages)', 'Nubia',
-    [[30.2, 24.0], [34.0, 23.6], [35.0, 17.5], [33.0, 14.0], [30.2, 15.0], [29.2, 19.5]])
-add('Canaanites and Phoenicians', -3000, -300, 'AA', 'People', 'Afro-Asiatic (Northwest Semitic)', 'Canaan',
-    [[34.6, 36.0], [36.6, 35.8], [37.0, 33.0], [36.0, 30.6], [34.3, 31.3]])
-add('Israelites', -1200, -586, 'AA', 'People', 'Afro-Asiatic (Hebrew)', 'Israelites',
-    [[34.8, 33.2], [36.0, 33.0], [36.2, 31.2], [35.2, 30.6], [34.5, 31.5]])
-add('Arameans', -1100, 700, 'AA', 'People', 'Afro-Asiatic (Aramaic)', 'Arameans',
-    [[36.2, 36.8], [40.0, 36.8], [41.8, 34.8], [39.0, 32.5], [36.2, 33.5]])
-add('Hurrians', -2300, -1000, 'IS', 'People', 'Hurro-Urartian', 'Hurrians',
-    [[37.0, 37.8], [43.6, 38.0], [44.6, 36.2], [40.6, 35.8], [37.6, 36.2]])
-add('Hittites and Luwians', -2000, -1181, 'IE', 'People', 'Indo-European (Anatolian)', 'Hittites',
-    [[30.0, 40.6], [35.0, 41.5], [39.6, 40.0], [38.6, 37.0], [33.0, 36.8], [29.6, 38.0]])
-add('Phrygians and Lydians', -1180, -100, 'IE', 'People', 'Indo-European (Phrygian, Anatolian)', 'Phrygians',
-    [[26.0, 39.2], [31.0, 40.6], [33.6, 39.6], [32.2, 37.6], [27.6, 37.2]])
-add('Armenians', -600, 2024, 'IE', 'People', 'Indo-European (Armenian)', 'Armenians',
-    [[41.0, 41.0], [45.6, 41.2], [47.0, 39.5], [45.5, 38.0], [42.5, 37.8], [40.6, 39.0]])
-add('Georgians', -600, 2024, 'IS', 'People', 'Kartvelian', 'Georgians',
-    [[40.0, 42.9], [46.5, 42.6], [46.5, 41.0], [42.6, 41.2]])
-add('Persians', -1000, 2024, 'IE', 'People', 'Indo-European (Iranian)', 'Persian people',
-    [[46.0, 38.2], [54.0, 37.6], [61.0, 35.2], [61.6, 27.0], [57.0, 25.6], [52.0, 27.6], [48.6, 30.0], [46.0, 34.0]])
-add('Kurds', 700, 2024, 'IE', 'People', 'Indo-European (Iranian)', 'Kurds',
-    [[38.5, 38.2], [44.6, 39.6], [47.2, 37.2], [46.0, 34.0], [43.0, 34.0], [40.0, 36.6]])
-add('Pashtuns', -500, 2024, 'IE', 'People', 'Indo-European (Iranian: Pashto)', 'Pashtuns',
-    [[62.0, 34.0], [66.0, 36.4], [70.2, 36.0], [72.2, 32.0], [69.0, 29.0], [64.0, 30.0]])
-add('Sogdians and Tajiks', -500, 2024, 'IE', 'People', 'Indo-European (Eastern Iranian, Tajik)', 'Sogdians',
-    [[62.0, 40.0], [68.0, 41.4], [75.0, 40.0], [74.4, 36.6], [68.0, 36.6]])
-add('Arabs', -900, 639, 'AA', 'People', 'Afro-Asiatic (Semitic: Arabic)', 'Arabs',
-    [[35.0, 29.5], [38.0, 32.0], [44.0, 32.6], [48.0, 30.0], [52.0, 24.0], [59.6, 22.6], [57.0, 17.0],
-     [52.0, 16.0], [43.0, 12.8], [40.0, 17.0], [36.0, 26.0]])
-add('Arabs', 640, 2024, 'AA', 'People', 'Afro-Asiatic (Semitic: Arabic)', 'Arabs', [
-    [[35.0, 29.5], [38.0, 32.0], [44.0, 32.6], [48.0, 30.0], [52.0, 24.0], [59.6, 22.6], [57.0, 17.0],
-     [52.0, 16.0], [43.0, 12.8], [40.0, 17.0], [36.0, 26.0]],
-    [[34.5, 36.8], [41.0, 37.2], [44.0, 36.0], [48.0, 31.2], [44.0, 33.0], [38.0, 33.0], [35.0, 31.0]],
-    [[25.0, 31.8], [34.4, 31.4], [34.0, 23.0], [25.0, 22.0]],
-    [[-13.0, 27.5], [-9.8, 35.7], [11.0, 37.3], [12.0, 33.0], [9.0, 28.0], [-1.0, 25.0]],
-])
+net('Greek colonial network', 'Trade network', -800, -300, 'Greek colonisation',
+    'Hundreds of Greek city-founded colonies and trading ports around the Mediterranean and the Black Sea.',
+    routes=[R([(23.73, 37.98), (25.5, 37.5), (27.28, 37.53)], sea=True),
+            R([(27.28, 37.53), (27.5, 40.0), (28.98, 41.0), (31.0, 42.5), (35.15, 42.03), (36.5, 45.35)], sea=True),
+            R([(28.98, 41.0), (30.5, 44.0), (31.9, 46.7)], sea=True),
+            R([(23.73, 37.98), (21.5, 37.0), (19.92, 39.62), (17.5, 38.5), (15.29, 37.07)], sea=True),
+            R([(17.5, 38.5), (14.25, 40.85), (9.0, 42.8), (5.37, 43.3), (3.12, 42.13)], sea=True)],
+    nodes=[('Athens', 23.73, 37.98, 'major'), ('Miletus', 27.28, 37.53), ('Byzantion', 28.98, 41.0), ('Sinope', 35.15, 42.03),
+           ('Olbia', 31.9, 46.7), ('Panticapaeum', 36.5, 45.35), ('Syracuse', 15.29, 37.07, 'major'), ('Neapolis', 14.25, 40.85),
+           ('Massalia', 5.37, 43.3, 'major'), ('Emporion', 3.12, 42.13)])
 
-# ---- Europe ---------------------------------------------------------------
-add('Yamnaya steppe peoples', -3400, -2300, 'IE', 'Culture', 'Indo-European (early; reconstructed)', 'Yamnaya culture',
-    [[28.0, 47.0], [34.0, 50.0], [45.0, 51.5], [56.0, 51.0], [56.0, 47.0], [48.0, 45.5], [40.0, 45.0], [33.0, 44.5]])
-add('Cucuteni and Danubian farmers', -3400, -2800, 'IS', 'Culture', 'Unknown (pre-Indo-European)', 'Cucuteni–Trypillia culture',
-    [[24.0, 44.5], [24.0, 49.0], [30.0, 50.6], [32.5, 48.0], [29.0, 45.0]])
-add('Megalith builders', -3400, -2400, 'IS', 'Culture', 'Unknown (pre-Indo-European)', 'Megalith', [
-    [[-10.5, 51.5], [-5.5, 58.8], [-2.0, 58.8], [1.8, 52.5], [1.8, 50.5], [-5.5, 49.8]],
-    [[-9.6, 36.8], [-9.6, 43.8], [-4.5, 48.7], [-1.5, 48.0], [-1.5, 43.5], [-6.0, 37.0]],
-])
-add('Corded Ware and Bell Beaker peoples', -2900, -1800, 'IE', 'Culture', 'Indo-European (early)', 'Corded Ware culture',
-    [[4.0, 50.0], [8.0, 55.0], [18.0, 57.0], [30.0, 58.0], [30.0, 52.0], [20.0, 49.0], [10.0, 47.0]])
-add('Uralic peoples', -3400, -500, 'UR', 'People', 'Uralic (early)', 'Uralic peoples',
-    [[44.0, 55.0], [60.0, 64.0], [70.0, 64.0], [66.0, 56.0], [56.0, 53.0]])
-add('Minoans', -3000, -1100, 'IS', 'Civilization', 'Minoan (undeciphered)', 'Minoan civilization',
-    [[23.4, 35.7], [26.6, 35.7], [26.6, 34.8], [23.4, 34.8]])
-add('Mycenaean Greeks', -1600, -1101, 'IE', 'Civilization', 'Indo-European (Mycenaean Greek)', 'Mycenaean Greece',
-    [[20.5, 40.0], [24.0, 40.2], [24.5, 37.5], [23.0, 36.3], [21.5, 36.5], [20.5, 38.5]])
-add('Ancient Greeks', -1100, -146, 'IE', 'People', 'Indo-European (Greek)', 'Ancient Greece', [
-    [[19.5, 40.8], [23.0, 41.5], [26.5, 41.2], [28.5, 40.5], [28.0, 37.0], [26.5, 36.5], [22.5, 36.3], [19.5, 39.0]],
-    [[12.5, 38.2], [16.0, 38.0], [17.2, 40.5], [16.0, 40.8], [14.5, 38.0]],
-])
-add('Greeks', -145, 2024, 'IE', 'People', 'Indo-European (Greek)', 'Greeks', [
-    [[19.5, 41.0], [23.0, 41.6], [26.5, 41.4], [26.5, 36.5], [22.5, 36.3], [19.5, 39.0]],
-    [[32.2, 35.0], [34.6, 35.6], [34.0, 34.6], [32.3, 34.6]],
-])
-add('Thracians', -1500, 400, 'IE', 'People', 'Indo-European (Thracian)', 'Thracians',
-    [[22.5, 43.5], [28.5, 43.8], [29.0, 41.0], [26.0, 40.8], [23.5, 41.0]])
-add('Illyrians', -1200, 300, 'IE', 'People', 'Indo-European (Illyrian)', 'Illyrians',
-    [[13.5, 45.5], [19.0, 45.5], [21.5, 42.5], [20.0, 40.5], [17.0, 41.5]])
-add('Etruscans', -900, -27, 'IS', 'People', 'Etruscan (language isolate)', 'Etruscan civilization',
-    [[10.0, 44.0], [12.5, 43.5], [12.5, 41.5], [11.0, 41.7], [10.0, 42.5]])
-add('Latins and Romans', -1000, 475, 'IE', 'People', 'Indo-European (Italic: Latin)', 'Italic peoples',
-    [[7.0, 44.0], [12.0, 46.0], [13.5, 45.7], [18.5, 40.2], [16.0, 38.0], [12.5, 38.0], [8.5, 40.5], [9.5, 43.5]])
-add('Italians', 476, 2024, 'IE', 'People', 'Indo-European (Romance: Italian)', 'Italians',
-    [[7.0, 44.0], [12.0, 46.5], [13.8, 45.7], [18.5, 40.2], [16.0, 38.0], [12.5, 38.0], [8.5, 40.5], [9.5, 43.5]])
-add('Iberians', -600, 100, 'IS', 'People', 'Iberian (language isolate)', 'Iberians',
-    [[-2.0, 43.0], [3.2, 42.4], [3.2, 41.0], [0.5, 38.5], [-2.5, 36.7], [-5.5, 36.5], [-7.5, 37.5], [-6.5, 40.0], [-2.0, 41.0]])
-add('Spanish and Portuguese', 476, 2024, 'IE', 'People', 'Indo-European (Romance: Castilian, Portuguese, Catalan)', 'Spaniards',
-    [[-9.6, 36.9], [-9.6, 43.8], [-1.8, 43.5], [3.2, 42.4], [0.3, 38.5], [-2.0, 36.7], [-5.6, 36.0]])
-add('Basques', -1000, 2024, 'IS', 'People', 'Basque (language isolate)', 'Basques',
-    [[-3.3, 43.6], [-0.8, 43.5], [-0.8, 42.5], [-2.8, 42.4]])
-add('French', 476, 2024, 'IE', 'People', 'Indo-European (Romance: French)', 'French people',
-    [[-4.8, 48.5], [-1.5, 49.7], [2.5, 51.0], [6.0, 49.5], [7.5, 47.5], [7.0, 44.0], [3.0, 42.5], [-1.8, 43.4], [-1.5, 46.0]])
-add('Celts', -800, -50, 'IE', 'People', 'Indo-European (Celtic)', 'Celts',
-    [[-8.0, 43.5], [-1.0, 49.0], [3.0, 51.0], [8.0, 51.5], [14.0, 49.5], [16.0, 47.5], [12.0, 46.8], [7.0, 45.5], [3.0, 43.5]])
-add('Britons and Gaels', -600, 450, 'IE', 'People', 'Indo-European (Celtic: Brythonic, Goidelic)', 'Britons (historical)',
-    [[-10.5, 51.4], [-5.5, 58.8], [-2.0, 58.8], [1.5, 52.5], [1.0, 50.8], [-5.5, 49.9]])
-add('Celtic fringe', 450, 2024, 'IE', 'People', 'Indo-European (Celtic: Welsh, Irish, Scottish Gaelic, Breton)', 'Celts', [
-    [[-10.5, 51.4], [-10.0, 55.2], [-6.0, 55.4], [-5.8, 52.0], [-8.0, 51.3]],
-    [[-5.3, 51.6], [-3.0, 51.4], [-3.0, 53.4], [-4.8, 53.4]],
-    [[-6.6, 56.4], [-5.0, 58.7], [-3.0, 57.5], [-4.0, 56.2]],
-    [[-4.8, 48.0], [-2.0, 48.0], [-2.5, 48.9], [-4.8, 48.8]],
-])
-add('Germanic peoples', -500, 299, 'IE', 'People', 'Indo-European (Germanic)', 'Germanic peoples',
-    [[4.0, 52.0], [8.0, 56.0], [13.0, 57.5], [22.0, 56.0], [22.0, 52.0], [16.0, 50.5], [8.0, 49.5]])
-add('Germans', 300, 2024, 'IE', 'People', 'Indo-European (Germanic: German)', 'Germans',
-    [[6.0, 47.5], [6.0, 51.5], [7.0, 53.8], [14.0, 54.5], [18.5, 54.8], [18.0, 51.0], [16.0, 48.7], [17.0, 47.7], [13.0, 46.5], [9.5, 46.5]])
-add('English', 450, 2024, 'IE', 'People', 'Indo-European (Germanic: English)', 'English people',
-    [[-5.5, 50.0], [1.7, 51.0], [1.7, 53.0], [-0.5, 55.5], [-2.5, 55.8], [-3.2, 54.5], [-3.0, 53.0], [-4.5, 51.8]])
-add('Scandinavians', 800, 2024, 'IE', 'People', 'Indo-European (North Germanic)', 'Scandinavians',
-    [[4.5, 58.5], [5.0, 62.0], [12.0, 66.0], [18.0, 69.5], [28.0, 71.0], [30.0, 69.5], [22.0, 66.0], [24.0, 64.0],
-     [22.0, 60.5], [18.5, 59.0], [18.0, 56.2], [12.5, 55.5], [11.0, 58.5]])
-add('Icelanders', 874, 2024, 'IE', 'People', 'Indo-European (North Germanic: Icelandic)', 'Icelanders',
-    [[-24.5, 63.3], [-13.3, 63.3], [-13.3, 66.6], [-24.5, 66.6]])
-add('Balts', -1000, 2024, 'IE', 'People', 'Indo-European (Baltic)', 'Balts',
-    [[19.5, 53.8], [21.5, 56.5], [21.0, 58.0], [28.0, 57.8], [28.0, 54.3], [23.5, 53.5]])
-add('Early Slavs', 500, 899, 'IE', 'People', 'Indo-European (Slavic)', 'Slavs',
-    [[16.0, 48.0], [17.0, 53.0], [24.0, 54.5], [34.0, 54.0], [35.0, 50.0], [30.0, 47.5], [22.0, 47.0]])
-add('West Slavs', 900, 2024, 'IE', 'People', 'Indo-European (Slavic: Polish, Czech, Slovak)', 'West Slavs',
-    [[12.0, 50.0], [14.0, 54.0], [24.0, 54.5], [24.0, 48.5], [17.0, 48.5]])
-add('South Slavs', 600, 2024, 'IE', 'People', 'Indo-European (Slavic: Serbo-Croatian, Bulgarian, Slovene)', 'South Slavs',
-    [[13.5, 46.5], [22.0, 46.0], [29.0, 44.0], [26.0, 41.5], [20.0, 41.5], [16.0, 44.0]])
-add('East Slavs', 900, 1499, 'IE', 'People', 'Indo-European (Slavic: Russian, Ukrainian, Belarusian)', 'East Slavs',
-    [[24.0, 48.5], [24.0, 54.0], [30.0, 59.0], [40.0, 60.0], [44.0, 58.0], [44.0, 50.0], [36.0, 47.0], [30.0, 46.0]])
-add('Russians and East Slavs', 1500, 1799, 'IE', 'People', 'Indo-European (Slavic: Russian, Ukrainian, Belarusian)', 'Russians',
-    [[24.0, 48.5], [24.0, 54.0], [28.0, 59.5], [34.0, 63.0], [56.0, 64.0], [62.0, 58.0], [54.0, 50.0], [44.0, 46.0], [36.0, 46.0], [30.0, 46.0]])
-add('Russians and East Slavs', 1800, 2024, 'IE', 'People', 'Indo-European (Slavic: Russian, Ukrainian, Belarusian)', 'Russians',
-    [[24.0, 48.5], [24.0, 54.0], [28.0, 59.5], [34.0, 63.0], [56.0, 64.0], [82.0, 62.0], [100.0, 56.0], [132.0, 48.5],
-     [134.0, 44.0], [112.0, 50.5], [80.0, 52.0], [62.0, 52.0], [54.0, 50.0], [44.0, 46.0], [36.0, 46.0], [30.0, 46.0]])
-add('Finns', -500, 2024, 'UR', 'People', 'Uralic (Finnic)', 'Finns',
-    [[21.0, 60.0], [24.0, 61.5], [30.0, 62.0], [34.0, 66.0], [28.0, 66.5], [22.0, 64.0]])
-add('Sámi', -500, 2024, 'UR', 'People', 'Uralic (Sámi)', 'Sámi people',
-    [[14.0, 66.5], [20.0, 69.5], [29.0, 70.5], [41.0, 68.5], [33.0, 67.0], [24.0, 66.5], [18.0, 66.5]])
-add('Hungarians', 895, 2024, 'UR', 'People', 'Uralic (Ugric: Hungarian)', 'Hungarians',
-    [[16.5, 48.5], [22.8, 48.4], [22.5, 46.0], [19.0, 45.8], [16.5, 46.8]])
-add('Samoyedic and Ob-Ugric peoples', -500, 2024, 'UR', 'People', 'Uralic (Samoyedic, Ugric)', 'Samoyedic peoples',
-    [[56.0, 66.0], [70.0, 73.0], [90.0, 72.0], [84.0, 64.0], [66.0, 60.0]])
+net('Incense Route', 'Trade network', -900, 300, 'Incense Route',
+    'Frankincense and myrrh carried by camel caravan from southern Arabia along the Hejaz to Gaza and the Mediterranean.',
+    routes=[R([(54.4, 17.0), (50.0, 16.0), (47.0, 15.0), (45.3, 15.45), (44.1, 17.5), (42.5, 19.5), (39.8, 21.4), (39.6, 24.5),
+               (37.9, 26.6), (36.5, 28.5), (35.45, 30.3), (34.45, 31.5)])],
+    nodes=[('Sumhuram', 54.4, 17.0), ('Shabwa', 47.0, 15.0), ('Marib', 45.3, 15.45, 'major'), ('Najran', 44.1, 17.5), ('Mecca', 39.8, 21.4),
+           ('Dedan (AlUla)', 37.9, 26.6), ('Petra', 35.45, 30.3, 'major'), ('Gaza', 34.45, 31.5)])
 
-# ---- Eurasian steppe and Siberia ------------------------------------------
-add('Scythians', -800, -200, 'IE', 'People', 'Indo-European (Iranian)', 'Scythians',
-    [[28.0, 46.0], [34.0, 50.5], [50.0, 51.0], [68.0, 50.0], [70.0, 45.0], [54.0, 44.0], [46.0, 43.0], [36.0, 45.0]])
-add('Sarmatians', -300, 400, 'IE', 'People', 'Indo-European (Iranian)', 'Sarmatians',
-    [[38.0, 46.0], [50.0, 50.0], [62.0, 51.0], [60.0, 45.0], [48.0, 43.5], [40.0, 44.0]])
-add('Xiongnu', -300, 400, 'TM', 'People', 'Unknown (Turkic or Mongolic ties debated)', 'Xiongnu',
-    [[88.0, 52.0], [112.0, 52.0], [118.0, 44.0], [106.0, 38.0], [94.0, 40.0]])
-add('Xianbei and early Mongols', 100, 900, 'TM', 'People', 'Mongolic (early)', 'Xianbei',
-    [[100.0, 50.0], [122.0, 53.0], [124.0, 43.0], [110.0, 40.0], [98.0, 43.0]])
-add('Turkic peoples', 400, 999, 'TM', 'People', 'Turkic', 'Turkic peoples',
-    [[60.0, 52.0], [80.0, 52.0], [100.0, 52.0], [110.0, 47.0], [96.0, 41.0], [78.0, 40.0], [62.0, 42.0], [56.0, 46.0]])
-add('Turkic peoples', 1000, 2024, 'TM', 'People', 'Turkic', 'Turkic peoples',
-    [[48.0, 36.0], [50.0, 46.0], [60.0, 52.0], [80.0, 52.0], [94.0, 50.0], [86.0, 42.0], [80.0, 38.0], [68.0, 36.8], [58.0, 36.5]])
-add('Anatolian Turks', 1071, 2024, 'TM', 'People', 'Turkic (Oghuz: Turkish)', 'Turkish people',
-    [[26.0, 36.5], [26.0, 41.8], [36.0, 42.0], [42.0, 41.2], [44.5, 39.5], [42.0, 37.0], [36.0, 36.4]])
-add('Azerbaijanis', 1000, 2024, 'TM', 'People', 'Turkic (Oghuz: Azerbaijani)', 'Azerbaijanis',
-    [[44.5, 41.5], [49.5, 41.8], [49.0, 38.2], [46.0, 37.5], [44.2, 39.5]])
-add('Mongols', 1000, 2024, 'TM', 'People', 'Mongolic', 'Mongols',
-    [[88.0, 50.0], [100.0, 52.0], [119.0, 50.0], [116.0, 45.0], [110.0, 41.5], [98.0, 42.0], [90.0, 45.0]])
-add('Tungusic peoples', -500, 2024, 'TM', 'People', 'Tungusic (Manchu, Evenki)', 'Tungusic peoples',
-    [[119.0, 53.0], [135.0, 54.0], [140.0, 48.0], [134.0, 43.0], [125.0, 41.0], [121.0, 46.0]])
-add('Evenks', -500, 2024, 'TM', 'People', 'Tungusic (Evenki)', 'Evenks',
-    [[100.0, 66.0], [120.0, 70.0], [140.0, 62.0], [130.0, 54.0], [110.0, 52.0]])
-add('Yakuts', 1200, 2024, 'TM', 'People', 'Turkic (Yakut)', 'Yakuts',
-    [[110.0, 70.0], [140.0, 71.0], [148.0, 64.0], [135.0, 58.0], [116.0, 60.0]])
-add('Chukchi and Kamchatkans', -2000, 2024, 'UR', 'People', 'Chukotko-Kamchatkan', 'Chukchi people',
-    [[160.0, 62.0], [180.0, 69.5], [180.0, 65.0], [170.0, 60.0], [160.0, 56.0]])
-add('Inuit', -2000, 2024, 'NA', 'People', 'Eskimo-Aleut (Inuit)', 'Inuit',
-    [[-168.0, 66.0], [-160.0, 71.0], [-140.0, 70.0], [-120.0, 70.0], [-95.0, 72.0], [-80.0, 70.0], [-62.0, 66.0],
-     [-55.0, 63.0], [-45.0, 60.0], [-58.0, 57.5], [-65.0, 59.0], [-78.0, 62.0], [-90.0, 64.0], [-100.0, 66.0],
-     [-124.0, 67.0], [-141.0, 69.0], [-156.0, 65.0]])
+net('Amber Road', 'Trade network', -1500, 500, 'Amber Road',
+    'Baltic amber carried south along the Vistula and the Morava to the Adriatic and Rome.',
+    routes=[R([(18.65, 54.35), (18.8, 52.9), (18.1, 51.76), (17.0, 50.0), (16.86, 48.11), (14.5, 46.05), (13.37, 45.77)])],
+    nodes=[('Baltic coast', 18.65, 54.35), ('Kalisz', 18.1, 51.76), ('Carnuntum', 16.86, 48.11, 'major'), ('Emona', 14.5, 46.05), ('Aquileia', 13.37, 45.77, 'major')])
 
-# ---- South and Central Asia ------------------------------------------------
-add('Indus Valley peoples', -3300, -1300, 'IS', 'Civilization', 'Unknown (script undeciphered)', 'Indus Valley Civilisation',
-    [[66.5, 24.0], [68.0, 28.5], [70.5, 33.0], [74.0, 34.0], [77.5, 30.5], [78.0, 28.0], [74.0, 23.0], [72.0, 21.0], [69.0, 22.5]])
-add('Indo-Aryan peoples', -1500, 2024, 'IE', 'People', 'Indo-European (Indo-Aryan)', 'Indo-Aryan peoples',
-    [[68.0, 36.0], [75.0, 36.5], [80.0, 30.0], [89.0, 27.0], [92.0, 26.0], [88.0, 22.0], [82.0, 21.5], [76.0, 20.0],
-     [73.0, 17.0], [72.0, 21.0], [68.0, 24.0], [66.0, 29.0]])
-add('Bengalis', 800, 2024, 'IE', 'People', 'Indo-European (Indo-Aryan: Bengali)', 'Bengalis',
-    [[86.0, 26.5], [92.5, 26.0], [92.0, 21.8], [88.0, 21.5]])
-add('Sinhalese', -500, 2024, 'IE', 'People', 'Indo-European (Indo-Aryan: Sinhala)', 'Sinhalese people',
-    [[79.8, 6.0], [81.9, 6.5], [81.2, 9.0], [79.8, 8.5]])
-add('Dravidian peoples', -1500, 2024, 'DR', 'People', 'Dravidian', 'Dravidian peoples',
-    [[73.5, 20.0], [78.0, 20.5], [82.0, 19.5], [85.0, 19.5], [80.0, 12.0], [79.8, 10.0], [77.5, 8.0], [76.0, 9.5], [74.5, 13.5]])
-add('Munda peoples', -1500, 2024, 'DR', 'People', 'Austroasiatic (Munda)', 'Munda peoples',
-    [[82.0, 24.0], [87.5, 24.0], [87.0, 21.0], [83.5, 20.5]])
-add('Tibetans', -600, 2024, 'ST', 'People', 'Sino-Tibetan (Tibetic)', 'Tibetan people',
-    [[78.0, 36.0], [88.0, 35.5], [95.0, 35.0], [101.0, 34.0], [102.0, 30.0], [98.0, 27.5], [92.0, 27.5], [85.0, 27.7], [79.0, 30.5]])
-add('Burmans', 800, 2024, 'ST', 'People', 'Sino-Tibetan (Lolo-Burmese)', 'Bamar people',
-    [[93.5, 25.0], [97.0, 24.0], [98.5, 18.0], [97.5, 15.5], [95.0, 15.8], [94.5, 20.0]])
+# ---- Classical and medieval ---------------------------------------------------------------------------
+net('Royal Road', 'Communications and logistics', -500, -330, 'Royal Road',
+    'The Achaemenid imperial post road with way stations and relay riders from Sardis to Susa.',
+    routes=[R([(28.04, 38.49), (30.0, 39.2), (31.99, 39.65), (34.5, 39.5), (36.5, 38.5), (38.5, 37.5), (40.7, 37.2), (43.15, 36.36), (45.0, 35.4), (48.25, 32.19)])],
+    nodes=[('Sardis', 28.04, 38.49, 'major'), ('Gordion', 31.99, 39.65), ('Samosata', 38.5, 37.5), ('Nineveh', 43.15, 36.36), ('Susa', 48.25, 32.19, 'major')])
 
-# ---- East Asia -------------------------------------------------------------
-add('Yellow River Neolithic cultures', -3400, -1700, 'ST', 'Culture', 'Sino-Tibetan (early; reconstructed)', 'Yangshao culture',
-    [[103.0, 36.0], [107.0, 36.5], [112.0, 38.0], [116.0, 38.0], [118.0, 34.0], [114.0, 32.5], [108.0, 33.0]])
-add('Liangzhu and Yangtze Neolithic', -3400, -2000, 'SE', 'Culture', 'Unknown', 'Liangzhu culture',
-    [[118.0, 32.0], [122.0, 32.0], [122.0, 28.5], [118.0, 28.0]])
-add('Huaxia', -1700, -207, 'ST', 'People', 'Sino-Tibetan (Old Chinese)', 'Huaxia',
-    [[103.0, 35.0], [106.0, 38.0], [116.0, 40.0], [119.0, 35.0], [119.0, 31.0], [112.0, 29.5], [107.0, 31.0]])
-add('Han Chinese', -206, 1299, 'ST', 'People', 'Sino-Tibetan (Sinitic)', 'Han Chinese',
-    [[100.0, 38.0], [106.0, 41.0], [120.0, 41.0], [123.0, 38.0], [122.0, 32.0], [120.0, 27.0], [111.0, 22.0], [104.0, 23.0],
-     [102.0, 29.0], [100.0, 33.0]])
-add('Han Chinese', 1300, 2024, 'ST', 'People', 'Sino-Tibetan (Sinitic)', 'Han Chinese',
-    [[98.0, 40.0], [106.0, 42.0], [121.0, 43.5], [126.0, 41.0], [123.0, 38.0], [122.0, 32.0], [120.0, 26.0], [112.0, 21.5],
-     [108.0, 21.5], [103.0, 22.5], [101.0, 26.0], [102.0, 31.0], [100.0, 34.0]])
-add('Baiyue peoples', -1000, 300, 'SE', 'People', 'Kra-Dai and Austroasiatic (probable)', 'Baiyue',
-    [[100.0, 26.0], [108.0, 27.0], [116.0, 27.0], [122.0, 28.0], [122.0, 24.0], [110.0, 21.0], [103.0, 21.0], [100.0, 23.0]])
-add('Tai peoples', 300, 2024, 'SE', 'People', 'Kra-Dai', 'Tai peoples',
-    [[98.5, 20.5], [104.0, 21.0], [108.0, 22.5], [110.0, 25.5], [104.0, 26.5], [100.0, 24.0]])
-add('Thai and Lao', 1000, 2024, 'SE', 'People', 'Kra-Dai (Thai, Lao)', 'Tai peoples',
-    [[98.5, 20.5], [103.0, 18.5], [105.0, 15.0], [102.0, 12.5], [100.0, 13.5], [99.0, 16.5]])
-add('Hmong–Mien peoples', -500, 2024, 'SE', 'People', 'Hmong–Mien', 'Hmong people',
-    [[106.0, 29.0], [111.0, 28.5], [111.0, 25.0], [106.0, 24.5]])
-add('Koreans', -2000, 2024, 'JK', 'People', 'Koreanic', 'Koreans',
-    [[124.5, 38.5], [127.0, 41.5], [130.5, 42.5], [130.0, 35.0], [126.5, 34.2], [125.0, 37.0]])
-add('Jōmon peoples', -3400, -301, 'IS', 'People', 'Unknown (Jōmon)', 'Jōmon period',
-    [[130.0, 31.0], [132.0, 35.0], [137.0, 37.0], [141.0, 41.0], [142.5, 44.5], [145.0, 43.5], [141.0, 38.5],
-     [140.0, 35.5], [135.0, 33.0], [131.0, 31.0]])
-add('Yayoi peoples', -300, 699, 'JK', 'People', 'Japonic (early)', 'Yayoi period',
-    [[129.5, 31.0], [130.5, 34.5], [136.0, 36.0], [140.0, 36.0], [141.0, 35.0], [136.0, 33.5], [132.0, 32.5]])
-add('Japanese', 700, 2024, 'JK', 'People', 'Japonic', 'Japanese people',
-    [[129.5, 31.0], [130.5, 35.0], [136.5, 37.5], [141.5, 41.5], [141.5, 39.0], [140.5, 35.0], [135.0, 33.0], [131.0, 31.0]])
-add('Ainu', -500, 2024, 'IS', 'People', 'Ainu (language isolate)', 'Ainu people', [
-    [[139.8, 41.4], [141.0, 45.6], [145.9, 44.3], [143.5, 41.9]],
-    [[141.9, 46.0], [143.0, 46.2], [143.4, 49.2], [142.2, 49.0]],
-])
+net('Silk Road (overland)', 'Trade network', -130, 1450, 'Silk Road',
+    'The overland web of caravan routes joining China, Central Asia, Persia and the Mediterranean.',
+    routes=[R([(108.9, 34.3), (103.8, 36.1), (94.7, 40.1), (89.2, 42.9), (80.0, 41.5), (75.99, 39.47), (72.8, 40.5), (66.97, 39.65), (64.4, 39.77),
+               (62.2, 37.6), (58.8, 36.2), (51.4, 35.6), (48.5, 34.8), (44.4, 33.3), (41.0, 33.8), (38.3, 34.55), (36.15, 36.2)]),
+            R([(94.7, 40.1), (88.9, 39.2), (79.9, 37.1), (77.25, 38.4), (75.99, 39.47)]),
+            R([(36.15, 36.2), (32.5, 37.9), (28.98, 41.0)]),
+            R([(66.97, 39.65), (66.9, 36.75), (62.2, 37.6)])],
+    nodes=[("Chang'an", 108.9, 34.3, 'major'), ('Dunhuang', 94.7, 40.1), ('Turpan', 89.2, 42.9), ('Khotan', 79.9, 37.1), ('Kashgar', 75.99, 39.47, 'major'),
+           ('Samarkand', 66.97, 39.65, 'major'), ('Bukhara', 64.4, 39.77), ('Balkh', 66.9, 36.75), ('Merv', 62.2, 37.6, 'major'), ('Rayy', 51.4, 35.6),
+           ('Baghdad', 44.4, 33.3, 'major'), ('Palmyra', 38.3, 34.55), ('Antioch', 36.15, 36.2), ('Constantinople', 28.98, 41.0, 'major')])
 
-# ---- Southeast Asia and Oceania --------------------------------------------
-add('Taiwanese indigenous peoples', -3400, 2024, 'AN', 'People', 'Austronesian (Formosan)', 'Taiwanese indigenous peoples',
-    [[119.8, 21.8], [122.2, 25.4], [122.2, 24.5], [121.2, 21.9]])
-add('Austronesian peoples', -1500, 2024, 'AN', 'People', 'Austronesian (Philippine, Bornean, Sulawesi)', 'Austronesian peoples', [
-    [[116.8, 4.8], [118.5, 11.5], [120.0, 18.8], [122.5, 19.5], [127.0, 16.5], [126.8, 5.8], [122.0, 4.8]],
-    [[108.8, -4.0], [108.8, 2.0], [111.0, 4.8], [115.5, 7.0], [119.5, 5.2], [118.5, 0.0], [116.0, -4.2]],
-    [[118.8, -5.8], [119.0, 1.2], [125.3, 1.8], [125.0, -2.0], [122.5, -5.5]],
-])
-add('Malays and Indonesians', -500, 2024, 'AN', 'People', 'Austronesian (Malayic, Javanese, Sundanese)', 'Malay people',
-    [[95.0, 5.8], [98.0, 5.5], [103.5, 1.3], [106.0, -2.8], [102.0, -5.8], [105.5, -6.9], [114.8, -8.8], [114.0, -7.2],
-     [109.0, -6.7], [105.0, -5.9], [100.0, -1.0], [96.0, 3.0]])
-add('Khmer', -500, 2024, 'SE', 'People', 'Austroasiatic (Khmer)', 'Khmer people',
-    [[102.0, 15.0], [106.0, 14.5], [107.5, 11.0], [104.5, 10.5], [102.5, 12.0]])
-add('Mon', 400, 2024, 'SE', 'People', 'Austroasiatic (Mon)', 'Mon people',
-    [[96.0, 19.0], [98.5, 18.5], [99.0, 14.5], [97.5, 15.0]])
-add('Vietnamese', -1000, 999, 'SE', 'People', 'Austroasiatic (Vietic)', 'Vietnamese people',
-    [[103.5, 23.0], [107.5, 22.5], [107.5, 18.5], [103.5, 20.0]])
-add('Vietnamese', 1000, 2024, 'SE', 'People', 'Austroasiatic (Vietic)', 'Vietnamese people',
-    [[103.5, 22.8], [108.0, 22.6], [109.5, 15.0], [108.2, 11.0], [106.0, 9.6], [104.8, 9.0], [105.4, 11.0],
-     [106.0, 16.0], [105.0, 18.5], [103.5, 20.0]])
-add('Cham', 200, 2024, 'AN', 'People', 'Austronesian (Chamic)', 'Cham people',
-    [[107.8, 16.0], [109.4, 14.0], [109.2, 11.5], [108.0, 11.2]])
-add('Lapita peoples', -1500, -501, 'AN', 'Culture', 'Austronesian (early Oceanic)', 'Lapita culture', [
-    [[147.0, -3.0], [150.0, -6.0], [160.0, -10.5], [170.0, -17.0], [180.0, -19.5], [180.0, -14.0], [172.0, -11.0], [160.0, -6.0], [150.0, -2.0]],
-    [[-180.0, -19.5], [-174.0, -21.0], [-171.0, -14.0], [-180.0, -14.0]],
-], clip=False)
-add('Samoans and Tongans', -1000, 2024, 'AN', 'People', 'Austronesian (Polynesian)', 'Polynesians',
-    [[-177.0, -22.5], [-172.5, -22.5], [-170.5, -13.0], [-173.5, -13.0], [-177.0, -17.5]], clip=False)
-add('Eastern Polynesians', 700, 2024, 'AN', 'People', 'Austronesian (Polynesian)', 'Polynesians',
-    [[-160.0, -9.0], [-138.0, -8.0], [-134.0, -14.0], [-145.0, -23.0], [-160.0, -22.0]], clip=False)
-add('Hawaiians', 1000, 2024, 'AN', 'People', 'Austronesian (Polynesian)', 'Native Hawaiians',
-    [[-160.5, 18.8], [-154.5, 18.8], [-154.5, 22.4], [-160.5, 22.4]], clip=False)
-add('Māori', 1250, 2024, 'AN', 'People', 'Austronesian (Polynesian: Māori)', 'Māori people',
-    [[166.4, -46.7], [168.0, -44.5], [172.7, -40.5], [173.0, -34.4], [178.6, -37.7], [175.0, -41.8]])
-add('Micronesians', -1500, 2024, 'AN', 'People', 'Austronesian (Micronesian)', 'Micronesians',
-    [[134.0, 7.5], [139.0, 10.5], [149.0, 10.0], [160.0, 7.5], [165.0, 5.0], [160.0, 4.0], [148.0, 5.0], [138.0, 6.0]], clip=False)
-add('Madagascar Malagasy', 500, 2024, 'AN', 'People', 'Austronesian (Malagasy)', 'Malagasy people',
-    [[43.0, -25.5], [47.0, -25.2], [50.5, -15.5], [49.5, -12.0], [44.0, -16.5]])
-add('Papuan peoples', -3400, 2024, 'PA', 'People', 'Papuan (many unrelated families)', 'Papuan peoples',
-    [[131.0, -1.0], [141.0, -2.0], [150.0, -5.5], [150.5, -10.5], [143.0, -9.2], [138.0, -8.2], [134.0, -4.0]])
-add('Melanesians', -1500, 2024, 'PA', 'People', 'Austronesian (Oceanic) and Papuan', 'Melanesians',
-    [[150.0, -3.0], [156.0, -6.5], [168.0, -14.0], [168.5, -20.5], [165.0, -22.0], [160.0, -10.0], [152.0, -4.5]], clip=False)
-add('Aboriginal Australians', -3400, 2024, 'PA', 'People', 'Australian (many families)', 'Aboriginal Australians',
-    [[113.0, -22.0], [114.0, -34.5], [129.0, -33.0], [140.0, -38.0], [146.0, -39.0], [153.0, -31.0], [153.5, -25.0],
-     [146.0, -18.5], [142.0, -10.8], [136.0, -12.0], [130.0, -12.0], [126.0, -14.5], [122.0, -17.0]])
-add('Australians', 1788, 2024, 'IE', 'People', 'Indo-European (Germanic: English)', 'Australians', [
-    [[138.0, -35.0], [153.5, -28.0], [153.0, -37.8], [141.0, -38.5], [135.0, -34.8]],
-    [[114.8, -35.0], [116.5, -31.0], [115.0, -28.0], [114.0, -33.0]],
-])
+net('Indian Ocean trade network', 'Trade network', -100, 1500, 'Indian Ocean trade',
+    'Monsoon-driven sea routes joining China, Southeast Asia, India, the Gulf, the Red Sea and East Africa.',
+    routes=[R([(113.3, 23.1), (111.0, 20.0), (108.3, 15.9), (107.5, 11.0), (104.5, 8.0), (104.0, 1.3), (102.2, 2.2)], sea=True),
+            R([(102.2, 2.2), (98.0, 5.5), (92.0, 6.5), (85.0, 6.0), (79.85, 6.9), (77.5, 8.0), (75.8, 11.25)], sea=True),
+            R([(75.8, 11.25), (68.0, 14.0), (62.0, 19.0), (58.4, 23.6), (57.0, 26.0), (54.0, 26.5), (51.5, 27.5), (49.5, 29.2), (47.8, 30.5)], sea=True),
+            R([(75.8, 11.25), (66.0, 12.0), (58.0, 12.0), (50.0, 12.3), (45.0, 12.8), (42.8, 14.0), (40.0, 19.0), (39.2, 21.5), (35.5, 26.5), (32.55, 29.97)], sea=True),
+            R([(45.0, 12.8), (51.3, 11.8), (50.5, 8.0), (47.0, 4.0), (45.3, 2.05), (40.1, -3.2), (39.7, -4.05), (39.2, -6.2), (39.5, -8.95)], sea=True)],
+    nodes=[('Guangzhou', 113.3, 23.1, 'major'), ('Quanzhou', 118.6, 24.9), ('Malacca', 102.2, 2.2, 'major'), ('Colombo', 79.85, 6.9), ('Calicut', 75.8, 11.25, 'major'),
+           ('Muscat', 58.4, 23.6), ('Hormuz', 56.5, 27.1), ('Basra', 47.8, 30.5), ('Aden', 45.0, 12.8, 'major'), ('Jeddah', 39.2, 21.5), ('Mogadishu', 45.3, 2.05),
+           ('Mombasa', 39.7, -4.05), ('Kilwa', 39.5, -8.95)])
 
-# ---- Africa ---------------------------------------------------------------
-add('Saharan pastoralists', -3400, -2000, 'NS', 'Culture', 'Nilo-Saharan and Afro-Asiatic (probable)', 'African humid period',
-    [[-10.0, 28.0], [10.0, 31.0], [25.0, 27.0], [30.0, 20.0], [20.0, 15.0], [0.0, 16.0], [-12.0, 20.0]])
-add('Berbers', -3000, 639, 'AA', 'People', 'Afro-Asiatic (Berber)', 'Berbers',
-    [[-9.5, 35.0], [-2.0, 35.5], [10.0, 37.2], [12.0, 33.0], [24.0, 32.0], [25.0, 28.0], [20.0, 22.0], [10.0, 22.0],
-     [0.0, 22.0], [-9.0, 27.0], [-13.0, 28.0]])
-add('Berbers', 640, 2024, 'AA', 'People', 'Afro-Asiatic (Berber)', 'Berbers',
-    [[-10.0, 30.0], [-2.0, 35.2], [8.0, 36.5], [10.0, 33.0], [8.0, 29.0], [8.0, 24.0], [0.0, 20.0], [-6.0, 23.0], [-10.0, 26.0]])
-add('Tuareg', 700, 2024, 'AA', 'People', 'Afro-Asiatic (Berber: Tamasheq)', 'Tuareg people',
-    [[-4.0, 24.0], [4.0, 25.0], [10.0, 26.0], [11.0, 20.0], [4.0, 15.5], [-1.0, 17.0], [-4.0, 20.0]])
-add('Cushitic peoples', -3000, 2024, 'AA', 'People', 'Afro-Asiatic (Cushitic)', 'Cushites',
-    [[33.5, 22.0], [38.0, 21.0], [43.0, 13.0], [51.2, 11.5], [49.0, 2.0], [41.0, -1.0], [36.0, 3.0], [35.0, 10.0], [33.5, 15.0]])
-add('Habesha (Ethiopian Semitic) peoples', -500, 2024, 'AA', 'People', 'Afro-Asiatic (Semitic: Amharic, Tigrinya, Ge\'ez)', 'Habesha peoples',
-    [[36.5, 15.5], [40.0, 15.0], [40.0, 10.5], [37.5, 9.5], [36.0, 12.0]])
-add('Nilotic peoples', -1000, 2024, 'NS', 'People', 'Nilo-Saharan (Nilotic)', 'Nilotic peoples',
-    [[27.0, 10.0], [34.0, 12.0], [35.0, 4.0], [37.0, -2.0], [36.0, -4.0], [32.0, -1.0], [29.0, 3.0], [27.0, 6.0]])
-add('Mandé peoples', 800, 2024, 'NC', 'People', 'Niger-Congo (Mande)', 'Mandé peoples',
-    [[-13.0, 15.0], [-4.0, 15.5], [-4.0, 9.0], [-9.0, 8.0], [-12.0, 11.0]])
-add('Songhai', 700, 2024, 'NS', 'People', 'Songhay (Nilo-Saharan)', 'Songhai people',
-    [[-3.0, 17.5], [4.0, 17.0], [4.0, 13.0], [0.0, 12.5], [-3.0, 14.0]])
-add('Hausa', 800, 2024, 'AA', 'People', 'Afro-Asiatic (Chadic: Hausa)', 'Hausa people',
-    [[4.0, 14.0], [11.0, 14.0], [11.0, 10.5], [5.0, 10.5]])
-add('Fula', 1000, 2024, 'NC', 'People', 'Niger-Congo (Atlantic: Fula)', 'Fula people',
-    [[-17.0, 16.5], [-12.0, 16.5], [-3.0, 15.0], [5.0, 13.5], [14.0, 12.5], [14.0, 9.5], [5.0, 9.5], [-4.0, 12.0], [-14.0, 12.5]])
-add('Yoruba', 600, 2024, 'NC', 'People', 'Niger-Congo (Yoruboid)', 'Yoruba people',
-    [[2.5, 8.8], [5.8, 9.0], [6.0, 6.4], [2.7, 6.4]])
-add('Igbo', 800, 2024, 'NC', 'People', 'Niger-Congo (Igboid)', 'Igbo people',
-    [[6.2, 7.2], [8.4, 7.0], [8.0, 5.0], [6.3, 5.2]])
-add('Akan', 1000, 2024, 'NC', 'People', 'Niger-Congo (Kwa: Akan)', 'Akan people',
-    [[-3.2, 8.0], [0.7, 8.0], [0.7, 5.2], [-3.2, 5.2]])
-add('Proto-Bantu peoples', -1000, -501, 'NC', 'People', 'Niger-Congo (Bantu, early)', 'Bantu expansion',
-    [[6.5, 7.0], [11.5, 7.0], [13.0, 3.0], [9.0, 2.3], [7.0, 4.0]])
-add('Bantu peoples', -500, 499, 'NC', 'People', 'Niger-Congo (Bantu)', 'Bantu peoples',
-    [[9.0, 4.0], [14.0, 4.5], [22.0, 4.5], [30.0, 2.0], [34.0, -2.0], [33.0, -6.0], [27.0, -7.0], [20.0, -6.0], [14.0, -5.5], [9.0, -1.5]])
-add('Bantu peoples', 500, 999, 'NC', 'People', 'Niger-Congo (Bantu)', 'Bantu peoples',
-    [[9.0, 3.0], [14.0, 4.5], [22.0, 4.5], [30.0, 2.0], [34.0, -2.0], [40.0, -3.0], [39.0, -10.0], [35.0, -20.0],
-     [33.0, -27.0], [30.0, -26.0], [24.0, -16.0], [15.0, -8.0], [9.0, -1.5]])
-add('Bantu peoples', 1000, 2024, 'NC', 'People', 'Niger-Congo (Bantu)', 'Bantu peoples',
-    [[9.0, 3.0], [14.0, 4.5], [22.0, 4.5], [31.0, 2.0], [41.0, -2.0], [40.5, -12.0], [35.0, -22.0], [32.5, -28.5],
-     [27.0, -33.5], [20.0, -31.0], [16.0, -25.0], [12.5, -17.0], [11.7, -13.0], [9.0, -5.0]])
-add('Khoisan', -3400, 1499, 'NS', 'People', 'Khoe-San (click languages)', 'Khoisan',
-    [[11.7, -17.5], [20.0, -20.0], [27.0, -20.0], [28.0, -26.0], [26.0, -33.5], [18.0, -34.0], [15.0, -28.0]])
-add('Khoisan', 1500, 2024, 'NS', 'People', 'Khoe-San (click languages)', 'Khoisan',
-    [[17.0, -18.5], [25.0, -19.0], [25.0, -25.0], [20.0, -27.0], [16.0, -25.0]])
-add('Swahili', 800, 2024, 'NC', 'People', 'Niger-Congo (Bantu: Swahili)', 'Swahili people',
-    [[38.5, -11.0], [41.5, -12.0], [42.0, -1.0], [41.2, 3.5], [39.0, -3.0], [38.8, -7.0]])
-add('Afrikaners', 1650, 2024, 'IE', 'People', 'Indo-European (Germanic: Afrikaans)', 'Afrikaners',
-    [[17.8, -34.5], [27.0, -33.8], [30.0, -30.0], [25.0, -28.0], [19.0, -28.5]])
+net('Sogdian merchant network', 'Community or diaspora', 400, 800, 'Sogdians',
+    'Sogdian traders settled in trading colonies from Samarkand to Chang\'an and ran much of the Silk Road\'s caravan trade.',
+    routes=[R([(66.97, 39.65), (67.6, 39.5), (71.4, 42.5), (75.2, 42.8), (80.6, 44.0), (89.2, 42.9), (94.7, 40.1), (103.8, 36.1), (106.2, 38.5), (108.9, 34.3), (112.45, 34.62)])],
+    nodes=[('Samarkand', 66.97, 39.65, 'major'), ('Panjakent', 67.6, 39.5), ('Suyab', 75.2, 42.8), ('Turpan', 89.2, 42.9), ('Dunhuang', 94.7, 40.1),
+           ('Guyuan', 106.2, 36.0), ("Chang'an", 108.9, 34.3, 'major'), ('Luoyang', 112.45, 34.62)])
 
-# ---- The Americas ----------------------------------------------------------
-add('Olmecs', -1500, -401, 'MA', 'Civilization', 'Unknown (Mixe–Zoquean probable)', 'Olmecs',
-    [[-96.2, 18.8], [-94.0, 18.4], [-94.2, 17.3], [-95.8, 17.3]])
-add('Maya', -2000, 2024, 'MA', 'People', 'Mayan', 'Maya peoples',
-    [[-92.5, 18.5], [-89.0, 21.3], [-87.0, 21.5], [-87.5, 17.5], [-88.5, 14.5], [-91.5, 14.5], [-92.5, 16.5]])
-add('Zapotecs and Mixtecs', -500, 2024, 'MA', 'People', 'Oto-Manguean', 'Zapotec peoples',
-    [[-98.0, 17.8], [-96.0, 18.0], [-95.0, 16.6], [-97.5, 16.0]])
-add('Teotihuacan', -100, 550, 'MA', 'Civilization', 'Unknown', 'Teotihuacan',
-    [[-99.8, 20.3], [-98.4, 20.3], [-98.4, 19.1], [-99.8, 19.1]])
-add('Nahua peoples', 600, 2024, 'MA', 'People', 'Uto-Aztecan (Nahuatl)', 'Nahua peoples',
-    [[-104.0, 21.0], [-98.0, 21.5], [-96.5, 19.0], [-97.5, 17.2], [-101.0, 17.3], [-103.5, 18.7]])
-add('Ancestral Puebloans', -100, 1299, 'NA', 'Culture', 'Unknown', 'Ancestral Puebloans',
-    [[-112.0, 38.0], [-108.0, 38.2], [-106.0, 36.0], [-107.0, 34.5], [-111.0, 34.8], [-112.5, 36.5]])
-add('Pueblo peoples', 1300, 2024, 'NA', 'People', 'Tanoan, Keresan, Zuni, Hopi', 'Pueblo peoples',
-    [[-111.5, 36.5], [-109.0, 36.5], [-106.0, 36.5], [-105.5, 34.5], [-108.0, 34.0], [-111.0, 35.0]])
-add('Mississippian peoples', 800, 1599, 'NA', 'Culture', 'Muskogean, Siouan, Caddoan (probable)', 'Mississippian culture',
-    [[-92.0, 37.5], [-88.0, 38.5], [-83.0, 36.0], [-82.0, 33.0], [-86.0, 31.5], [-91.0, 32.5], [-94.0, 35.0]])
-add('Eastern Woodlands peoples', -1000, 1850, 'NA', 'People', 'Algonquian, Iroquoian, Siouan, Muskogean', 'Eastern Woodlands',
-    [[-94.0, 48.0], [-76.0, 47.0], [-66.0, 45.0], [-75.0, 36.0], [-82.0, 31.0], [-92.0, 30.0], [-94.0, 36.0]])
-add('Iroquois', 1000, 1799, 'NA', 'People', 'Iroquoian', 'Iroquois',
-    [[-79.0, 44.0], [-74.0, 45.0], [-74.0, 42.2], [-78.5, 42.2]])
-add('Plains peoples', 1000, 1880, 'NA', 'People', 'Siouan, Algonquian, Caddoan, Uto-Aztecan', 'Plains Indians',
-    [[-112.0, 50.0], [-96.0, 50.0], [-96.0, 35.0], [-104.0, 29.0], [-111.0, 40.0]])
-add('Pacific Northwest peoples', -3000, 2024, 'NA', 'People', 'Salishan, Wakashan, Tsimshianic, Haida', 'Indigenous peoples of the Pacific Northwest Coast',
-    [[-135.0, 59.0], [-124.0, 49.0], [-123.0, 43.0], [-124.0, 47.7], [-130.0, 54.0]])
-add('Californian peoples', -3400, 1849, 'NA', 'People', 'Many families (Penutian, Hokan, Uto-Aztecan)', 'Indigenous peoples of California',
-    [[-124.0, 42.0], [-121.0, 40.0], [-117.0, 34.0], [-120.0, 34.4], [-123.0, 37.0]])
-add('Dene (Athabaskan) peoples', -1000, 2024, 'NA', 'People', 'Na-Dene (Athabaskan)', 'Dene',
-    [[-160.0, 65.0], [-140.0, 66.0], [-120.0, 64.0], [-110.0, 62.0], [-110.0, 56.0], [-125.0, 55.0], [-135.0, 60.0]])
-add('Navajo and Apache', 1400, 2024, 'NA', 'People', 'Na-Dene (Southern Athabaskan)', 'Navajo',
-    [[-112.0, 37.5], [-107.0, 37.0], [-105.0, 33.0], [-108.0, 31.5], [-112.0, 33.5]])
-add('Caral–Supe civilization', -3000, -1800, 'AD', 'Civilization', 'Unknown', 'Caral–Supe civilization',
-    [[-78.0, -9.0], [-76.5, -9.0], [-76.5, -11.5], [-78.5, -11.5]])
-add('Chavín', -900, -201, 'AD', 'Culture', 'Unknown', 'Chavín culture',
-    [[-78.5, -8.0], [-76.5, -8.0], [-76.5, -10.5], [-78.5, -10.5]])
-add('Moche and Nazca', -200, 799, 'AD', 'Culture', 'Unknown (Mochica, Quechua probable)', 'Moche culture',
-    [[-81.0, -4.5], [-78.0, -6.0], [-77.5, -11.0], [-75.5, -15.0], [-74.0, -15.5], [-76.0, -13.0], [-79.0, -8.0]])
-add('Tiwanaku', 400, 1099, 'AD', 'Civilization', 'Puquina and Aymara (probable)', 'Tiwanaku',
-    [[-71.0, -13.0], [-66.0, -14.5], [-66.0, -20.0], [-70.0, -19.5], [-71.5, -16.5]])
-add('Quechua and Aymara', 1000, 2024, 'AD', 'People', 'Quechuan and Aymaran', 'Quechua people',
-    [[-79.5, -1.0], [-76.5, -2.0], [-72.0, -10.0], [-68.0, -14.0], [-66.0, -22.0], [-68.5, -24.0], [-70.0, -20.0],
-     [-72.0, -14.0], [-75.0, -10.0], [-78.0, -5.0], [-80.0, -3.0]])
-add('Mapuche', 1000, 2024, 'AD', 'People', 'Mapudungun (isolate)', 'Mapuche',
-    [[-73.5, -36.0], [-71.0, -36.5], [-71.5, -41.0], [-73.5, -42.0], [-73.8, -38.5]])
-add('Amazonian peoples', -3400, 2024, 'AD', 'People', 'Many families (Arawakan, Cariban, Tupian...)', 'Indigenous peoples of the Amazon rainforest',
-    [[-74.0, 3.0], [-60.0, 5.0], [-50.0, 2.0], [-48.0, -3.0], [-56.0, -9.0], [-66.0, -12.0], [-73.0, -8.0]])
-add('Tupi–Guarani peoples', -1000, 1899, 'AD', 'People', 'Tupian (Tupi–Guarani)', 'Tupi people',
-    [[-64.0, -9.0], [-58.0, -14.0], [-47.0, -24.0], [-41.0, -23.0], [-35.0, -6.0], [-48.0, -1.0], [-56.0, -4.0]])
-add('Taíno and Caribbean peoples', -400, 1599, 'AD', 'People', 'Arawakan (Taíno)', 'Taíno',
-    [[-85.0, 23.5], [-72.0, 20.5], [-65.0, 18.8], [-61.0, 16.0], [-61.0, 11.0], [-72.0, 12.0], [-79.0, 18.5]])
-add('Brazilians', 1500, 1799, 'IE', 'People', 'Indo-European (Romance: Portuguese)', 'Brazilians',
-    [[-50.0, -1.0], [-35.0, -5.0], [-39.0, -15.0], [-48.0, -28.0], [-53.0, -33.0], [-57.0, -30.0], [-52.0, -22.0], [-52.0, -12.0]])
-add('Brazilians', 1800, 2024, 'IE', 'People', 'Indo-European (Romance: Portuguese)', 'Brazilians',
-    [[-73.8, -7.5], [-60.0, 5.0], [-51.0, 4.5], [-34.8, -7.0], [-39.0, -17.5], [-48.0, -28.0], [-53.5, -33.5],
-     [-57.5, -30.2], [-54.0, -26.0], [-58.0, -22.5], [-58.0, -16.0], [-65.0, -11.0], [-70.0, -10.5]])
-add('Spanish-speaking Americans', 1520, 1799, 'IE', 'People', 'Indo-European (Romance: Spanish)', 'Hispanic America', [
-    [[-105.0, 22.0], [-97.0, 26.0], [-97.5, 21.0], [-96.0, 18.5], [-91.0, 18.2], [-87.0, 21.4], [-88.5, 15.8], [-83.5, 11.0],
-     [-80.0, 8.5], [-86.0, 11.0], [-92.0, 14.5], [-100.0, 17.0]],
-    [[-80.5, 8.0], [-72.0, 11.5], [-69.0, 7.0], [-76.0, 0.0], [-80.5, -3.0], [-78.0, 2.0]],
-    [[-81.0, -5.0], [-76.5, -14.0], [-70.3, -18.0], [-70.5, -33.0], [-72.0, -41.0], [-70.0, -34.0], [-68.0, -25.0], [-72.0, -12.0]],
-])
-add('Spanish-speaking Americans', 1800, 2024, 'IE', 'People', 'Indo-European (Romance: Spanish)', 'Hispanic America', [
-    [[-117.2, 32.5], [-110.0, 31.3], [-103.0, 29.0], [-97.2, 25.9], [-97.7, 21.0], [-96.0, 18.5], [-91.0, 18.2], [-87.0, 21.4],
-     [-88.5, 15.8], [-83.5, 11.0], [-80.0, 8.5], [-86.0, 11.0], [-92.0, 14.5], [-105.0, 20.0]],
-    [[-78.5, 2.0], [-77.0, 8.5], [-72.0, 12.0], [-62.0, 10.7], [-60.0, 6.0], [-70.0, 0.5], [-72.0, -10.0], [-68.5, -11.0],
-     [-66.0, -22.0], [-62.0, -24.0], [-58.0, -27.0], [-57.0, -34.0], [-58.5, -38.0], [-62.0, -40.0], [-65.5, -45.0],
-     [-69.0, -51.0], [-72.0, -54.0], [-72.5, -45.0], [-73.5, -38.0], [-71.4, -30.0], [-70.3, -18.0], [-76.5, -14.0],
-     [-81.0, -5.0], [-79.0, 1.0]],
-])
-add('Anglo-Americans', 1607, 1799, 'IE', 'People', 'Indo-European (Germanic: English)', 'Anglo-America',
-    [[-81.5, 31.5], [-79.0, 36.0], [-75.0, 40.0], [-70.0, 43.0], [-67.0, 45.0], [-70.5, 41.5], [-75.5, 38.0], [-79.5, 33.5]])
-add('Anglo-Americans', 1800, 1899, 'IE', 'People', 'Indo-European (Germanic: English)', 'Anglo-America',
-    [[-97.0, 28.0], [-94.0, 34.0], [-95.0, 41.0], [-90.0, 47.5], [-83.0, 46.0], [-67.0, 45.0], [-70.0, 41.5],
-     [-75.5, 36.0], [-81.5, 30.5], [-85.0, 30.0]])
-add('Anglo-Americans', 1900, 2024, 'IE', 'People', 'Indo-European (Germanic: English)', 'Anglo-America',
-    [[-124.5, 48.5], [-117.0, 49.0], [-96.0, 49.0], [-83.0, 46.0], [-67.0, 45.0], [-70.0, 41.5], [-75.5, 36.0],
-     [-81.0, 30.5], [-85.0, 30.0], [-97.0, 26.5], [-106.0, 31.5], [-117.0, 32.4], [-121.0, 32.5], [-125.0, 38.0], [-125.0, 41.0]])
-add('French Canadians', 1608, 2024, 'IE', 'People', 'Indo-European (Romance: French)', 'French Canadians',
-    [[-79.0, 46.0], [-64.0, 49.5], [-59.5, 48.0], [-66.0, 45.0], [-73.5, 45.0], [-77.0, 45.5]])
+net('Hajj caravans', 'Pilgrimage', 650, 1900, 'Hajj',
+    'Annual pilgrim caravans from Damascus, Cairo, Baghdad and Yemen converging on Mecca, with organised water stops and escorts.',
+    routes=[R([(36.3, 33.5), (35.74, 30.2), (36.57, 28.38), (39.6, 24.5), (39.83, 21.42)]),
+            R([(31.24, 30.04), (33.5, 29.5), (35.0, 28.8), (37.0, 27.5), (39.6, 24.5)]),
+            R([(44.4, 33.3), (44.4, 32.0), (42.5, 27.0), (40.5, 25.0), (39.6, 24.5)]),
+            R([(44.2, 15.35), (43.0, 18.0), (41.5, 20.0), (39.83, 21.42)])],
+    nodes=[('Damascus', 36.3, 33.5, 'major'), ('Cairo', 31.24, 30.04, 'major'), ('Kufa', 44.4, 32.0), ('Sana\'a', 44.2, 15.35), ('Medina', 39.6, 24.5, 'major'), ('Mecca', 39.83, 21.42, 'major')])
 
+net('Radhanite merchants', 'Community or diaspora', 800, 1000, 'Radhanite',
+    'Jewish merchants who, in the account of the Abbasid postmaster Ibn Khordadbeh, linked the Frankish lands, the caliphate, India and China.',
+    routes=[R([(3.0, 43.18), (5.0, 40.0), (10.0, 37.5), (20.0, 34.0), (29.9, 31.2)], sea=True),
+            R([(29.9, 31.2), (31.24, 30.04), (36.3, 33.5), (44.4, 33.3), (47.8, 30.5)]),
+            R([(44.4, 33.3), (51.4, 35.6), (62.2, 37.6), (75.99, 39.47), (94.7, 40.1), (108.9, 34.3)]),
+            R([(47.8, 30.5), (56.5, 27.1), (67.0, 24.85), (75.8, 11.25)], sea=True)],
+    nodes=[('Narbonne', 3.0, 43.18), ('Alexandria', 29.9, 31.2), ('Baghdad', 44.4, 33.3, 'major'), ('Basra', 47.8, 30.5), ('Debal', 67.0, 24.85), ("Chang'an", 108.9, 34.3)])
 
-# ---- Later batches (stages in time, local identities) ------------------------
-import importlib  # noqa: E402
+net('Trans-Saharan trade', 'Trade network', 300, 1900, 'Trans-Saharan trade',
+    'Camel caravans carrying gold, salt, cloth and people between the Maghreb, Egypt and the Sahel.',
+    routes=[R([(-4.3, 31.3), (-4.0, 27.0), (-4.0, 23.6), (-6.9, 17.3), (-3.0, 16.77)]),
+            R([(-3.0, 16.77), (0.04, 16.27)]), R([(-3.0, 16.77), (-4.0, 15.0), (-4.55, 13.9)]),
+            R([(13.2, 32.9), (9.5, 30.1), (10.2, 25.0), (7.99, 16.97), (8.5, 12.0)]),
+            R([(31.25, 30.05), (25.0, 29.5), (21.3, 29.1), (13.9, 25.9), (12.9, 18.7), (14.5, 13.5)])],
+    nodes=[('Sijilmasa', -4.3, 31.3), ('Taghaza', -4.0, 23.6), ('Timbuktu', -3.0, 16.77, 'major'), ('Gao', 0.04, 16.27), ('Djenné', -4.55, 13.9),
+           ('Tripoli', 13.2, 32.9), ('Ghadames', 9.5, 30.1), ('Agadez', 7.99, 16.97), ('Kano', 8.5, 12.0, 'major'), ('Cairo', 31.25, 30.05), ('Njimi (Kanem)', 14.5, 13.5)])
 
-for _module in ('societies_more_1', 'societies_more_2', 'societies_more_3', 'societies_more_4'):
-    importlib.import_module(_module).register()
+net('Swahili coast trade network', 'Trade network', 800, 1500, 'Swahili coast',
+    'Stone-built port towns trading gold from the Zimbabwe plateau, ivory and slaves for Indian Ocean cloth, beads and ceramics.',
+    routes=[R([(45.3, 2.05), (40.9, -2.27), (40.1, -3.2), (39.7, -4.05), (39.2, -6.2), (39.5, -8.95), (40.7, -15.0), (34.7, -20.2)], sea=True),
+            R([(34.7, -20.2), (32.5, -20.2), (30.93, -20.27)])],
+    nodes=[('Mogadishu', 45.3, 2.05), ('Lamu', 40.9, -2.27), ('Mombasa', 39.7, -4.05, 'major'), ('Zanzibar', 39.2, -6.2), ('Kilwa', 39.5, -8.95, 'major'),
+           ('Sofala', 34.7, -20.2), ('Great Zimbabwe', 30.93, -20.27, 'major')])
+
+net('Varangian and Volga river routes', 'Trade network', 750, 1100, 'Trade route from the Varangians to the Greeks',
+    'Rus\' and Scandinavian traders carried furs, slaves and silver along the rivers to Constantinople and, by the Volga, to Baghdad.',
+    routes=[R([(17.54, 59.34), (24.0, 59.9), (30.3, 59.95), (32.3, 59.99), (31.27, 58.52), (32.04, 54.78), (30.52, 50.45), (31.5, 46.6), (28.98, 41.0)]),
+            R([(32.3, 59.99), (36.0, 58.5), (40.0, 57.0), (49.05, 54.9), (47.9, 46.35), (51.0, 41.5), (54.4, 36.8), (51.4, 35.6), (44.4, 33.3)])],
+    nodes=[('Birka', 17.54, 59.34), ('Staraya Ladoga', 32.3, 59.99), ('Novgorod', 31.27, 58.52, 'major'), ('Smolensk', 32.04, 54.78), ('Kyiv', 30.52, 50.45, 'major'),
+           ('Constantinople', 28.98, 41.0, 'major'), ('Bolghar', 49.05, 54.9), ('Itil', 47.9, 46.35), ('Baghdad', 44.4, 33.3)])
+
+net('Camino de Santiago', 'Pilgrimage', 900, 1600, 'Camino de Santiago',
+    'Pilgrim roads across France and northern Spain to the shrine of St James, with hospices, bridges and market towns along them.',
+    routes=[R([(-1.32, 43.01), (-1.64, 42.82), (-2.45, 42.47), (-3.7, 42.34), (-5.57, 42.6), (-6.06, 42.46), (-7.4, 42.78), (-8.54, 42.88)]),
+            R([(2.35, 48.85), (0.69, 47.39), (-0.58, 44.84), (-1.24, 43.16), (-1.32, 43.01)]),
+            R([(3.88, 45.04), (2.4, 44.6), (1.08, 44.1), (-1.24, 43.16)])],
+    nodes=[('Santiago de Compostela', -8.54, 42.88, 'major'), ('León', -5.57, 42.6), ('Burgos', -3.7, 42.34), ('Pamplona', -1.64, 42.82),
+           ('Le Puy', 3.88, 45.04), ('Tours', 0.69, 47.39), ('Paris', 2.35, 48.85)])
+
+net('Lombard League', 'Faction or party', 1167, 1250, 'Lombard League',
+    'North Italian communes bound by oath against the emperor, the political federation behind the Guelph cause.',
+    routes=[R([(9.19, 45.46), (10.22, 45.54), (10.99, 45.44), (11.88, 45.41), (12.24, 45.67)]),
+            R([(9.19, 45.46), (9.69, 45.05), (10.79, 45.16)])],
+    nodes=[('Milan', 9.19, 45.46, 'major'), ('Brescia', 10.22, 45.54), ('Verona', 10.99, 45.44), ('Padua', 11.88, 45.41), ('Treviso', 12.24, 45.67),
+           ('Piacenza', 9.69, 45.05), ('Mantua', 10.79, 45.16), ('Bologna', 11.34, 44.5)])
+
+net('Hanseatic League', 'Trade network', 1241, 1669, 'Hanseatic League',
+    'A league of north German and Baltic trading towns with walled trading posts (kontore) from London to Novgorod.',
+    routes=[R([(10.69, 53.9), (12.5, 54.6), (15.0, 55.3), (18.3, 57.64), (22.5, 57.3), (24.1, 56.95)], sea=True),
+            R([(18.3, 57.64), (21.0, 59.0), (24.75, 59.44), (28.0, 59.8), (30.3, 59.95), (31.27, 58.52)], sea=True),
+            R([(10.69, 53.9), (14.0, 54.7), (18.65, 54.35), (20.5, 54.7)], sea=True),
+            R([(10.69, 53.9), (9.99, 53.55), (8.0, 54.2), (5.0, 53.8), (3.5, 52.4), (3.22, 51.3), (1.5, 51.2), (0.7, 51.5), (-0.09, 51.51)], sea=True),
+            R([(9.99, 53.55), (8.0, 55.5), (8.0, 57.5), (5.0, 59.0), (5.32, 60.39)], sea=True)],
+    nodes=[('Lübeck', 10.69, 53.87, 'major'), ('Hamburg', 9.99, 53.55), ('Cologne', 6.96, 50.94), ('Bruges', 3.22, 51.21, 'major'), ('London (Steelyard)', -0.09, 51.51, 'major'),
+           ('Bergen', 5.32, 60.39, 'major'), ('Novgorod', 31.27, 58.52, 'major'), ('Danzig', 18.65, 54.35), ('Riga', 24.1, 56.95), ('Visby', 18.3, 57.64),
+           ('Reval (Tallinn)', 24.75, 59.44), ('Königsberg', 20.5, 54.7)])
+
+net('Venetian maritime network', 'Company or maritime system', 1000, 1797, 'Stato da Màr',
+    'Venice\'s string of fortified ports, galley convoys and trading quarters from the Adriatic to the Black Sea and the Levant.',
+    routes=[R([(12.33, 45.44), (14.0, 43.5), (15.2, 44.1), (19.9, 39.6), (21.7, 36.8), (25.13, 35.34), (28.2, 36.4), (33.95, 35.1), (35.07, 32.93)], sea=True),
+            R([(25.13, 35.34), (26.0, 38.0), (26.5, 40.0), (28.98, 41.0), (31.0, 43.0), (35.0, 45.0), (39.2, 47.2)], sea=True),
+            R([(25.13, 35.34), (27.0, 33.5), (29.9, 31.2)], sea=True)],
+    nodes=[('Venice', 12.33, 45.44, 'major'), ('Zara', 15.2, 44.1), ('Corfu', 19.9, 39.6), ('Modon', 21.7, 36.8), ('Candia', 25.13, 35.34, 'major'),
+           ('Famagusta', 33.95, 35.1), ('Acre', 35.07, 32.93), ('Alexandria', 29.9, 31.2), ('Constantinople', 28.98, 41.0, 'major'), ('Tana', 39.2, 47.2)])
+
+net('Genoese trading network', 'Company or maritime system', 1100, 1600, 'Republic of Genoa',
+    'Genoese colonies and banking houses from the western Mediterranean to Caffa on the Black Sea.',
+    routes=[R([(8.93, 44.41), (8.5, 42.0), (11.0, 38.0), (10.17, 36.8)], sea=True),
+            R([(8.93, 44.41), (9.0, 40.0), (15.0, 37.0), (21.0, 37.0), (26.1, 38.4), (26.5, 40.0), (28.97, 41.02), (31.0, 43.0), (35.38, 45.03)], sea=True),
+            R([(8.93, 44.41), (5.0, 40.0), (0.0, 38.0), (-2.0, 36.3), (-6.0, 36.1), (-6.3, 36.5), (-5.99, 37.39)], sea=True)],
+    nodes=[('Genoa', 8.93, 44.41, 'major'), ('Tunis', 10.17, 36.8), ('Chios', 26.1, 38.4), ('Pera (Galata)', 28.97, 41.02, 'major'), ('Caffa', 35.38, 45.03, 'major'), ('Seville', -5.99, 37.39)])
+
+net('Mongol yam relay system', 'Communications and logistics', 1206, 1368, 'Yam (route)',
+    'A continental relay of post stations with horses, riders and passports linking the Mongol khanates.',
+    routes=[R([(116.4, 39.9), (102.8, 47.2), (89.1, 44.1), (80.6, 44.0), (68.3, 42.9), (59.2, 42.3), (46.0, 48.7), (40.0, 52.0), (37.6, 55.75)]),
+            R([(68.3, 42.9), (66.97, 39.65), (62.2, 37.6), (55.0, 36.5), (46.3, 38.1)])],
+    nodes=[('Khanbaliq (Beijing)', 116.4, 39.9, 'major'), ('Karakorum', 102.8, 47.2, 'major'), ('Almaliq', 80.6, 44.0), ('Otrar', 68.3, 42.9), ('Urgench', 59.2, 42.3),
+           ('Sarai', 46.0, 48.7, 'major'), ('Tabriz', 46.3, 38.1, 'major'), ('Moscow', 37.6, 55.75)])
+
+net('Guelph and Ghibelline factions', 'Faction or party', 1200, 1400, 'Guelphs and Ghibellines',
+    'The two great factional blocs of Italian city politics, for or against imperial authority, cutting across cities and families.',
+    nodes=[('Florence (Guelph)', 11.25, 43.77, 'major'), ('Bologna (Guelph)', 11.34, 44.5), ('Lucca (Guelph)', 10.5, 43.84), ('Pisa (Ghibelline)', 10.4, 43.72, 'major'),
+           ('Siena (Ghibelline)', 11.33, 43.32), ('Verona (Ghibelline)', 10.99, 45.44), ('Pavia (Ghibelline)', 9.16, 45.18)])
+
+net('Armenian merchant network (New Julfa)', 'Community or diaspora', 1600, 1750, 'New Julfa',
+    'A family-firm diaspora operating from Isfahan\'s Armenian quarter to Venice, Amsterdam, Surat, Madras and Manila.',
+    routes=[R([(51.65, 32.65), (44.0, 36.0), (37.16, 36.2), (27.14, 38.42), (10.31, 43.55)]),
+            R([(10.31, 43.55), (4.9, 52.37)], sea=True),
+            R([(51.65, 32.65), (56.27, 27.19), (65.0, 22.0), (72.83, 21.17), (80.27, 13.08), (100.0, 2.0), (120.98, 14.6)], sea=True)],
+    nodes=[('New Julfa (Isfahan)', 51.65, 32.65, 'major'), ('Aleppo', 37.16, 36.2), ('Izmir', 27.14, 38.42), ('Livorno', 10.31, 43.55), ('Amsterdam', 4.9, 52.37, 'major'),
+           ('Surat', 72.83, 21.17), ('Madras', 80.27, 13.08), ('Manila', 120.98, 14.6)])
+
+net('Qhapaq Ñan (Inca road system)', 'Communications and logistics', 1400, 1535, 'Inca road system',
+    'Some 40,000 km of imperial roads with relay runners (chasqui), storehouses and way stations linking Cusco to the four quarters.',
+    routes=[R([(-71.97, -13.52), (-74.0, -10.0), (-77.0, -8.0), (-78.5, -7.16), (-79.5, -4.0), (-78.5, -0.2)]),
+            R([(-71.97, -13.52), (-69.3, -15.9), (-68.1, -16.5), (-65.75, -19.58), (-66.0, -24.0), (-69.5, -30.0), (-70.65, -33.45)])],
+    nodes=[('Cusco', -71.97, -13.52, 'major'), ('Cajamarca', -78.5, -7.16), ('Quito', -78.5, -0.2, 'major'), ('Lake Titicaca', -69.3, -15.9), ('Potosí', -65.75, -19.58), ('Santiago', -70.65, -33.45)])
+
+# ---- Early modern ---------------------------------------------------------------------------------------
+net('Carreira da Índia (Portuguese India route)', 'Company or maritime system', 1498, 1700, 'Carreira da Índia',
+    'The Portuguese state\'s annual armada route round Africa, with fortified ports (feitorias) from Mozambique to Macau and Japan.',
+    routes=[R([(-9.14, 38.7), (-14.0, 25.0), (-20.0, 5.0), (-5.0, -20.0), (18.4, -34.4), (35.0, -26.0), (40.7, -15.0), (48.0, -2.0), (60.0, 8.0), (73.8, 15.5)], sea=True),
+            R([(73.8, 15.5), (76.27, 9.97), (85.0, 6.0), (95.0, 5.0), (102.2, 2.2), (108.0, 10.0), (113.54, 22.2), (125.0, 28.0), (129.9, 32.7)], sea=True),
+            R([(73.8, 15.5), (65.0, 20.0), (58.4, 23.6), (56.5, 27.1)], sea=True)],
+    nodes=[('Lisbon', -9.14, 38.7, 'major'), ('Mozambique Island', 40.7, -15.0), ('Goa', 73.8, 15.5, 'major'), ('Cochin', 76.27, 9.97), ('Malacca', 102.2, 2.2, 'major'),
+           ('Macau', 113.54, 22.2, 'major'), ('Nagasaki', 129.9, 32.7), ('Hormuz', 56.5, 27.1)])
+
+net('Spanish treasure fleets (Carrera de Indias)', 'Company or maritime system', 1530, 1790, 'Spanish treasure fleet',
+    'Convoyed fleets carrying silver and goods between Seville and the Spanish Indies through a few licensed ports.',
+    routes=[R([(-5.99, 37.39), (-6.3, 36.5), (-15.0, 28.0), (-40.0, 20.0), (-61.0, 15.0), (-72.0, 12.0), (-75.5, 10.4)], sea=True),
+            R([(-61.0, 15.0), (-80.0, 10.0), (-79.9, 9.35)], sea=True),
+            R([(-75.5, 10.4), (-82.4, 23.1)], sea=True), R([(-96.0, 19.2), (-90.0, 21.5), (-82.4, 23.1)], sea=True),
+            R([(-82.4, 23.1), (-78.0, 28.0), (-60.0, 36.0), (-30.0, 39.0), (-9.14, 38.0), (-5.99, 37.39)], sea=True)],
+    nodes=[('Seville', -5.99, 37.39, 'major'), ('Cartagena de Indias', -75.5, 10.4), ('Portobelo', -79.65, 9.55), ('Veracruz', -96.13, 19.2), ('Havana', -82.4, 23.1, 'major')])
+
+net('Manila galleon route', 'Company or maritime system', 1565, 1815, 'Manila galleon',
+    'Annual galleons carrying Chinese silk and porcelain and Mexican silver across the Pacific between Manila and Acapulco.',
+    routes=[R([(120.98, 14.6), (125.0, 20.0), (140.0, 30.0), (160.0, 36.0), (179.9, 40.0)], sea=True),
+            R([(-179.9, 40.0), (-150.0, 40.0), (-130.0, 34.0), (-110.0, 22.0), (-99.9, 16.85)], sea=True)],
+    nodes=[('Manila', 120.98, 14.6, 'major'), ('Acapulco', -99.9, 16.85, 'major')])
+
+net('Dutch East India Company network (VOC)', 'Company or maritime system', 1602, 1799, 'Dutch East India Company',
+    'The Dutch chartered company\'s fleet, forts and factories from the Cape to Batavia, Ceylon and Dejima.',
+    routes=[R([(4.9, 52.37), (-3.0, 48.0), (-10.0, 38.0), (-18.0, 10.0), (-12.0, -20.0), (10.0, -35.0), (18.42, -33.92)], sea=True),
+            R([(18.42, -33.92), (50.0, -35.0), (80.0, -20.0), (105.0, -8.0), (106.85, -6.2)], sea=True),
+            R([(18.42, -33.92), (60.0, -25.0), (75.0, -5.0), (79.85, 6.9)], sea=True),
+            R([(106.85, -6.2), (110.0, 2.0), (115.0, 10.0), (120.0, 20.0), (126.0, 28.0), (129.73, 32.75)], sea=True),
+            R([(106.85, -6.2), (115.0, -7.5), (128.2, -3.7)], sea=True)],
+    nodes=[('Amsterdam', 4.9, 52.37, 'major'), ('Cape Town', 18.42, -33.92, 'major'), ('Colombo', 79.85, 6.9), ('Batavia', 106.85, -6.2, 'major'),
+           ('Dejima (Nagasaki)', 129.73, 32.75, 'major'), ('Ambon', 128.2, -3.7)])
+
+net('Hudson\'s Bay fur-trade network', 'Company or maritime system', 1670, 1870, 'Fur trade',
+    'Company posts, canoe brigades and river portages carrying furs from the Canadian interior to Hudson Bay and Montreal.',
+    routes=[R([(-0.12, 51.5), (-30.0, 56.0), (-60.0, 60.5), (-80.0, 59.0), (-92.43, 57.0)], sea=True),
+            R([(-92.43, 57.0), (-97.8, 53.97), (-102.3, 53.96), (-113.5, 53.5), (-119.0, 52.9), (-122.67, 45.62)]),
+            R([(-73.57, 45.5), (-79.0, 46.0), (-84.0, 46.5), (-89.2, 48.4), (-94.0, 48.6), (-97.14, 49.9), (-97.8, 53.97)])],
+    nodes=[('York Factory', -92.43, 57.0, 'major'), ('Norway House', -97.8, 53.97), ('Fort Edmonton', -113.5, 53.5), ('Fort Vancouver', -122.67, 45.62),
+           ('Montreal', -73.57, 45.5, 'major'), ('Fort William', -89.2, 48.4), ('Red River (Winnipeg)', -97.14, 49.9)])
+
+net('Transatlantic slave trade', 'Trade network', 1501, 1866, 'Atlantic slave trade',
+    'The forced shipment of some 12 million Africans to the Americas along fixed commercial routes, run by European merchant houses, '
+    'chartered companies and African coastal and inland suppliers.',
+    routes=[R([(-17.4, 14.7), (-35.0, 13.0), (-55.0, 13.0), (-59.6, 13.1)], sea=True),
+            R([(-1.35, 5.08), (-10.0, 3.0), (-25.0, 2.0), (-35.0, -6.0), (-38.5, -12.97)], sea=True),
+            R([(13.2, -8.8), (0.0, -12.0), (-25.0, -14.0), (-43.2, -22.9)], sea=True),
+            R([(-3.0, 53.4), (-12.0, 45.0), (-17.4, 14.7)], sea=True),
+            R([(-59.6, 13.1), (-70.0, 17.0), (-76.8, 17.97), (-82.4, 23.1)], sea=True),
+            R([(-76.8, 17.97), (-80.0, 25.0), (-79.93, 32.78)], sea=True)],
+    nodes=[('Liverpool', -3.0, 53.4), ('Gorée', -17.4, 14.7), ('Elmina', -1.35, 5.08, 'major'), ('Luanda', 13.2, -8.8, 'major'), ('Salvador', -38.5, -12.97, 'major'),
+           ('Rio de Janeiro', -43.2, -22.9), ('Bridgetown', -59.6, 13.1), ('Kingston', -76.8, 17.97), ('Charleston', -79.93, 32.78), ('Havana', -82.4, 23.1)])
+
+net('Barbary corsair network', 'Clandestine network', 1500, 1830, 'Barbary pirates',
+    'Corsair fleets based in Algiers, Tunis, Tripoli and Salé that raided shipping and coasts and ran a slave and ransom economy.',
+    routes=[R([(3.06, 36.75), (2.7, 39.6), (8.0, 40.0)], sea=True), R([(3.06, 36.75), (-5.0, 36.2), (-12.0, 45.0), (-6.0, 50.0), (-9.4, 51.5)], sea=True),
+            R([(-6.8, 34.05), (-10.0, 40.0), (-14.0, 50.0), (-20.0, 63.4)], sea=True), R([(13.19, 32.89), (15.0, 36.0), (14.0, 40.0)], sea=True)],
+    nodes=[('Algiers', 3.06, 36.75, 'major'), ('Tunis', 10.17, 36.8), ('Tripoli', 13.19, 32.89), ('Salé', -6.8, 34.05, 'major'), ('Baltimore (Ireland)', -9.4, 51.5)])
+
+net('Golden Age of Piracy', 'Clandestine network', 1650, 1730, 'Golden Age of Piracy',
+    'Pirate havens and the "Pirate Round" from the Caribbean to the Indian Ocean, held together by crews, fences and corrupt ports.',
+    routes=[R([(-77.35, 25.05), (-65.0, 30.0), (-30.0, 20.0), (-15.0, 0.0), (-5.0, -20.0), (18.4, -34.4), (40.0, -28.0), (49.9, -16.9)], sea=True),
+            R([(49.9, -16.9), (60.0, 8.0), (43.4, 12.6)], sea=True), R([(-77.35, 25.05), (-76.84, 17.94), (-72.8, 20.05)], sea=True)],
+    nodes=[('Nassau', -77.35, 25.05, 'major'), ('Port Royal', -76.84, 17.94, 'major'), ('Tortuga', -72.8, 20.05), ('Île Sainte-Marie', 49.9, -16.9, 'major')])
+
+net('Maroon and quilombo communities', 'Community or diaspora', 1500, 1900, 'Maroons',
+    'Settlements of escaped enslaved people, from large quilombos to mountain and swamp strongholds, often trading and allying with neighbours.',
+    zones=[Z(blob(-36.0, -9.0, 0.6, 0.6), s=1605, e=1694), Z(blob(-76.6, 18.1, 0.5, 0.35)), Z(blob(-76.5, 36.6, 0.4, 0.35), s=1700, e=1865),
+           Z(blob(-75.2, 10.1, 0.3, 0.3), s=1599, e=1900), Z(blob(-54.9, 4.0, 0.8, 0.8), s=1700, e=1900)],
+    nodes=[('Palmares', -36.0, -9.0, 'major'), ('Blue Mountains', -76.6, 18.1), ('Great Dismal Swamp', -76.5, 36.6), ('San Basilio de Palenque', -75.2, 10.1), ('Saramaka', -54.9, 4.0)])
+
+# ---- Modern -------------------------------------------------------------------------------------------------
+net('Jacobin club network', 'Faction or party', 1789, 1794, 'Jacobin Club',
+    'A network of affiliated political clubs across France coordinated from the Paris Jacobin Club, at its height thousands of local societies.',
+    routes=[R([(2.35, 48.86), (4.83, 45.76)]), R([(2.35, 48.86), (-0.58, 44.84)]), R([(2.35, 48.86), (5.37, 43.3)]), R([(2.35, 48.86), (-1.55, 47.22)]),
+            R([(2.35, 48.86), (7.75, 48.58)]), R([(2.35, 48.86), (3.06, 50.63)]), R([(2.35, 48.86), (1.44, 43.6)]), R([(2.35, 48.86), (-4.49, 48.39)])],
+    nodes=[('Paris', 2.35, 48.86, 'major'), ('Lyon', 4.83, 45.76), ('Bordeaux', -0.58, 44.84), ('Marseille', 5.37, 43.3), ('Nantes', -1.55, 47.22), ('Strasbourg', 7.75, 48.58),
+           ('Lille', 3.06, 50.63), ('Toulouse', 1.44, 43.6), ('Brest', -4.49, 48.39)])
+
+net('Underground Railroad', 'Clandestine network', 1810, 1865, 'Underground Railroad',
+    'Networks of safe houses, guides and sympathisers that helped enslaved people escape to the northern states and Canada.',
+    routes=[R([(-85.76, 38.25), (-84.5, 39.1), (-83.0, 40.5), (-83.05, 42.33)]), R([(-84.5, 39.1), (-81.7, 41.5), (-83.1, 42.1)]),
+            R([(-76.6, 39.3), (-75.16, 39.95), (-74.0, 40.7), (-73.75, 42.65), (-79.05, 43.1)]),
+            R([(-91.4, 31.56), (-90.2, 35.0), (-90.2, 38.6), (-87.65, 41.88), (-83.05, 42.33)])],
+    nodes=[('Louisville', -85.76, 38.25), ('Cincinnati', -84.5, 39.1, 'major'), ('Detroit', -83.05, 42.33, 'major'), ('Philadelphia', -75.16, 39.95, 'major'),
+           ('Albany', -73.75, 42.65), ('Niagara', -79.05, 43.1, 'major'), ('Chicago', -87.65, 41.88), ('Baltimore', -76.6, 39.3)])
+
+net('Pony Express', 'Communications and logistics', 1860, 1861, 'Pony Express',
+    'A relay of riders and stations carrying mail between Missouri and California in about ten days.',
+    routes=[R([(-94.85, 39.77), (-98.97, 40.64), (-104.55, 42.2), (-108.9, 42.35), (-111.9, 40.76), (-119.77, 39.16), (-121.49, 38.58)])],
+    nodes=[('St. Joseph', -94.85, 39.77, 'major'), ('Fort Kearny', -98.97, 40.64), ('Fort Laramie', -104.55, 42.2), ('Salt Lake City', -111.9, 40.76), ('Sacramento', -121.49, 38.58, 'major')])
+
+net('Communist International (Comintern)', 'Faction or party', 1919, 1943, 'Communist International',
+    'A Moscow-directed network of national communist parties, couriers and front organisations.',
+    routes=[R([(37.6, 55.75), (13.4, 52.5)]), R([(37.6, 55.75), (2.35, 48.85)]), R([(37.6, 55.75), (121.47, 31.23)]), R([(37.6, 55.75), (-99.13, 19.43)]),
+            R([(37.6, 55.75), (-3.7, 40.4)]), R([(37.6, 55.75), (-0.12, 51.5)])],
+    nodes=[('Moscow', 37.6, 55.75, 'major'), ('Berlin', 13.4, 52.5), ('Paris', 2.35, 48.85), ('Shanghai', 121.47, 31.23), ('Mexico City', -99.13, 19.43), ('Madrid', -3.7, 40.4), ('London', -0.12, 51.5)])
+
+net('Chinese Communist base areas and Long March', 'Faction or party', 1927, 1949, 'Long March',
+    'Rural base areas held by the Red Army and party, and the 1934-35 retreat between them.',
+    routes=[R([(116.03, 25.88), (111.0, 26.0), (106.9, 27.7), (102.2, 29.9), (100.0, 32.0), (102.7, 32.2), (108.2, 36.9), (109.5, 36.6)], s=1934, e=1936)],
+    zones=[Z(blob(116.0, 26.0, 1.2, 1.0), s=1931, e=1934), Z(blob(109.5, 36.6, 1.5, 1.2), s=1936, e=1948)],
+    nodes=[('Ruijin (Jiangxi Soviet)', 116.03, 25.88, 'major'), ('Zunyi', 106.9, 27.7), ('Luding Bridge', 102.2, 29.9), ("Yan'an", 109.5, 36.6, 'major')])

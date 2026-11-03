@@ -1,4 +1,4 @@
-"""Threads that join stages of one society through time, and broad umbrella entries.
+"""Threads that join stages of one civilization through time, and broad umbrella entries.
 
 LINES maps a lineage id to the entry names that belong to it (an entry name may
 appear in several stages). Entries added with an explicit `line=` keep it.

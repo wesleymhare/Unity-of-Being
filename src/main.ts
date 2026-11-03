@@ -33,12 +33,14 @@ import {
 maplibregl.setWorkerUrl(workerUrl);
 
 const BASE = import.meta.env.BASE_URL;
-/** Zoom at which local society identities (level 3) fade in. */
+/** Zoom at which local civilization identities (level 3) fade in. */
 const LOCAL_ZOOM = 3.6;
+/** Hub label keys start here; network keys are small indexes. */
+const SOC_HUB_K = 10_000;
 const MIN_YEAR = -3400;
 const MAX_YEAR = 2024;
 
-/** Properties of one polity, realm group or society (see data/*.py). */
+/** Properties of one polity, realm group or civilization (see data/*.py). */
 interface Props extends LabelProps {
   w: string;
   q: string;
@@ -48,11 +50,11 @@ interface Props extends LabelProps {
   c: string;
   /** Realm-level outline. */
   r?: number;
-  /** Societies: what kind of community, its languages, and its family group. */
+  /** Civilizations: what kind of community, its languages, and its family group. */
   kind?: string;
   fam?: string;
   fg?: string;
-  /** Societies: level (1 broad sphere, 2 people, 3 local identity), lineage id, one-line note. */
+  /** Civilizations: level (1 broad sphere, 2 people, 3 local identity), lineage id, one-line note. */
   lv?: number;
   ln?: string;
   nt?: string;
@@ -60,12 +62,22 @@ interface Props extends LabelProps {
   p?: string;
   pq?: string;
   era?: string;
+  /** Societies: the network a hub label belongs to, and its main hubs as text. */
+  ent?: number;
+  hubs?: string;
 }
 
 interface MapFeature {
   type: string;
   geometry: unknown;
   properties: Props;
+}
+
+interface SocietyData {
+  type: string;
+  features: MapFeature[];
+  entities: Props[];
+  labels: Props[];
 }
 
 interface FeatureCollection {
@@ -86,8 +98,8 @@ const signed = (value: number): string =>
   `${value < 0 ? '−' : '+'}${Math.abs(value).toFixed(1)}`;
 
 // ---- State from the URL hash ------------------------------------------------
-type Lens = 'polities' | 'societies' | 'biomes';
-const LENSES: Lens[] = ['polities', 'societies', 'biomes'];
+type Lens = 'polities' | 'civilizations' | 'societies' | 'biomes';
+const LENSES: Lens[] = ['polities', 'civilizations', 'societies', 'biomes'];
 
 const params = new URLSearchParams(location.hash.replace(/^#/, ''));
 const num = (key: string, fallback: number): number => {
@@ -240,21 +252,28 @@ const YEAR_FILTERS: Record<string, (value: number) => Filter> = {
   'polity-realm-line': realmFilter,
   'sub-fill': (value) => ['all', yearFilter(value), ['!', ['has', 'bd']]],
   'sub-line': (value) => ['all', yearFilter(value), ['has', 'bd']],
-  'society-fill': yearFilter,
-  'society-casing': yearFilter,
-  'society-line': yearFilter,
+  'civilization-fill': yearFilter,
+  'civilization-casing': yearFilter,
+  'civilization-line': yearFilter,
+  'soc-zone-fill': (value) => ['all', yearFilter(value), ['==', ['get', 't'], 'z']],
+  'soc-zone-line': (value) => ['all', yearFilter(value), ['==', ['get', 't'], 'z']],
+  'soc-route-casing': (value) => ['all', yearFilter(value), ['==', ['get', 't'], 'r']],
+  'soc-route': (value) => ['all', yearFilter(value), ['==', ['get', 't'], 'r'], ['!', ['has', 'sea']]],
+  'soc-route-sea': (value) => ['all', yearFilter(value), ['==', ['get', 't'], 'r'], ['has', 'sea']],
+  'soc-node': (value) => ['all', yearFilter(value), ['==', ['get', 't'], 'n']],
 };
 
 const LENS_LAYERS: Record<Lens, string[]> = {
   polities: ['polity-fill', 'polity-line', 'polity-realm-casing', 'polity-realm-line', 'polity-hl', 'sub-fill', 'sub-line', 'sub-hl'],
-  societies: ['society-fill', 'society-casing', 'society-line', 'society-hl'],
+  civilizations: ['civilization-fill', 'civilization-casing', 'civilization-line', 'civilization-hl'],
+  societies: ['soc-zone-fill', 'soc-zone-line', 'soc-route-casing', 'soc-route', 'soc-route-sea', 'soc-node', 'soc-hl-route', 'soc-hl-zone', 'soc-hl-node'],
   biomes: ['biome-raster', 'eco-lines', 'ocean-mask'],
 };
 
 const fillLayerOf = (lens: Lens): string | null =>
-  lens === 'polities' ? 'polity-fill' : lens === 'societies' ? 'society-fill' : null;
+  lens === 'polities' ? 'polity-fill' : lens === 'civilizations' ? 'civilization-fill' : null;
 const highlightLayerOf = (lens: Lens): string | null =>
-  lens === 'polities' ? 'polity-hl' : lens === 'societies' ? 'society-hl' : null;
+  lens === 'polities' ? 'polity-hl' : lens === 'civilizations' ? 'civilization-hl' : null;
 
 /** Province shapes carry keys from here up, so they never clash with polity keys. */
 const SUB_K = 1_000_000;
@@ -263,6 +282,8 @@ const SUB_ZOOM = 3.4;
 let subProps: Props[] = [];
 let subParents = new Set<string>();
 let polityProps: Props[] = [];
+let civilizationProps: Props[] = [];
+/** Societies: one record per network, and the label items (titles and hubs). */
 let societyProps: Props[] = [];
 let biomeModel: BiomeModel | null = null;
 
@@ -279,11 +300,21 @@ const subLabels = new LabelLayer<Props>(map, (p) => {
 }, 1);
 subLabels.minZoom = SUB_ZOOM;
 polityLabels.suppress = (f) => map.getZoom() >= SUB_ZOOM && subParents.has(f.n);
-const societyLabels = new LabelLayer<Props>(map, (p) => {
+const civilizationLabels = new LabelLayer<Props>(map, (p) => {
   const stack = standingAt(p.lx, p.ly, year);
   overlapSet = stack.some((item) => item.k === p.k) ? stack : [p, ...stack];
   openPanel(p);
 });
+const societyLabels = new LabelLayer<Props>(map, (p) => {
+  const entity = societyProps[p.ent ?? p.k];
+  if (!entity) return;
+  // A hub shared by several networks lists them all.
+  const stack = p.k >= SOC_HUB_K
+    ? societyProps.filter((item) => item.s <= year && item.e >= year && item.hubs?.split(', ').includes(p.n))
+    : [entity];
+  overlapSet = [entity, ...stack.filter((item) => item.k !== entity.k)];
+  openPanel(entity);
+}, 3);
 // Ecoregion patches are often thin strips with long names, so let names overhang them.
 const biomeLabels = new LabelLayer<EcoPatch>(map, (patch) => openBiomePanel(patch.lx, patch.ly), 2.2);
 
@@ -291,12 +322,13 @@ function activeLabels(): { schedule(): void } | null {
   if (activeLens === 'polities') {
     return { schedule: () => { polityLabels.schedule(); subLabels.schedule(); } };
   }
+  if (activeLens === 'civilizations') return civilizationLabels;
   if (activeLens === 'societies') return societyLabels;
   return biomeLabels;
 }
 
 function lensProps(lens: Lens): Props[] {
-  return lens === 'polities' ? polityProps : lens === 'societies' ? societyProps : [];
+  return lens === 'polities' ? polityProps : lens === 'civilizations' ? civilizationProps : lens === 'societies' ? societyProps : [];
 }
 
 // ---- Hash -------------------------------------------------------------------
@@ -327,16 +359,41 @@ function renderEraNote(): void {
 function renderLegend(): void {
   renderEraNote();
   legendBody.replaceChildren();
-  if (activeLens !== 'societies') {
+  if (activeLens !== 'civilizations' && activeLens !== 'societies') {
     legend.hidden = true;
     return;
   }
   legend.hidden = false;
 
   if (activeLens === 'societies') {
-    legendTitle.textContent = 'Language family or sphere';
+    legendTitle.textContent = 'Kind of network';
     const present = new Map<string, { colour: string; count: number }>();
     for (const p of societyProps) {
+      if (p.s > year || p.e < year || !p.kind) continue;
+      const entry = present.get(p.kind);
+      if (entry) entry.count++;
+      else present.set(p.kind, { colour: p.c, count: 1 });
+    }
+    for (const [name, { colour, count }] of [...present].sort((a, b) => b[1].count - a[1].count)) {
+      const row = document.createElement('div');
+      row.className = 'legend-row';
+      const chip = document.createElement('i');
+      chip.style.background = colour;
+      const label = document.createElement('span');
+      label.textContent = name;
+      const total = document.createElement('em');
+      total.textContent = String(count);
+      row.append(chip, label, total);
+      legendBody.append(row);
+    }
+    if (!present.size) legendBody.textContent = 'No networks are mapped for this year.';
+    return;
+  }
+
+  if (activeLens === 'civilizations') {
+    legendTitle.textContent = 'Language family or sphere';
+    const present = new Map<string, { colour: string; count: number }>();
+    for (const p of civilizationProps) {
       if (p.s > year || p.e < year || !p.fg) continue;
       const entry = present.get(p.fg);
       if (entry) entry.count++;
@@ -354,7 +411,7 @@ function renderLegend(): void {
       row.append(chip, label, total);
       legendBody.append(row);
     }
-    if (!present.size) legendBody.textContent = 'No societies are mapped for this year.';
+    if (!present.size) legendBody.textContent = 'No civilizations are mapped for this year.';
   }
 }
 
@@ -399,6 +456,7 @@ function setYear(next: number): void {
     subParents = new Set(subProps.filter((item) => item.s <= year && item.e >= year).map((item) => item.p as string));
     polityLabels.setYear(year, activeLens === 'polities');
     subLabels.setYear(year, activeLens === 'polities');
+    civilizationLabels.setYear(year, activeLens === 'civilizations');
     societyLabels.setYear(year, activeLens === 'societies');
     renderLegend();
     if (activeLens === 'biomes' && !panel.hidden && biomePoint) scheduleBiomePanel();
@@ -465,7 +523,7 @@ function renderFacts(facts: WikiFacts | null, extraFacts: WikiFact[] = []): void
 function renderFallback(name: string, hits: { title: string; snippet: string }[]): void {
   pSummary.classList.remove('error');
   pSummary.classList.add('muted');
-  const label = activeLens === 'societies' ? 'society' : activeLens === 'biomes' ? 'ecoregion' : 'polity';
+  const label = activeLens === 'civilizations' ? 'civilization' : activeLens === 'biomes' ? 'ecoregion' : 'polity';
   pSummary.textContent = hits.length
     ? `No single Wikipedia article matches this ${label}. Closest matches are below.`
     : `No single Wikipedia article matches this ${label}.`;
@@ -882,10 +940,17 @@ function showPanel(): void {
 }
 
 function setHighlight(p: Props | null): void {
-  for (const id of ['polity-hl', 'society-hl', 'sub-hl']) {
+  for (const id of ['polity-hl', 'civilization-hl', 'sub-hl', 'soc-hl-route', 'soc-hl-zone', 'soc-hl-node']) {
     if (map.getLayer(id)) map.setFilter(id, NO_FEATURE);
   }
   if (!p) return;
+  if (activeLens === 'societies') {
+    const mine = (type: string): Filter => ['all', yearFilter(year), ['==', ['get', 'k'], p.k], ['==', ['get', 't'], type]];
+    if (map.getLayer('soc-hl-route')) map.setFilter('soc-hl-route', mine('r'));
+    if (map.getLayer('soc-hl-zone')) map.setFilter('soc-hl-zone', mine('z'));
+    if (map.getLayer('soc-hl-node')) map.setFilter('soc-hl-node', mine('n'));
+    return;
+  }
   const id = p.k >= SUB_K ? 'sub-hl' : highlightLayerOf(activeLens);
   if (id && map.getLayer(id)) map.setFilter(id, highlightFilter(year, p.k));
 }
@@ -893,14 +958,15 @@ function setHighlight(p: Props | null): void {
 function updateSelection(): void {
   subLabels.setSelected(selectedKey);
   polityLabels.setSelected(selectedKey);
-  societyLabels.setSelected(selectedKey);
+  civilizationLabels.setSelected(selectedKey);
+  societyLabels.setSelected(activeLens === 'societies' ? selectedKey : -1);
 }
 
 /** Everything under the last click, so overlapping shapes can all be reached. */
 let overlapSet: Props[] = [];
 
-// ---- Where you stand (societies) -------------------------------------------
-// Societies are not nested like polities. A person stands inside several peer
+// ---- Where you stand (civilizations) -------------------------------------------
+// Civilizations are not nested like polities. A person stands inside several peer
 // identities at once (a region, a people, a wider sphere) with no centre above
 // them, so every identity active at the clicked point is found by geometry,
 // whatever is drawn on top, how far the map is zoomed, or how faint a shape is.
@@ -908,7 +974,7 @@ interface Footprint {
   box: [number, number, number, number];
   polys: number[][][][];
 }
-let societyFootprints: Footprint[] = [];
+let civilizationFootprints: Footprint[] = [];
 
 function buildFootprints(features: MapFeature[]): Footprint[] {
   return features.map((feature) => {
@@ -942,11 +1008,11 @@ function inRing(ring: number[][], x: number, y: number): boolean {
   return inside;
 }
 
-/** Every society active in `atYear` whose footprint contains the point, local first. */
+/** Every civilization active in `atYear` whose footprint contains the point, local first. */
 function standingAt(lng: number, lat: number, atYear: number): Props[] {
   const found: Props[] = [];
-  societyFootprints.forEach((foot, index) => {
-    const p = societyProps[index];
+  civilizationFootprints.forEach((foot, index) => {
+    const p = civilizationProps[index];
     if (!p || p.s > atYear || p.e < atYear) return;
     const [minX, minY, maxX, maxY] = foot.box;
     if (lng < minX || lng > maxX || lat < minY || lat > maxY) return;
@@ -982,13 +1048,13 @@ function renderOthers(current: Props): void {
   pOthersList.replaceChildren();
   const others = overlapSet.filter((item) => item.k !== current.k);
   pOthers.hidden = others.length === 0;
-  const societies = activeLens === 'societies';
-  const provinces = !societies && others.length > 0 && current.k < SUB_K && others.every((item) => item.k >= SUB_K);
-  pOthersHead.textContent = societies ? 'Where you stand · peer identities' : provinces ? 'Provinces (approximate)' : 'Also here';
+  const civilizations = activeLens === 'civilizations';
+  const provinces = !civilizations && others.length > 0 && current.k < SUB_K && others.every((item) => item.k >= SUB_K);
+  pOthersHead.textContent = activeLens === 'societies' ? 'Networks here' : civilizations ? 'Where you stand · peer identities' : provinces ? 'Provinces (approximate)' : 'Also here';
   let tier = -1;
   for (const item of others) {
     const level = item.lv ?? 2;
-    if (societies && level !== tier) {
+    if (civilizations && level !== tier) {
       tier = level;
       const heading = document.createElement('span');
       heading.className = 'others-tier';
@@ -1012,7 +1078,7 @@ let lineages = new Map<string, Props[]>();
 
 function buildLineages(): void {
   lineages = new Map();
-  for (const p of societyProps) {
+  for (const p of civilizationProps) {
     if (!p.ln) continue;
     const list = lineages.get(p.ln);
     if (list) list.push(p);
@@ -1026,7 +1092,7 @@ function renderLineage(p: Props): void {
   const stages = p.ln ? lineages.get(p.ln) : undefined;
   pNote.hidden = !p.nt;
   pNote.textContent = p.nt ?? '';
-  if (activeLens !== 'societies' || !stages || stages.length < 2) {
+  if (activeLens !== 'civilizations' || !stages || stages.length < 2) {
     pLineage.hidden = true;
     return;
   }
@@ -1071,17 +1137,20 @@ function openPanel(p: Props): void {
   const ticket = resetPanel();
   const controller = panelAbort as AbortController;
 
+  const civilizations = activeLens === 'civilizations';
   const societies = activeLens === 'societies';
   const province = p.k >= SUB_K;
   pName.textContent = name;
   pName.title = name;
   pYears.textContent = province ? `Part of ${p.p} · ${p.era}` : fmtRange(p.s, p.e);
-  pKind.textContent = province ? 'Province' : societies ? 'Society' : p.g ? 'Realm' : 'Polity';
-  pSource.textContent = province ? 'Approximate borders' : societies ? 'Curated' : 'Cliopatria';
+  pKind.textContent = province ? 'Province' : civilizations ? 'Civilization' : societies ? 'Society' : p.g ? 'Realm' : 'Polity';
+  pSource.textContent = province ? 'Approximate borders' : civilizations || societies ? 'Curated' : 'Cliopatria';
   pFine.textContent = province
     ? 'Province borders: approximated from Natural Earth (public domain) inside Cliopatria shapes (CC BY 4.0) · Text: Wikipedia (CC BY-SA) · Modern map: OpenStreetMap (ODbL)'
     : societies
-    ? 'Footprints: curated approximations, see docs/SOCIETIES.md · Text: Wikipedia (CC BY-SA) · Modern map: OpenStreetMap (ODbL)'
+    ? 'Routes, hubs and areas: curated and schematic, see docs/SOCIETIES.md · Text: Wikipedia (CC BY-SA) · Modern map: OpenStreetMap (ODbL)'
+    : civilizations
+    ? 'Footprints: curated approximations, see docs/CIVILIZATIONS.md · Text: Wikipedia (CC BY-SA) · Modern map: OpenStreetMap (ODbL)'
     : 'Borders: Cliopatria (CC BY 4.0) · Text: Wikipedia (CC BY-SA) · Facts: Wikidata (CC0) · Modern map: OpenStreetMap (ODbL)';
   pSwatch.style.background = p.c;
   pSummary.textContent = 'Loading Wikipedia…';
@@ -1100,6 +1169,12 @@ function openPanel(p: Props): void {
   const extraFacts: WikiFact[] = [];
   if (societies) {
     if (p.kind) extraFacts.push({ label: 'Type', value: p.kind });
+    if (p.hubs) {
+      const list = p.hubs.split(', ');
+      extraFacts.push({ label: 'Connects', value: list.slice(0, 10).join(', ') + (list.length > 10 ? ' …' : '') });
+    }
+  } else if (civilizations) {
+    if (p.kind) extraFacts.push({ label: 'Type', value: p.kind });
     if (p.fam) extraFacts.push({ label: 'Languages', value: p.fam });
     if (p.fg) extraFacts.push({ label: 'Family group', value: p.fg });
   } else if (province) {
@@ -1107,8 +1182,8 @@ function openPanel(p: Props): void {
   } else if (p.m) {
     extraFacts.push({ label: 'Realm', value: p.m });
   }
-  if (qid && !societies && !p.g) void loadLeaders(qid, year, ticket);
-  if (qid && !societies) void loadSubdivisions(qid, ticket, controller.signal);
+  if (qid && !civilizations && !societies && !p.g) void loadLeaders(qid, year, ticket);
+  if (qid && !civilizations && !societies) void loadSubdivisions(qid, ticket, controller.signal);
   void loadPanel(rawTitle, qid, name, ticket, controller.signal, extraFacts);
 }
 
@@ -1245,15 +1320,17 @@ function updateLensButtons(): void {
 
 function setLens(next: Lens): void {
   if (next === activeLens) return;
+  if (next === 'civilizations' && !civilizationProps.length) return;
   if (next === 'societies' && !societyProps.length) return;
   if (next === 'biomes' && !biomeModel) return;
   closePanel();
   activeLens = next;
   const source = activeSourceId();
   if (map.getSource(source) && !map.isSourceLoaded(source)) {
-    showVeil(next === 'societies' ? 'Drawing societies…' : next === 'biomes' ? 'Drawing climate…' : 'Drawing borders…');
+    showVeil(next === 'civilizations' ? 'Drawing civilizations…' : next === 'societies' ? 'Drawing networks…' : next === 'biomes' ? 'Drawing climate…' : 'Drawing borders…');
   }
   polityLabels.clear();
+  civilizationLabels.clear();
   societyLabels.clear();
   biomeLabels.clear();
   setLensVisibility();
@@ -1364,7 +1441,7 @@ function failLoading(message: string): void {
 }
 
 function activeSourceId(): string {
-  return activeLens === 'polities' ? 'polities' : activeLens === 'societies' ? 'societies' : 'ocean';
+  return activeLens === 'polities' ? 'polities' : activeLens === 'civilizations' ? 'civilizations' : activeLens === 'societies' ? 'societies' : 'ocean';
 }
 
 /** Show the veil while a lens that has not drawn yet is being tiled. */
@@ -1387,7 +1464,7 @@ function checkSources(): void {
 
 map.on('load', async () => {
   try {
-    const [land, polityData, societyData, rivers, lakes, koppen, ecoBin, ecoMeta, ecoLines, ocean, subData] = await Promise.all([
+    const [land, polityData, civilizationData, societyData, rivers, lakes, koppen, ecoBin, ecoMeta, ecoLines, ocean, subData] = await Promise.all([
       getJson(`${BASE}data/land.geojson`),
       getJson<FeatureCollection>(`${BASE}data/polities.geojson`, (loaded, total) => {
         const megabytes = loaded / 1048576;
@@ -1401,7 +1478,11 @@ map.on('load', async () => {
           loadingProgress.style.width = '100%';
         }
       }),
-      getJson<FeatureCollection>(`${BASE}data/societies.geojson`).catch((error) => {
+      getJson<FeatureCollection>(`${BASE}data/civilizations.geojson`).catch((error) => {
+        console.error('Civilizations data:', error);
+        return null;
+      }),
+      getJson<SocietyData>(`${BASE}data/societies.geojson`).catch((error) => {
         console.error('Societies data:', error);
         return null;
       }),
@@ -1422,11 +1503,11 @@ map.on('load', async () => {
     loadingProgress.style.width = '100%';
 
     const polityFeatures = polityData.features;
-    const societyFeatures = societyData?.features ?? [];
+    const civilizationFeatures = civilizationData?.features ?? [];
     polityFeatures.forEach((feature, index) => {
       feature.properties.k = index;
     });
-    societyFeatures.forEach((feature, index) => {
+    civilizationFeatures.forEach((feature, index) => {
       feature.properties.k = index;
     });
     // Provinces: polygons get keys from SUB_K up; internal border lines (bd) carry none.
@@ -1441,12 +1522,14 @@ map.on('load', async () => {
       subProps.push(props);
     }
     polityProps = polityFeatures.map((feature) => feature.properties);
-    societyProps = societyFeatures.map((feature) => feature.properties);
-    societyFootprints = buildFootprints(societyFeatures);
+    civilizationProps = civilizationFeatures.map((feature) => feature.properties);
+    civilizationFootprints = buildFootprints(civilizationFeatures);
+    societyProps = societyData?.entities ?? [];
+    societyLabels.setFeatures(societyData?.labels ?? []);
     buildLineages();
     polityLabels.setFeatures(polityProps);
     subLabels.setFeatures(subProps);
-    societyLabels.setFeatures(societyProps);
+    civilizationLabels.setFeatures(civilizationProps);
 
     if (koppen && ecoBin && ecoMeta && ocean) {
       try {
@@ -1462,8 +1545,10 @@ map.on('load', async () => {
         button.title = message;
       }
     };
+    if (!civilizationProps.length) disable('civilizations', 'Civilizations data unavailable');
     if (!societyProps.length) disable('societies', 'Societies data unavailable');
     if (!biomeModel) disable('biomes', 'Biome data unavailable');
+    if (activeLens === 'civilizations' && !civilizationProps.length) activeLens = 'polities';
     if (activeLens === 'societies' && !societyProps.length) activeLens = 'polities';
     if (activeLens === 'biomes' && !biomeModel) activeLens = 'polities';
 
@@ -1474,9 +1559,13 @@ map.on('load', async () => {
       type: 'geojson',
       data: { type: 'FeatureCollection', features: polityFeatures } as GeoData,
     });
+    map.addSource('civilizations', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: civilizationFeatures } as GeoData,
+    });
     map.addSource('societies', {
       type: 'geojson',
-      data: { type: 'FeatureCollection', features: societyFeatures } as GeoData,
+      data: { type: 'FeatureCollection', features: societyData?.features ?? [] } as GeoData,
     });
     map.addSource('subdivisions', {
       type: 'geojson',
@@ -1501,15 +1590,15 @@ map.on('load', async () => {
       layout: { visibility: visible('polities') },
     });
     map.addLayer({
-      id: 'society-fill',
+      id: 'civilization-fill',
       type: 'fill',
-      source: 'societies',
+      source: 'civilizations',
       filter: yearFilter(year),
       paint: {
         'fill-color': ['get', 'c'],
         'fill-opacity': localFade(0.62),
       },
-      layout: { visibility: visible('societies') },
+      layout: { visibility: visible('civilizations') },
     });
 
     if (biomeModel && ocean) {
@@ -1665,36 +1754,100 @@ map.on('load', async () => {
     });
 
     map.addLayer({
-      id: 'society-casing',
+      id: 'civilization-casing',
       type: 'line',
-      source: 'societies',
+      source: 'civilizations',
       filter: yearFilter(year),
       paint: {
         'line-color': '#201811',
         'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.9, 4, 1.4, 9, 2.4],
         'line-opacity': localFade(0.26),
       },
-      layout: { ...roundLines, visibility: visible('societies') },
+      layout: { ...roundLines, visibility: visible('civilizations') },
     });
     map.addLayer({
-      id: 'society-line',
+      id: 'civilization-line',
       type: 'line',
-      source: 'societies',
+      source: 'civilizations',
       filter: yearFilter(year),
       paint: {
         'line-color': '#2a2118',
         'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.35, 4, 0.65, 9, 1.3],
         'line-opacity': localFade(0.6),
       },
+      layout: { ...roundLines, visibility: visible('civilizations') },
+    });
+    map.addLayer({
+      id: 'civilization-hl',
+      type: 'line',
+      source: 'civilizations',
+      filter: NO_FEATURE,
+      paint: { 'line-color': '#f6e7b8', 'line-width': 2.2, 'line-opacity': 0.95 },
+      layout: { 'line-join': 'round', visibility: visible('civilizations') },
+    });
+
+    // Societies: areas of presence, routes (solid on land, dashed at sea) and hubs.
+    const socYear = (type: string): Filter => ['all', yearFilter(year), ['==', ['get', 't'], type]];
+    map.addLayer({
+      id: 'soc-zone-fill', type: 'fill', source: 'societies', filter: socYear('z'),
+      paint: { 'fill-color': ['get', 'c'], 'fill-opacity': 0.32 },
+      layout: { visibility: visible('societies') },
+    });
+    map.addLayer({
+      id: 'soc-zone-line', type: 'line', source: 'societies', filter: socYear('z'),
+      paint: { 'line-color': ['get', 'c'], 'line-width': 1.6, 'line-dasharray': [3, 2], 'line-opacity': 0.95 },
       layout: { ...roundLines, visibility: visible('societies') },
     });
     map.addLayer({
-      id: 'society-hl',
-      type: 'line',
-      source: 'societies',
-      filter: NO_FEATURE,
-      paint: { 'line-color': '#f6e7b8', 'line-width': 2.2, 'line-opacity': 0.95 },
+      id: 'soc-route-casing', type: 'line', source: 'societies', filter: socYear('r'),
+      paint: {
+        'line-color': '#1d1710',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 1, 3, 5, 4.4, 9, 6],
+        'line-opacity': 0.55,
+      },
+      layout: { ...roundLines, visibility: visible('societies') },
+    });
+    map.addLayer({
+      id: 'soc-route', type: 'line', source: 'societies',
+      filter: ['all', yearFilter(year), ['==', ['get', 't'], 'r'], ['!', ['has', 'sea']]],
+      paint: { 'line-color': ['get', 'c'], 'line-width': ['interpolate', ['linear'], ['zoom'], 1, 1.6, 5, 2.6, 9, 4], 'line-opacity': 0.96 },
+      layout: { ...roundLines, visibility: visible('societies') },
+    });
+    map.addLayer({
+      id: 'soc-route-sea', type: 'line', source: 'societies',
+      filter: ['all', yearFilter(year), ['==', ['get', 't'], 'r'], ['has', 'sea']],
+      paint: {
+        'line-color': ['get', 'c'], 'line-width': ['interpolate', ['linear'], ['zoom'], 1, 1.6, 5, 2.6, 9, 4],
+        'line-opacity': 0.96, 'line-dasharray': [2, 1.6],
+      },
       layout: { 'line-join': 'round', visibility: visible('societies') },
+    });
+    map.addLayer({
+      id: 'soc-node', type: 'circle', source: 'societies', filter: socYear('n'),
+      paint: {
+        'circle-color': ['get', 'c'],
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, ['case', ['has', 'm'], 3.2, 2], 6, ['case', ['has', 'm'], 6.5, 4.2]],
+        'circle-stroke-color': '#1d1710', 'circle-stroke-width': 1.4,
+      },
+      layout: { visibility: visible('societies') },
+    });
+    map.addLayer({
+      id: 'soc-hl-zone', type: 'line', source: 'societies', filter: NO_FEATURE,
+      paint: { 'line-color': '#f6e7b8', 'line-width': 2.6, 'line-opacity': 0.95 },
+      layout: { 'line-join': 'round', visibility: visible('societies') },
+    });
+    map.addLayer({
+      id: 'soc-hl-route', type: 'line', source: 'societies', filter: NO_FEATURE,
+      paint: { 'line-color': '#f6e7b8', 'line-width': ['interpolate', ['linear'], ['zoom'], 1, 4, 5, 6, 9, 8], 'line-opacity': 0.5 },
+      layout: { ...roundLines, visibility: visible('societies') },
+    });
+    map.addLayer({
+      id: 'soc-hl-node', type: 'circle', source: 'societies', filter: NO_FEATURE,
+      paint: {
+        'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': '#f6e7b8', 'circle-stroke-width': 2.2,
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 1, ['case', ['has', 'm'], 6, 4.5], 6, ['case', ['has', 'm'], 10, 7.5]],
+      },
+      layout: { visibility: visible('societies') },
     });
 
     map.on('click', (event) => {
@@ -1702,7 +1855,7 @@ map.on('load', async () => {
         openBiomePanel(event.lngLat.lng, event.lngLat.lat);
         return;
       }
-      if (activeLens === 'societies') {
+      if (activeLens === 'civilizations') {
         const stack = standingAt(event.lngLat.lng, event.lngLat.lat, year);
         if (!stack.length) {
           closePanel();
@@ -1710,6 +1863,30 @@ map.on('load', async () => {
         }
         overlapSet = stack;
         openPanel(pickStanding(stack));
+        return;
+      }
+      if (activeLens === 'societies') {
+        const pad = 7;
+        const box: [maplibregl.PointLike, maplibregl.PointLike] = [
+          [event.point.x - pad, event.point.y - pad], [event.point.x + pad, event.point.y + pad],
+        ];
+        const found = map.queryRenderedFeatures(box, {
+          layers: ['soc-node', 'soc-route', 'soc-route-sea', 'soc-zone-fill'],
+        });
+        // Nodes first, then routes, then zones; one entry per network.
+        const rank: Record<string, number> = { n: 0, r: 1, z: 2 };
+        found.sort((a, b) => rank[(a.properties as { t: string }).t] - rank[(b.properties as { t: string }).t]);
+        const stack: Props[] = [];
+        for (const hit of found) {
+          const entity = societyProps[(hit.properties as { k: number }).k];
+          if (entity && !stack.includes(entity)) stack.push(entity);
+        }
+        if (!stack.length) {
+          closePanel();
+          return;
+        }
+        overlapSet = stack;
+        openPanel(stack[0]);
         return;
       }
       const fill = fillLayerOf(activeLens);
@@ -1743,7 +1920,15 @@ map.on('load', async () => {
       overlapSet = ordered;
       if (ordered.length) openPanel(ordered[0]);
     });
-    for (const lens of ['polities', 'societies'] as Lens[]) {
+    for (const layer of ['soc-node', 'soc-route', 'soc-route-sea', 'soc-zone-fill']) {
+      map.on('mousemove', layer, () => {
+        if (activeLens === 'societies') map.getCanvas().style.cursor = 'pointer';
+      });
+      map.on('mouseleave', layer, () => {
+        if (activeLens === 'societies') map.getCanvas().style.cursor = '';
+      });
+    }
+    for (const lens of ['polities', 'civilizations'] as Lens[]) {
       const layer = fillLayerOf(lens) as string;
       map.on('mousemove', layer, () => {
         if (lens === activeLens) map.getCanvas().style.cursor = 'pointer';

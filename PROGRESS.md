@@ -46,6 +46,11 @@
 - **Provinces inside big polities** are drawn on the map (same colour as the parent, dashed internal borders, own labels from zoom 3.4, clickable with Wikipedia panel): Roman Empire, Achaemenid, Sasanian, Ottoman, Han, Tang, Ming, Qing, Mughal, British Raj. Built from modern Natural Earth boundaries, so approximate. See `docs/SUBDIVISIONS.md`. The panel list of Wikidata subdivisions stays for polities that have them.
 - **Help button** (top right, "?") now holds the sources and a short how-to; the footer credits line is gone.
 
+### Civilizations rename and new Societies lens (3 November 2026)
+- **Renamed** the old Societies lens to **Civilizations** (sociocultural belonging and ancestry; room for haplogroup layers later). Code, data (`public/data/civilizations.geojson`, `data/civilizations_*.py`, `npm run data:civilizations`), docs (`docs/CIVILIZATIONS.md`). Old links with `lens=societies` now open the new lens.
+- **New Societies lens**: de facto networks as routes (solid land, dashed sea), hubs and zones, ~40 curated networks from Uruk colonies to the Comintern, coloured by kind with a live legend. Click a hub, route or zone for the network panel (Type, Connects, "Networks here" chips). Data in `data/societies_data.py`, built by `data/build-societies.py`. See `docs/SOCIETIES.md`.
+- Label engine now includes the pixel offset (`oy`) in its collision boxes.
+
 ## Known rough edges
 - Ecoregions are modern in every year; only the Köppen half of a biome label changes with time.
 - Initial load downloads and parses the 25 MB border GeoJSON: several seconds on slow machines. Fix later with vector tiles (PMTiles) or per-era files.
@@ -57,7 +62,8 @@
 - `public/data/land.geojson` stores Afro-Eurasia in a frame shifted by -360 degrees (MapLibre draws it fine). The Python tools normalise it in `geo_labels.load_land`; the cleaner fix is in `data/build-land.mjs`.
 
 ## Next
-- **Planned (parked):** rename Societies to Civilizations (sociocultural, ancestry) and add a new Societies lens for de facto control networks, trade routes, communities and factions. See `docs/PLAN-LENSES.md`.
+- Grow Societies: more networks (Americas, Africa, Pacific), weighted edges, modern parties and factions.
+- Haplogroup layer for Civilizations (open ancient-DNA data only, with uncertainty).
 - Check the new panel features live (flag choice, infobox parsing on odd articles, subdivision coverage) and tune the map-image filter in `src/wiki.ts`.
 - Check the Society Wikipedia titles and add more Americas and Oceania entries; consider a second-level split of the broad Indo-European entries.
 - Worldview lens (curated file).

@@ -876,7 +876,7 @@ a { color: var(--brass); }
   opacity: 0.55;
 }
 
-/* Panel figure: a flag, or a photograph of the biome or society */
+/* Panel figure: a flag, or a photograph of the biome or civilization */
 .figure { margin: 0 0 12px; }
 .figure img {
   display: block;
@@ -1008,3 +1008,17 @@ a { color: var(--brass); }
   .help { top: 58px; right: 8px; max-height: calc(100vh - 120px); }
   .help-btn { margin-left: auto; }
 }
+
+/* Societies: network titles sit above their route, hub names below their dot. */
+.poly-label.net-title {
+  font-size: inherit;
+  font-style: italic;
+  letter-spacing: 0.3px;
+  color: #ffe9b8;
+}
+.poly-label.net-hub {
+  font-weight: 600;
+  font-size: inherit;
+  color: #efe6cf;
+}
+.poly-label.net-hub:not(.major) { font-weight: 400; opacity: 0.92; }

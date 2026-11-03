@@ -1,4 +1,4 @@
-"""Shared helpers for building label anchors and colours (polities and societies).
+"""Shared helpers for building label anchors and colours (polities and civilizations).
 
 Needs: shapely >= 2.
 """

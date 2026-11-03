@@ -78,6 +78,7 @@ interface SocietyData {
   features: MapFeature[];
   entities: Props[];
   labels: Props[];
+  kinds: Record<string, string>;
 }
 
 interface FeatureCollection {
@@ -245,6 +246,18 @@ const localFade = (full: number): maplibregl.ExpressionSpecification => [
 ];
 const NO_FEATURE: Filter = ['==', ['get', 'k'], -1];
 
+/** Societies: kinds switched off in the legend (kind name), and the colour of each kind. */
+const hiddenKinds = new Set<string>();
+let socKinds: Record<string, string> = {};
+/** Year, element type and the legend's hidden kinds, as one filter. */
+const socFilter = (value: number, type: string, ...extra: Filter[]): Filter => {
+  const hidden = [...hiddenKinds].map((kind) => socKinds[kind]).filter(Boolean);
+  return [
+    'all', yearFilter(value), ['==', ['get', 't'], type], ...extra,
+    ...(hidden.length ? [['!', ['in', ['get', 'c'], ['literal', hidden]]] as Filter] : []),
+  ];
+};
+
 const YEAR_FILTERS: Record<string, (value: number) => Filter> = {
   'polity-fill': leafFilter,
   'polity-line': leafFilter,
@@ -255,12 +268,12 @@ const YEAR_FILTERS: Record<string, (value: number) => Filter> = {
   'civilization-fill': yearFilter,
   'civilization-casing': yearFilter,
   'civilization-line': yearFilter,
-  'soc-zone-fill': (value) => ['all', yearFilter(value), ['==', ['get', 't'], 'z']],
-  'soc-zone-line': (value) => ['all', yearFilter(value), ['==', ['get', 't'], 'z']],
-  'soc-route-casing': (value) => ['all', yearFilter(value), ['==', ['get', 't'], 'r']],
-  'soc-route': (value) => ['all', yearFilter(value), ['==', ['get', 't'], 'r'], ['!', ['has', 'sea']]],
-  'soc-route-sea': (value) => ['all', yearFilter(value), ['==', ['get', 't'], 'r'], ['has', 'sea']],
-  'soc-node': (value) => ['all', yearFilter(value), ['==', ['get', 't'], 'n']],
+  'soc-zone-fill': (value) => socFilter(value, 'z'),
+  'soc-zone-line': (value) => socFilter(value, 'z'),
+  'soc-route-casing': (value) => socFilter(value, 'r'),
+  'soc-route': (value) => socFilter(value, 'r', ['!', ['has', 'sea']]),
+  'soc-route-sea': (value) => socFilter(value, 'r', ['has', 'sea']),
+  'soc-node': (value) => socFilter(value, 'n'),
 };
 
 const LENS_LAYERS: Record<Lens, string[]> = {
@@ -315,6 +328,7 @@ const societyLabels = new LabelLayer<Props>(map, (p) => {
   overlapSet = [entity, ...stack.filter((item) => item.k !== entity.k)];
   openPanel(entity);
 }, 3);
+societyLabels.suppress = (f) => [...hiddenKinds].some((kind) => socKinds[kind] === f.c);
 // Ecoregion patches are often thin strips with long names, so let names overhang them.
 const biomeLabels = new LabelLayer<EcoPatch>(map, (patch) => openBiomePanel(patch.lx, patch.ly), 2.2);
 
@@ -366,7 +380,7 @@ function renderLegend(): void {
   legend.hidden = false;
 
   if (activeLens === 'societies') {
-    legendTitle.textContent = 'Kind of network';
+    legendTitle.textContent = 'Kinds · click to filter';
     const present = new Map<string, { colour: string; count: number }>();
     for (const p of societyProps) {
       if (p.s > year || p.e < year || !p.kind) continue;
@@ -374,9 +388,13 @@ function renderLegend(): void {
       if (entry) entry.count++;
       else present.set(p.kind, { colour: p.c, count: 1 });
     }
-    for (const [name, { colour, count }] of [...present].sort((a, b) => b[1].count - a[1].count)) {
-      const row = document.createElement('div');
-      row.className = 'legend-row';
+    // Hidden kinds stay listed (dimmed) even when none is active this year.
+    for (const kind of hiddenKinds) if (!present.has(kind)) present.set(kind, { colour: socKinds[kind] ?? '#888', count: 0 });
+    for (const [name, { colour, count }] of [...present].sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))) {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'legend-row legend-pick' + (hiddenKinds.has(name) ? ' off' : '');
+      row.setAttribute('aria-pressed', String(!hiddenKinds.has(name)));
       const chip = document.createElement('i');
       chip.style.background = colour;
       const label = document.createElement('span');
@@ -384,7 +402,19 @@ function renderLegend(): void {
       const total = document.createElement('em');
       total.textContent = String(count);
       row.append(chip, label, total);
+      row.addEventListener('click', () => toggleKind(name));
       legendBody.append(row);
+    }
+    if (hiddenKinds.size) {
+      const all = document.createElement('button');
+      all.type = 'button';
+      all.className = 'legend-all';
+      all.textContent = 'Show all kinds';
+      all.addEventListener('click', () => {
+        hiddenKinds.clear();
+        applySocietyKinds();
+      });
+      legendBody.append(all);
     }
     if (!present.size) legendBody.textContent = 'No networks are mapped for this year.';
     return;
@@ -413,6 +443,21 @@ function renderLegend(): void {
     }
     if (!present.size) legendBody.textContent = 'No civilizations are mapped for this year.';
   }
+}
+
+function toggleKind(kind: string): void {
+  if (hiddenKinds.has(kind)) hiddenKinds.delete(kind);
+  else hiddenKinds.add(kind);
+  applySocietyKinds();
+}
+
+/** Re-filter the Societies layers and labels after the legend changes. */
+function applySocietyKinds(): void {
+  for (const id of Object.keys(YEAR_FILTERS)) {
+    if (id.startsWith('soc-') && map.getLayer(id)) map.setFilter(id, YEAR_FILTERS[id](year));
+  }
+  societyLabels.setYear(year, true);
+  renderLegend();
 }
 
 legendToggle.addEventListener('click', () => {
@@ -1525,6 +1570,7 @@ map.on('load', async () => {
     civilizationProps = civilizationFeatures.map((feature) => feature.properties);
     civilizationFootprints = buildFootprints(civilizationFeatures);
     societyProps = societyData?.entities ?? [];
+    socKinds = societyData?.kinds ?? {};
     societyLabels.setFeatures(societyData?.labels ?? []);
     buildLineages();
     polityLabels.setFeatures(polityProps);
@@ -1790,7 +1836,7 @@ map.on('load', async () => {
     const socYear = (type: string): Filter => ['all', yearFilter(year), ['==', ['get', 't'], type]];
     map.addLayer({
       id: 'soc-zone-fill', type: 'fill', source: 'societies', filter: socYear('z'),
-      paint: { 'fill-color': ['get', 'c'], 'fill-opacity': 0.32 },
+      paint: { 'fill-color': ['get', 'c'], 'fill-opacity': 0.22 },
       layout: { visibility: visible('societies') },
     });
     map.addLayer({

@@ -633,6 +633,13 @@ a { color: var(--brass); }
   #ticks span { font-size: 9px; }
   }
 
+@media (max-width: 520px) {
+  /* Four lenses need the room. */
+  .brand { display: none; }
+  .lens-switch { flex: 1 1 auto; min-width: 0; }
+  .lens-btn { flex: 1 1 auto; padding: 5px 4px; font-size: 9px; letter-spacing: 0.4px; }
+}
+
 @media (max-width: 420px) {
   #year-label { font-size: 23px; }
   .speed select { padding: 4px 5px; font-size: 11px; }
@@ -1022,3 +1029,27 @@ a { color: var(--brass); }
   color: #efe6cf;
 }
 .poly-label.net-hub:not(.major) { font-weight: 400; opacity: 0.92; }
+
+/* Societies legend: rows are toggles. */
+.legend-pick {
+  width: 100%;
+  background: none;
+  border: 0;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+.legend-pick:hover span { color: var(--brass-lt); }
+.legend-pick.off { opacity: 0.38; }
+.legend-pick.off span { text-decoration: line-through; }
+.legend-all {
+  margin-top: 4px;
+  padding: 0;
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: 11px;
+  color: var(--brass-lt);
+  cursor: pointer;
+  text-decoration: underline;
+}

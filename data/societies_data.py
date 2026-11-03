@@ -5,6 +5,10 @@ Polity). It is who actually moves things and holds things together, whatever the
 says: trade networks, logistics and communications systems, companies, factions and parties,
 diasporas and communities, pilgrimage systems, clandestine networks.
 
+In the sense of Marxist and world-society theory, a society is any group held together by a
+network of exchange, communication and organisation: a state, an NGO, a party, an ethnic or
+religious group, a company, a diaspora. Kinds are descriptive, not exclusive.
+
 Each entity is drawn from three kinds of element:
     routes   lines between hubs (land or sea)           R([(lng, lat), ...], sea=False)
     nodes    hubs: cities, ports, posts, bases           ('Name', lng, lat) or ('Name', lng, lat, 'major')
@@ -18,9 +22,11 @@ KINDS = {
     'Trade network': '#e0a63a',
     'Company or maritime system': '#5b95d6',
     'Communications and logistics': '#52bcd0',
+    'State or confederacy': '#c2b280',
     'Faction or party': '#d9645c',
-    'Community or diaspora': '#a982d6',
-    'Pilgrimage': '#6fc47e',
+    'Community, diaspora or ethnic group': '#a982d6',
+    'Religious network': '#6fc47e',
+    'NGO or international organisation': '#e58bb8',
     'Clandestine network': '#d8d4c8',
 }
 
@@ -31,8 +37,10 @@ def R(pts, sea=False, s=None, e=None):
     return {'pts': pts, 'sea': sea, 'e': e, 's': s}
 
 
-def Z(pts, s=None, e=None):
-    return {'pts': pts, 's': s, 'e': e}
+def Z(pts=None, s=None, e=None, poly=None, countries=None):
+    """An area. Give it as a polygon (pts), as the shape of a historic polity (poly='Inca Empire',
+    the largest Cliopatria record inside the years), or as a union of modern countries."""
+    return {'pts': pts, 's': s, 'e': e, 'poly': poly, 'countries': countries}
 
 
 def blob(lon, lat, rx, ry, n=14):
@@ -62,11 +70,6 @@ net('Indus–Mesopotamia trade (Meluhha)', 'Trade network', -2600, -1900, 'Indus
             R([(72.25, 22.5), (69.5, 22.0), (66.0, 24.0), (62.0, 24.8)], sea=True)],
     nodes=[('Mohenjo-daro', 68.1, 27.3, 'major'), ('Lothal', 72.25, 22.5), ('Dilmun (Bahrain)', 50.55, 26.2), ('Magan (Oman)', 56.5, 23.6), ('Ur', 46.1, 30.96, 'major')])
 
-net('Old Assyrian merchant colonies', 'Community or diaspora', -1950, -1750, 'Kültepe',
-    'Assyrian merchants from Assur ran tin and textile caravans to a chain of trading quarters (karum) in Anatolia.',
-    routes=[R([(43.26, 35.46), (40.5, 37.3), (38.5, 37.9), (35.64, 38.85)])],
-    nodes=[('Assur', 43.26, 35.46, 'major'), ('Kanesh (Kültepe)', 35.64, 38.85, 'major'), ('Purushanda', 33.6, 38.3), ('Hattusa', 34.6, 40.0)])
-
 net('Phoenician and Carthaginian network', 'Trade network', -1200, -146, 'Phoenicia',
     'Tyrian and later Carthaginian ports strung across the Mediterranean to the Atlantic coast of Iberia and Morocco.',
     routes=[R([(35.2, 33.27), (33.63, 34.92), (27.0, 35.4), (18.0, 35.6), (14.5, 35.9), (10.32, 36.85), (5.0, 37.2), (-2.0, 36.5), (-6.29, 36.53)], sea=True),
@@ -92,11 +95,6 @@ net('Incense Route', 'Trade network', -900, 300, 'Incense Route',
                (37.9, 26.6), (36.5, 28.5), (35.45, 30.3), (34.45, 31.5)])],
     nodes=[('Sumhuram', 54.4, 17.0), ('Shabwa', 47.0, 15.0), ('Marib', 45.3, 15.45, 'major'), ('Najran', 44.1, 17.5), ('Mecca', 39.8, 21.4),
            ('Dedan (AlUla)', 37.9, 26.6), ('Petra', 35.45, 30.3, 'major'), ('Gaza', 34.45, 31.5)])
-
-net('Amber Road', 'Trade network', -1500, 500, 'Amber Road',
-    'Baltic amber carried south along the Vistula and the Morava to the Adriatic and Rome.',
-    routes=[R([(18.65, 54.35), (18.8, 52.9), (18.1, 51.76), (17.0, 50.0), (16.86, 48.11), (14.5, 46.05), (13.37, 45.77)])],
-    nodes=[('Baltic coast', 18.65, 54.35), ('Kalisz', 18.1, 51.76), ('Carnuntum', 16.86, 48.11, 'major'), ('Emona', 14.5, 46.05), ('Aquileia', 13.37, 45.77, 'major')])
 
 # ---- Classical and medieval ---------------------------------------------------------------------------
 net('Royal Road', 'Communications and logistics', -500, -330, 'Royal Road',
@@ -126,27 +124,13 @@ net('Indian Ocean trade network', 'Trade network', -100, 1500, 'Indian Ocean tra
            ('Muscat', 58.4, 23.6), ('Hormuz', 56.5, 27.1), ('Basra', 47.8, 30.5), ('Aden', 45.0, 12.8, 'major'), ('Jeddah', 39.2, 21.5), ('Mogadishu', 45.3, 2.05),
            ('Mombasa', 39.7, -4.05), ('Kilwa', 39.5, -8.95)])
 
-net('Sogdian merchant network', 'Community or diaspora', 400, 800, 'Sogdians',
-    'Sogdian traders settled in trading colonies from Samarkand to Chang\'an and ran much of the Silk Road\'s caravan trade.',
-    routes=[R([(66.97, 39.65), (67.6, 39.5), (71.4, 42.5), (75.2, 42.8), (80.6, 44.0), (89.2, 42.9), (94.7, 40.1), (103.8, 36.1), (106.2, 38.5), (108.9, 34.3), (112.45, 34.62)])],
-    nodes=[('Samarkand', 66.97, 39.65, 'major'), ('Panjakent', 67.6, 39.5), ('Suyab', 75.2, 42.8), ('Turpan', 89.2, 42.9), ('Dunhuang', 94.7, 40.1),
-           ('Guyuan', 106.2, 36.0), ("Chang'an", 108.9, 34.3, 'major'), ('Luoyang', 112.45, 34.62)])
-
-net('Hajj caravans', 'Pilgrimage', 650, 1900, 'Hajj',
+net('Hajj caravans', 'Religious network', 650, 1900, 'Hajj',
     'Annual pilgrim caravans from Damascus, Cairo, Baghdad and Yemen converging on Mecca, with organised water stops and escorts.',
     routes=[R([(36.3, 33.5), (35.74, 30.2), (36.57, 28.38), (39.6, 24.5), (39.83, 21.42)]),
             R([(31.24, 30.04), (33.5, 29.5), (35.0, 28.8), (37.0, 27.5), (39.6, 24.5)]),
             R([(44.4, 33.3), (44.4, 32.0), (42.5, 27.0), (40.5, 25.0), (39.6, 24.5)]),
             R([(44.2, 15.35), (43.0, 18.0), (41.5, 20.0), (39.83, 21.42)])],
     nodes=[('Damascus', 36.3, 33.5, 'major'), ('Cairo', 31.24, 30.04, 'major'), ('Kufa', 44.4, 32.0), ('Sana\'a', 44.2, 15.35), ('Medina', 39.6, 24.5, 'major'), ('Mecca', 39.83, 21.42, 'major')])
-
-net('Radhanite merchants', 'Community or diaspora', 800, 1000, 'Radhanite',
-    'Jewish merchants who, in the account of the Abbasid postmaster Ibn Khordadbeh, linked the Frankish lands, the caliphate, India and China.',
-    routes=[R([(3.0, 43.18), (5.0, 40.0), (10.0, 37.5), (20.0, 34.0), (29.9, 31.2)], sea=True),
-            R([(29.9, 31.2), (31.24, 30.04), (36.3, 33.5), (44.4, 33.3), (47.8, 30.5)]),
-            R([(44.4, 33.3), (51.4, 35.6), (62.2, 37.6), (75.99, 39.47), (94.7, 40.1), (108.9, 34.3)]),
-            R([(47.8, 30.5), (56.5, 27.1), (67.0, 24.85), (75.8, 11.25)], sea=True)],
-    nodes=[('Narbonne', 3.0, 43.18), ('Alexandria', 29.9, 31.2), ('Baghdad', 44.4, 33.3, 'major'), ('Basra', 47.8, 30.5), ('Debal', 67.0, 24.85), ("Chang'an", 108.9, 34.3)])
 
 net('Trans-Saharan trade', 'Trade network', 300, 1900, 'Trans-Saharan trade',
     'Camel caravans carrying gold, salt, cloth and people between the Maghreb, Egypt and the Sahel.',
@@ -170,21 +154,6 @@ net('Varangian and Volga river routes', 'Trade network', 750, 1100, 'Trade route
             R([(32.3, 59.99), (36.0, 58.5), (40.0, 57.0), (49.05, 54.9), (47.9, 46.35), (51.0, 41.5), (54.4, 36.8), (51.4, 35.6), (44.4, 33.3)])],
     nodes=[('Birka', 17.54, 59.34), ('Staraya Ladoga', 32.3, 59.99), ('Novgorod', 31.27, 58.52, 'major'), ('Smolensk', 32.04, 54.78), ('Kyiv', 30.52, 50.45, 'major'),
            ('Constantinople', 28.98, 41.0, 'major'), ('Bolghar', 49.05, 54.9), ('Itil', 47.9, 46.35), ('Baghdad', 44.4, 33.3)])
-
-net('Camino de Santiago', 'Pilgrimage', 900, 1600, 'Camino de Santiago',
-    'Pilgrim roads across France and northern Spain to the shrine of St James, with hospices, bridges and market towns along them.',
-    routes=[R([(-1.32, 43.01), (-1.64, 42.82), (-2.45, 42.47), (-3.7, 42.34), (-5.57, 42.6), (-6.06, 42.46), (-7.4, 42.78), (-8.54, 42.88)]),
-            R([(2.35, 48.85), (0.69, 47.39), (-0.58, 44.84), (-1.24, 43.16), (-1.32, 43.01)]),
-            R([(3.88, 45.04), (2.4, 44.6), (1.08, 44.1), (-1.24, 43.16)])],
-    nodes=[('Santiago de Compostela', -8.54, 42.88, 'major'), ('León', -5.57, 42.6), ('Burgos', -3.7, 42.34), ('Pamplona', -1.64, 42.82),
-           ('Le Puy', 3.88, 45.04), ('Tours', 0.69, 47.39), ('Paris', 2.35, 48.85)])
-
-net('Lombard League', 'Faction or party', 1167, 1250, 'Lombard League',
-    'North Italian communes bound by oath against the emperor, the political federation behind the Guelph cause.',
-    routes=[R([(9.19, 45.46), (10.22, 45.54), (10.99, 45.44), (11.88, 45.41), (12.24, 45.67)]),
-            R([(9.19, 45.46), (9.69, 45.05), (10.79, 45.16)])],
-    nodes=[('Milan', 9.19, 45.46, 'major'), ('Brescia', 10.22, 45.54), ('Verona', 10.99, 45.44), ('Padua', 11.88, 45.41), ('Treviso', 12.24, 45.67),
-           ('Piacenza', 9.69, 45.05), ('Mantua', 10.79, 45.16), ('Bologna', 11.34, 44.5)])
 
 net('Hanseatic League', 'Trade network', 1241, 1669, 'Hanseatic League',
     'A league of north German and Baltic trading towns with walled trading posts (kontore) from London to Novgorod.',
@@ -218,19 +187,6 @@ net('Mongol yam relay system', 'Communications and logistics', 1206, 1368, 'Yam 
             R([(68.3, 42.9), (66.97, 39.65), (62.2, 37.6), (55.0, 36.5), (46.3, 38.1)])],
     nodes=[('Khanbaliq (Beijing)', 116.4, 39.9, 'major'), ('Karakorum', 102.8, 47.2, 'major'), ('Almaliq', 80.6, 44.0), ('Otrar', 68.3, 42.9), ('Urgench', 59.2, 42.3),
            ('Sarai', 46.0, 48.7, 'major'), ('Tabriz', 46.3, 38.1, 'major'), ('Moscow', 37.6, 55.75)])
-
-net('Guelph and Ghibelline factions', 'Faction or party', 1200, 1400, 'Guelphs and Ghibellines',
-    'The two great factional blocs of Italian city politics, for or against imperial authority, cutting across cities and families.',
-    nodes=[('Florence (Guelph)', 11.25, 43.77, 'major'), ('Bologna (Guelph)', 11.34, 44.5), ('Lucca (Guelph)', 10.5, 43.84), ('Pisa (Ghibelline)', 10.4, 43.72, 'major'),
-           ('Siena (Ghibelline)', 11.33, 43.32), ('Verona (Ghibelline)', 10.99, 45.44), ('Pavia (Ghibelline)', 9.16, 45.18)])
-
-net('Armenian merchant network (New Julfa)', 'Community or diaspora', 1600, 1750, 'New Julfa',
-    'A family-firm diaspora operating from Isfahan\'s Armenian quarter to Venice, Amsterdam, Surat, Madras and Manila.',
-    routes=[R([(51.65, 32.65), (44.0, 36.0), (37.16, 36.2), (27.14, 38.42), (10.31, 43.55)]),
-            R([(10.31, 43.55), (4.9, 52.37)], sea=True),
-            R([(51.65, 32.65), (56.27, 27.19), (65.0, 22.0), (72.83, 21.17), (80.27, 13.08), (100.0, 2.0), (120.98, 14.6)], sea=True)],
-    nodes=[('New Julfa (Isfahan)', 51.65, 32.65, 'major'), ('Aleppo', 37.16, 36.2), ('Izmir', 27.14, 38.42), ('Livorno', 10.31, 43.55), ('Amsterdam', 4.9, 52.37, 'major'),
-           ('Surat', 72.83, 21.17), ('Madras', 80.27, 13.08), ('Manila', 120.98, 14.6)])
 
 net('Qhapaq Ñan (Inca road system)', 'Communications and logistics', 1400, 1535, 'Inca road system',
     'Some 40,000 km of imperial roads with relay runners (chasqui), storehouses and way stations linking Cusco to the four quarters.',
@@ -291,45 +247,7 @@ net('Transatlantic slave trade', 'Trade network', 1501, 1866, 'Atlantic slave tr
     nodes=[('Liverpool', -3.0, 53.4), ('Gorée', -17.4, 14.7), ('Elmina', -1.35, 5.08, 'major'), ('Luanda', 13.2, -8.8, 'major'), ('Salvador', -38.5, -12.97, 'major'),
            ('Rio de Janeiro', -43.2, -22.9), ('Bridgetown', -59.6, 13.1), ('Kingston', -76.8, 17.97), ('Charleston', -79.93, 32.78), ('Havana', -82.4, 23.1)])
 
-net('Barbary corsair network', 'Clandestine network', 1500, 1830, 'Barbary pirates',
-    'Corsair fleets based in Algiers, Tunis, Tripoli and Salé that raided shipping and coasts and ran a slave and ransom economy.',
-    routes=[R([(3.06, 36.75), (2.7, 39.6), (8.0, 40.0)], sea=True), R([(3.06, 36.75), (-5.0, 36.2), (-12.0, 45.0), (-6.0, 50.0), (-9.4, 51.5)], sea=True),
-            R([(-6.8, 34.05), (-10.0, 40.0), (-14.0, 50.0), (-20.0, 63.4)], sea=True), R([(13.19, 32.89), (15.0, 36.0), (14.0, 40.0)], sea=True)],
-    nodes=[('Algiers', 3.06, 36.75, 'major'), ('Tunis', 10.17, 36.8), ('Tripoli', 13.19, 32.89), ('Salé', -6.8, 34.05, 'major'), ('Baltimore (Ireland)', -9.4, 51.5)])
-
-net('Golden Age of Piracy', 'Clandestine network', 1650, 1730, 'Golden Age of Piracy',
-    'Pirate havens and the "Pirate Round" from the Caribbean to the Indian Ocean, held together by crews, fences and corrupt ports.',
-    routes=[R([(-77.35, 25.05), (-65.0, 30.0), (-30.0, 20.0), (-15.0, 0.0), (-5.0, -20.0), (18.4, -34.4), (40.0, -28.0), (49.9, -16.9)], sea=True),
-            R([(49.9, -16.9), (60.0, 8.0), (43.4, 12.6)], sea=True), R([(-77.35, 25.05), (-76.84, 17.94), (-72.8, 20.05)], sea=True)],
-    nodes=[('Nassau', -77.35, 25.05, 'major'), ('Port Royal', -76.84, 17.94, 'major'), ('Tortuga', -72.8, 20.05), ('Île Sainte-Marie', 49.9, -16.9, 'major')])
-
-net('Maroon and quilombo communities', 'Community or diaspora', 1500, 1900, 'Maroons',
-    'Settlements of escaped enslaved people, from large quilombos to mountain and swamp strongholds, often trading and allying with neighbours.',
-    zones=[Z(blob(-36.0, -9.0, 0.6, 0.6), s=1605, e=1694), Z(blob(-76.6, 18.1, 0.5, 0.35)), Z(blob(-76.5, 36.6, 0.4, 0.35), s=1700, e=1865),
-           Z(blob(-75.2, 10.1, 0.3, 0.3), s=1599, e=1900), Z(blob(-54.9, 4.0, 0.8, 0.8), s=1700, e=1900)],
-    nodes=[('Palmares', -36.0, -9.0, 'major'), ('Blue Mountains', -76.6, 18.1), ('Great Dismal Swamp', -76.5, 36.6), ('San Basilio de Palenque', -75.2, 10.1), ('Saramaka', -54.9, 4.0)])
-
 # ---- Modern -------------------------------------------------------------------------------------------------
-net('Jacobin club network', 'Faction or party', 1789, 1794, 'Jacobin Club',
-    'A network of affiliated political clubs across France coordinated from the Paris Jacobin Club, at its height thousands of local societies.',
-    routes=[R([(2.35, 48.86), (4.83, 45.76)]), R([(2.35, 48.86), (-0.58, 44.84)]), R([(2.35, 48.86), (5.37, 43.3)]), R([(2.35, 48.86), (-1.55, 47.22)]),
-            R([(2.35, 48.86), (7.75, 48.58)]), R([(2.35, 48.86), (3.06, 50.63)]), R([(2.35, 48.86), (1.44, 43.6)]), R([(2.35, 48.86), (-4.49, 48.39)])],
-    nodes=[('Paris', 2.35, 48.86, 'major'), ('Lyon', 4.83, 45.76), ('Bordeaux', -0.58, 44.84), ('Marseille', 5.37, 43.3), ('Nantes', -1.55, 47.22), ('Strasbourg', 7.75, 48.58),
-           ('Lille', 3.06, 50.63), ('Toulouse', 1.44, 43.6), ('Brest', -4.49, 48.39)])
-
-net('Underground Railroad', 'Clandestine network', 1810, 1865, 'Underground Railroad',
-    'Networks of safe houses, guides and sympathisers that helped enslaved people escape to the northern states and Canada.',
-    routes=[R([(-85.76, 38.25), (-84.5, 39.1), (-83.0, 40.5), (-83.05, 42.33)]), R([(-84.5, 39.1), (-81.7, 41.5), (-83.1, 42.1)]),
-            R([(-76.6, 39.3), (-75.16, 39.95), (-74.0, 40.7), (-73.75, 42.65), (-79.05, 43.1)]),
-            R([(-91.4, 31.56), (-90.2, 35.0), (-90.2, 38.6), (-87.65, 41.88), (-83.05, 42.33)])],
-    nodes=[('Louisville', -85.76, 38.25), ('Cincinnati', -84.5, 39.1, 'major'), ('Detroit', -83.05, 42.33, 'major'), ('Philadelphia', -75.16, 39.95, 'major'),
-           ('Albany', -73.75, 42.65), ('Niagara', -79.05, 43.1, 'major'), ('Chicago', -87.65, 41.88), ('Baltimore', -76.6, 39.3)])
-
-net('Pony Express', 'Communications and logistics', 1860, 1861, 'Pony Express',
-    'A relay of riders and stations carrying mail between Missouri and California in about ten days.',
-    routes=[R([(-94.85, 39.77), (-98.97, 40.64), (-104.55, 42.2), (-108.9, 42.35), (-111.9, 40.76), (-119.77, 39.16), (-121.49, 38.58)])],
-    nodes=[('St. Joseph', -94.85, 39.77, 'major'), ('Fort Kearny', -98.97, 40.64), ('Fort Laramie', -104.55, 42.2), ('Salt Lake City', -111.9, 40.76), ('Sacramento', -121.49, 38.58, 'major')])
-
 net('Communist International (Comintern)', 'Faction or party', 1919, 1943, 'Communist International',
     'A Moscow-directed network of national communist parties, couriers and front organisations.',
     routes=[R([(37.6, 55.75), (13.4, 52.5)]), R([(37.6, 55.75), (2.35, 48.85)]), R([(37.6, 55.75), (121.47, 31.23)]), R([(37.6, 55.75), (-99.13, 19.43)]),
@@ -341,3 +259,6 @@ net('Chinese Communist base areas and Long March', 'Faction or party', 1927, 194
     routes=[R([(116.03, 25.88), (111.0, 26.0), (106.9, 27.7), (102.2, 29.9), (100.0, 32.0), (102.7, 32.2), (108.2, 36.9), (109.5, 36.6)], s=1934, e=1936)],
     zones=[Z(blob(116.0, 26.0, 1.2, 1.0), s=1931, e=1934), Z(blob(109.5, 36.6, 1.5, 1.2), s=1936, e=1948)],
     nodes=[('Ruijin (Jiangxi Soviet)', 116.03, 25.88, 'major'), ('Zunyi', 106.9, 27.7), ('Luding Bridge', 102.2, 29.9), ("Yan'an", 109.5, 36.6, 'major')])
+
+
+import societies_more  # noqa: E402,F401  (more networks, registered on import)

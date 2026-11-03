@@ -50,6 +50,7 @@
 - **Renamed** the old Societies lens to **Civilizations** (sociocultural belonging and ancestry; room for haplogroup layers later). Code, data (`public/data/civilizations.geojson`, `data/civilizations_*.py`, `npm run data:civilizations`), docs (`docs/CIVILIZATIONS.md`). Old links with `lens=societies` now open the new lens.
 - **New Societies lens**: de facto networks as routes (solid land, dashed sea), hubs and zones, ~40 curated networks from Uruk colonies to the Comintern, coloured by kind with a live legend. Click a hub, route or zone for the network panel (Type, Connects, "Networks here" chips). Data in `data/societies_data.py`, built by `data/build-societies.py`. See `docs/SOCIETIES.md`.
 - Label engine now includes the pixel offset (`oy`) in its collision boxes.
+- **Societies widened and tightened (same day).** Definition now follows Marxist and world-society theory: any big group held together by a logistical network (state, church, company, bloc, party, international body), controlling things on the ground. Niche networks pruned; 54 big ones kept. **Areas** added (from Cliopatria polity shapes, unions of modern countries, or hand polygons): Mongol, Inca, Roman, Achaemenid, Aztec, steppe confederations, Latin and Orthodox Christendom, Catholic Church, NATO, Warsaw Pact, EU, Chinese tributary system and others. Legend rows are filters. Mobile: brand hidden under 520px so all four lens buttons fit. See `docs/SOCIETIES.md`.
 
 ## Known rough edges
 - Ecoregions are modern in every year; only the Köppen half of a biome label changes with time.

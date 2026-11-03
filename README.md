@@ -5,7 +5,7 @@ Tier 1 (this version) is a Paradox-style political map of 3400 BCE to 2024 CE wi
 
 - **Polities:** who governed (states, empires, realms). Source: Cliopatria, cleaned so realms are not drawn on top of their own parts.
 - **Civilizations:** who lived there. A people held together by shared language and way of life, whatever state ruled them. See [docs/CIVILIZATIONS.md](docs/CIVILIZATIONS.md).
-- **Societies:** how things were held together de facto. Trade routes, logistics and post systems, companies, factions, parties, diasporas and pilgrimage networks, drawn as routes, hubs and zones. See [docs/SOCIETIES.md](docs/SOCIETIES.md).
+- **Societies:** who actually controls things on the ground. Big de facto networks of any kind (states and confederacies, churches, companies, blocs, parties, international organisations, trade and logistics systems), drawn as areas, routes and hubs. See [docs/SOCIETIES.md](docs/SOCIETIES.md).
 - **Biomes:** WWF-style ecoregions split by Köppen–Geiger climate class, with the climate shifted slightly through time (for example "Am North Western Ghats montane rain forests"). See [docs/BIOMES.md](docs/BIOMES.md).
 
 Live site: https://wesleymhare.github.io/Unity-of-Being/

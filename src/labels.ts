@@ -127,6 +127,7 @@ export class LabelLayer<T extends LabelProps> {
   private selectedKey = -1;
   private readonly placed = new Map<number, Placed>();
   private raf = 0;
+  private enabled = true;
   /** Labels stay hidden below this zoom. */
   minZoom = 0;
   /** Hide individual labels (used to drop a polity's name once its provinces are labelled). */
@@ -146,7 +147,7 @@ export class LabelLayer<T extends LabelProps> {
   setYear(year: number, render = true): void {
     this.year = year;
     this.refreshActive();
-    if (render) this.update();
+    if (render && this.enabled) this.update();
   }
 
   setSelected(key: number): void {
@@ -159,8 +160,18 @@ export class LabelLayer<T extends LabelProps> {
     this.placed.clear();
   }
 
+  /** A layer that is not on screen (another lens is active) never draws, even if a frame was already queued. */
+  setEnabled(on: boolean): void {
+    this.enabled = on;
+    if (!on) {
+      if (this.raf) cancelAnimationFrame(this.raf);
+      this.raf = 0;
+      this.clear();
+    }
+  }
+
   schedule(): void {
-    if (this.raf) return;
+    if (!this.enabled || this.raf) return;
     this.raf = requestAnimationFrame(() => {
       this.raf = 0;
       this.update();
@@ -173,6 +184,10 @@ export class LabelLayer<T extends LabelProps> {
   }
 
   update(): void {
+    if (!this.enabled) {
+      this.clear();
+      return;
+    }
     const canvas = this.map.getCanvas();
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;

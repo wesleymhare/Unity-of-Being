@@ -473,6 +473,8 @@ if (window.innerWidth < 760) {
 
 // ---- Year -------------------------------------------------------------------
 let yearRaf = 0;
+let lastYearApply = 0;
+const YEAR_APPLY_MS = 70;
 function setYear(next: number): void {
   year = clamp(Math.round(next), MIN_YEAR, MAX_YEAR);
 
@@ -487,7 +489,14 @@ function setYear(next: number): void {
   }
 
   if (yearRaf) return;
-  yearRaf = requestAnimationFrame(() => {
+  // Re-filtering the big layers is heavy, so while the year is being dragged or played, apply at most
+  // every YEAR_APPLY_MS; the last value always lands because the work reads `year` when it runs.
+  const wait = Math.max(0, YEAR_APPLY_MS - (performance.now() - lastYearApply));
+  const start = (): void => {
+    yearRaf = requestAnimationFrame(applyYear);
+  };
+  const applyYear = (): void => {
+    lastYearApply = performance.now();
     yearRaf = 0;
     slider.value = String(year);
     yearLabel.textContent = fmtYear(year);
@@ -507,7 +516,9 @@ function setYear(next: number): void {
     if (activeLens === 'biomes' && !panel.hidden && biomePoint) scheduleBiomePanel();
     if (!panel.hidden && panelQid && activeLens === 'polities') scheduleLeaderRefresh();
     scheduleHash();
-  });
+  };
+  if (wait > 0) yearRaf = window.setTimeout(start, wait);
+  else start();
 }
 
 let biomeLabelTimer = 0;
@@ -1370,20 +1381,29 @@ function setLens(next: Lens): void {
   if (next === 'biomes' && !biomeModel) return;
   closePanel();
   activeLens = next;
-  const source = activeSourceId();
-  if (map.getSource(source) && !map.isSourceLoaded(source)) {
-    showVeil(next === 'civilizations' ? 'Drawing civilizations…' : next === 'societies' ? 'Drawing networks…' : next === 'biomes' ? 'Drawing climate…' : 'Drawing borders…');
-  }
-  polityLabels.clear();
-  civilizationLabels.clear();
-  societyLabels.clear();
-  biomeLabels.clear();
+  syncLabelLayers();
   setLensVisibility();
   updateLensButtons();
   if (next === 'biomes') renderBiomes(true);
   setYear(year);
   activeLabels()?.schedule();
   scheduleHash();
+  // Veil only while the new lens really has nothing to show; otherwise make sure no old one lingers.
+  const source = activeSourceId();
+  if (map.getSource(source) && !map.isSourceLoaded(source)) {
+    showVeil(next === 'civilizations' ? 'Drawing civilizations…' : next === 'societies' ? 'Drawing networks…' : next === 'biomes' ? 'Drawing climate…' : 'Drawing borders…');
+  } else if (dataReady) {
+    finishLoading();
+  }
+}
+
+/** Only the active lens's label layers may draw; the others are cleared and refuse queued frames. */
+function syncLabelLayers(): void {
+  polityLabels.setEnabled(activeLens === 'polities');
+  subLabels.setEnabled(activeLens === 'polities');
+  civilizationLabels.setEnabled(activeLens === 'civilizations');
+  societyLabels.setEnabled(activeLens === 'societies');
+  biomeLabels.setEnabled(activeLens === 'biomes');
 }
 
 for (const button of lensButtons) {
@@ -1467,13 +1487,16 @@ async function getJson<T = unknown>(
 }
 
 let loadingDone = false;
+let loadingHideTimer = 0;
 let dataReady = false;
 function finishLoading(): void {
   if (loadingDone || !dataReady) return;
   loadingDone = true;
   loading.classList.add('hide');
   mapVeil.hidden = true;
-  window.setTimeout(() => {
+  if (loadingHideTimer) window.clearTimeout(loadingHideTimer);
+  loadingHideTimer = window.setTimeout(() => {
+    loadingHideTimer = 0;
     loading.hidden = true;
   }, 260);
 }
@@ -1491,6 +1514,9 @@ function activeSourceId(): string {
 
 /** Show the veil while a lens that has not drawn yet is being tiled. */
 function showVeil(message: string): void {
+  // A fade-out from an earlier lens switch must not hide this veil.
+  if (loadingHideTimer) window.clearTimeout(loadingHideTimer);
+  loadingHideTimer = 0;
   loadingDone = false;
   loading.hidden = false;
   loading.classList.remove('hide', 'error');
@@ -1599,6 +1625,7 @@ map.on('load', async () => {
     if (activeLens === 'biomes' && !biomeModel) activeLens = 'polities';
 
     map.on('sourcedata', checkSources);
+    map.on('idle', checkSources);
 
     map.addSource('land', { type: 'geojson', data: land as GeoData });
     map.addSource('polities', {
@@ -1997,6 +2024,7 @@ map.on('load', async () => {
     });
 
     updateLensButtons();
+    syncLabelLayers();
     setLensVisibility();
     if (activeLens === 'biomes') renderBiomes(true);
     setYear(year);

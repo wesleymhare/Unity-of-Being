@@ -52,6 +52,9 @@
 - Label engine now includes the pixel offset (`oy`) in its collision boxes.
 - **Societies widened and tightened (same day).** Definition now follows Marxist and world-society theory: any big group held together by a logistical network (state, church, company, bloc, party, international body), controlling things on the ground. Niche networks pruned; 54 big ones kept. **Areas** added (from Cliopatria polity shapes, unions of modern countries, or hand polygons): Mongol, Inca, Roman, Achaemenid, Aztec, steppe confederations, Latin and Orthodox Christendom, Catholic Church, NATO, Warsaw Pact, EU, Chinese tributary system and others. Legend rows are filters. Mobile: brand hidden under 520px so all four lens buttons fit. See `docs/SOCIETIES.md`.
 
+### Fast switching fix (3 November 2026)
+- Switching lenses or dragging the year quickly could leave stale labels from the old lens, a stuck loading veil, or a janky map. Fixes: label layers of inactive lenses are disabled (they cancel queued frames and never redraw); the loading veil's fade-out can no longer hide a newer veil, and the veil clears on `idle`; year changes re-filter at most every 70 ms (the last value always lands). Stress-tested with 24 rapid lens+year switches and slider scrubbing.
+
 ## Known rough edges
 - Ecoregions are modern in every year; only the Köppen half of a biome label changes with time.
 - Initial load downloads and parses the 25 MB border GeoJSON: several seconds on slow machines. Fix later with vector tiles (PMTiles) or per-era files.

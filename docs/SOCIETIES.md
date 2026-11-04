@@ -1,35 +1,88 @@
 # Societies (the lens)
 
-A **Society** is a de facto network of organisation: a group held together by a working system
-of exchange, communication, authority and supply, whatever the legal map says. The idea follows
-Marxist and world-society theory: a society is not only a state. It can be a state or
-confederacy, a church, an ethnic or religious community, a company, a party or bloc, an
-international organisation, a trade or logistics system, an alliance. What matters is that it
-**controls something on the ground**.
+**A Society is an organised system that controls or moves things on the ground, at the scale of a
+continent, a major region or the whole world.** It answers "who actually runs the flows and holds
+the ground here?", whatever the legal map says.
 
-It is not a people held together by language and way of life (that is a
-[Civilization](CIVILIZATIONS.md)), and not the legal borders of a state (that is a Polity).
-Where a Polity says who claims the land, a Society says who actually moves things across it.
+Status: definition agreed with Wes on 4 November 2026. The data below is being brought into line
+(see "Existing entries").
 
-## What counts
-**Big and real.** A network qualifies when it held ground or throughput at the scale of a
-continent or a major region: territory it governed or policed in practice, ports and roads it
-ran, a supply chain, a command structure, tens of thousands of members or more. Niche or purely
-local networks (one family firm, one pilgrimage town, a single movement) are left out for now.
+## The test
+Something is a Society only if it passes all three:
+
+1. **It controls or moves something real.** People, goods, money, information or force: it
+   governs or polices ground in practice, runs routes, ports or relays, supplies or commands
+   people, or keeps a working chain of custody.
+2. **At scale.** A continent, a major region, or a global system. One family firm, one market
+   town, one pilgrimage site or a single local movement does not count (yet).
+3. **It can be drawn.** You can point to hubs, routes or an area of control, with years. If it
+   cannot be placed on a map, it is not a Society.
+
+## What is not a Society, and where it goes
+| It is... | It goes in | Notes |
+|---|---|---|
+| A legal state or empire and its borders | **Polities** | Who claims the land |
+| A people: language, ancestry, culture, **ethnic communities and diasporas** | **Civilizations** | Who you belong to |
+| A faith, philosophy or way of seeing the world | **Worldviews** (planned tab) | What people believe |
+| How a polity is structured (monarchy, republic, one-party state, theocracy...) | **Ideologies** (planned tab) | How polities are organised |
+| Climate and ecoregions | **Biomes** | |
+
+Edge cases, decided:
+- **A church** splits in two. The *belief* is a Worldview. The *organisation* is a Society only if
+  it passes the test as a system (landholdings, schools, supply, a command chain), and then it is
+  listed for what it runs, not for what it believes.
+- **An armed faction holding ground** (the Chinese Communist base areas) is a Society for the
+  ground and supply it controlled. Its ideology goes in Ideologies.
+- **An alliance or bloc** (NATO, the Warsaw Pact) is a Society: it moves force, money and
+  materiel across a region.
+- **A diaspora** with a working trade network (the Overseas Chinese) is a **Civilization**. If the
+  network is a company or a shipping system, the company is the Society.
+
+## Kinds (descriptive, not exclusive)
+Kind is stored and shown as "Type" in the panel; colour comes from the sphere (below).
 
 | Kind | Examples |
 |---|---|
-| Trade network | Silk Road, Indian Ocean trade, Trans-Saharan trade, Hanseatic League, Atlantic slave trade |
-| Company or maritime system | VOC, British East India Company, Hudson's Bay, Spanish treasure fleets, container shipping |
-| Communications and logistics | Royal Road, Roman roads, Mongol yam, Qhapaq Ñan, Grand Canal, Trans-Siberian, telegraph cables |
-| State or confederacy | Steppe nomadic confederations, Aztec Triple Alliance, Haudenosaunee, Chinese tributary system |
-| Faction or party | Comintern, Chinese Communist base areas |
-| Community, diaspora or ethnic group | Overseas Chinese, Polynesian voyaging |
-| Religious network | Latin Christendom, the Catholic Church, Orthodox Christendom, Buddhism, the Jesuits, Hajj |
-| NGO or international organisation | United Nations, Red Cross and Red Crescent, NATO, Warsaw Pact, European Union |
+| Trade network | Silk Road, Indian Ocean trade, Trans-Saharan trade, Hanseatic League, transatlantic slave trade |
+| Company or maritime system | VOC, British East India Company, Hudson's Bay, Spanish treasure fleets |
+| **Corporation or supply chain** (modern) | Major shipping lines, oil majors, tech platforms, global manufacturing chains |
+| Communications and logistics | Royal Road, Roman roads, Mongol yam, Qhapaq Ñan, Grand Canal, Trans-Siberian, telegraph and undersea cables, container shipping |
+| State-like confederacy | Steppe nomadic confederations, Aztec Triple Alliance, Haudenosaunee, Chinese tributary system |
+| Alliance or bloc | NATO, Warsaw Pact, European Union, OPEC-style cartels |
+| International organisation or NGO | United Nations, Red Cross and Red Crescent |
+| Armed faction holding ground | Chinese Communist base areas |
+| **Criminal or clandestine network** | Large trafficking and smuggling networks, documented cartels |
 
-Kinds are descriptive, not exclusive: one network can be several things (the Church is a faith, a
-landowner, a school system). The legend lets you switch kinds on and off.
+## The modern era
+Societies go all the way to the present, including **big corporations and criminal networks**,
+under extra rules because the evidence is thinner and the stakes are higher:
+- **Corporations:** include a company only if it runs a system (ports, fleets, platforms, a
+  global supply chain) at the scale above. Show the system, not the brand. Years and hubs from
+  filings, annual reports or standard references.
+- **Criminal networks:** include a network only if it is documented by court judgments, UN or
+  government reports, or major investigative reporting. Name the organisation, never a living
+  person. Hubs and routes are approximate and described as reported; label uncertainty plainly.
+  When in doubt, leave it out.
+
+## Spheres: colour by lineage through time
+Colour is the **sphere of influence**, not the kind. A sphere is a lineage or bloc that its
+own members would recognise: Latin Christendom, Orthodox Christendom, the Chinese sphere, the
+Western bloc.
+
+Spheres have a **history**. They can split, merge and be renamed, and the colours follow:
+- A sphere has an id, a name, dates and optional **parents** and **children** (for example early
+  Christendom splits into the Latin and Orthodox spheres, and the Latin sphere later divides again).
+- The hue family stays with the root lineage; a child keeps the parent's hue and shifts its
+  lightness a little, so related spheres read as relatives and unrelated ones stay distinct. A
+  merger takes the dominant parent's hue.
+- A network belongs to the sphere that applies **in each year**. If a sphere splits while the
+  network exists, the network follows the child that carried it on, or is shown under the parent
+  until the split.
+- The legend lists the spheres present in the year shown; the panel will show the lineage of the
+  network's sphere ("This sphere through time"), and later a family-tree view.
+
+Today there are 18 flat spheres in `data/societies_groups.py`. Turning them into lineages is the
+next data change (see "Next").
 
 ## How it is drawn
 - **Areas** are zones of de facto control or presence, dashed outline and light fill. They come
@@ -70,9 +123,31 @@ with `Z(poly=...)`, `Z(countries=[...])` or `Z([(lng, lat), ...])`, or add to an
 Coordinates are approximate. Country-union areas use modern borders, so they are coarse for the past.
 Wikipedia titles are unchecked against live Wikipedia; the panel falls back to a search.
 
-## Later
-- More big networks in the Americas, Africa and the Pacific; bigger coverage of the modern era
-  (corporations, supply chains, parties, blocs).
-- Edges with weights (volume) and direction, once there are open datasets (Orbis, Roman roads,
-  ancient trade ledgers).
-- Areas that change shape through the years (for example per-decade bloc membership).
+## Existing entries under this definition
+54 networks exist today. Decisions:
+
+- **Stay (most of them):** trade, company, logistics, confederacy, alliance, international
+  organisation and the Chinese Communist base areas.
+- **Move out once their homes exist** (they stay on the map until then so nothing is lost):
+  - To **Worldviews**: Spread of Buddhism, Early Christian communities, Church of the East, Society of
+    Jesus missions, Latin Christendom (the medieval Church), Catholic Church worldwide, Orthodox
+    Christendom. Where the organisation itself passes the test it may come back as a Society framed
+    for what it runs.
+  - To **Civilizations**: Overseas Chinese networks, Lapita and Polynesian voyaging.
+- **Review:** Hajj caravans (keep as a logistics system, the pilgrimage itself is a Worldview),
+  Communist International (an organisation moving money and people; its ideology is an Ideology),
+  Haudenosaunee Confederacy (a confederacy, close to a Polity).
+
+## Next
+1. Turn the 18 spheres into **lineages** with split and merge dates and the colour rule above.
+2. Add the new kinds: corporations and supply chains, criminal networks, with the modern-era rules.
+3. Move the listed entries when Worldviews and Civilizations can take them.
+4. More big networks in the Americas, Africa and the Pacific.
+5. Edges with weights (volume) and direction, once open datasets exist (Orbis, Roman roads,
+   ancient trade ledgers); areas that change shape through the years (per-decade bloc membership).
+
+## Open questions
+- Numbers for "at scale" (for example a minimum number of countries or a minimum throughput) so the
+  test can be applied the same way every time.
+- Whether an organised church should be listed as its own Society in addition to its Worldview.
+- How Ideologies and Worldviews will be defined; their docs should say where they meet Societies.

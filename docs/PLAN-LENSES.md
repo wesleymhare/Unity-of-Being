@@ -1,5 +1,10 @@
 # Plan: renaming Societies and adding a new Societies lens
 
+**Update, 4 November 2026.** Two more tabs are planned: **Ideologies** (how polities are structured)
+and **Worldviews** (faiths and philosophies). Faiths therefore leave Societies for Worldviews, and
+ethnic communities and diasporas belong in Civilizations. See the sharpened definition in
+`docs/SOCIETIES.md`.
+
 **Status: done (3 November 2026).** The rename is complete, and the new Societies lens exists with ~40 curated networks (see `docs/SOCIETIES.md`). The notes below are kept as the original plan.
 
 Status: **planned, not started** (parked on 2 November 2026, per Wes).

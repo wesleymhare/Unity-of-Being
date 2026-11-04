@@ -66,7 +66,8 @@
 - Deep time before 3400 BCE (continental drift, ice ages, sea level).
 - Tier 2 tile view; Tier 3 hex dioramas.
 - Edit mode for worldbuilding.
-- A sharper definition of Societies (open).
+- Ideologies tab (how polities are structured) and Worldviews tab (faiths, philosophies).
+- Societies as lineages: spheres that split and merge through time, with modern corporations and criminal networks (rules in `docs/SOCIETIES.md`).
 
 ## Known rough edges
 - Ecoregions are modern in every year; only the Köppen half of a biome label changes with time.

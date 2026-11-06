@@ -1,3 +1,5 @@
+> Navigation: [START_HERE.md](START_HERE.md) links to the current project records and consultation workflow.
+
 # Unity of Being
 
 An interactive map of human history: polities, civilizations, biomes and worldviews, with a year slider.

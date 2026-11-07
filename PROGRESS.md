@@ -55,6 +55,13 @@
 ### Fast switching fix (3 November 2026)
 - Switching lenses or dragging the year quickly could leave stale labels from the old lens, a stuck loading veil, or a janky map. Fixes: label layers of inactive lenses are disabled (they cancel queued frames and never redraw); the loading veil's fade-out can no longer hide a newer veil, and the veil clears on `idle`; year changes re-filter at most every 70 ms (the last value always lands). Stress-tested with 24 rapid lens+year switches and slider scrubbing.
 
+### 7 November 2026: polity stat sheet and panel cleanup
+- **Fixed-order stat sheet for every polity** (`src/profile.ts`, `docs/POLITY-STATS.md`): Government, People, Land and economy, Military, Lineage, always the same rows in the same order, dashes where nothing is on record. Year-aware (nearest dated value, marked "c. 1520"). World Bank data for modern states (population, GDP, armed forces, spending); Wikidata for the rest; a curated-figures file for later (`public/data/polity-stats.json`).
+- **Wikipedia infobox moved to the bottom and folded** ("More from the Wikipedia infobox"); it was the scrambled block after the description.
+- **Rulers:** fuller reign sequence with a "Full timeline" button. Fixed a bug: Wikidata qualifier dates were read as if they were whole claims, so the direct head-of-state fallback and dated flags, population and capital never matched real data.
+- Long province lists fold into one line so the stat sheet is not pushed off screen.
+- Not verified against live Wikidata or the World Bank (the build sandbox cannot reach them); checked with mocked responses.
+
 ### 3 November 2026: last decade, water, Societies colour, placeholders
 - **Timeline now runs to 2026.** The old "present" marker (2024) was moved to 2026 in the data sources and built files.
 - **2016-2026 is the de jure world** (`data/build-modern-polities.py`, Natural Earth 1:50m): no rebel or occupied zones, Palestine = West Bank + Gaza, Crimea/Donetsk/Luhansk = Ukraine, Golan = Syria, Western Sahara restored, renames by year. Cliopatria is cut at 2015. See `docs/POLITIES.md`.

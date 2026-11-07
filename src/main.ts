@@ -4,6 +4,7 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import './style.css';
 import { BiomeModel, CLASSES, GROUPS, climateShift, type EcoMeta, type EcoPatch } from './biomes';
 import { LabelLayer, type LabelProps } from './labels';
+import { buildSheet, emptySheet, getCurated, getProfileData, getWorldBank, type Curated, type ProfileData, type ProfileGroup, type WorldBank } from './profile';
 import {
   getArticlePhoto,
   getInfobox,
@@ -176,6 +177,8 @@ const pImage = $<HTMLImageElement>('p-image');
 const pFigureKind = $('p-figure-kind');
 const pFigureLink = $<HTMLAnchorElement>('p-figure-link');
 const pInfobox = $('p-infobox');
+const pProfile = $('p-profile');
+const pLeadersMore = $<HTMLButtonElement>('p-leaders-more');
 const pSubs = $('p-subs');
 const pFacts = $<HTMLDListElement>('p-facts');
 const pOsm = $('p-osm');
@@ -596,6 +599,7 @@ function setYear(next: number): void {
     renderLegend();
     if (activeLens === 'biomes' && !panel.hidden && biomePoint) scheduleBiomePanel();
     if (!panel.hidden && panelQid && activeLens === 'polities') scheduleLeaderRefresh();
+    if (profileActive && !panel.hidden) renderProfile();
     scheduleHash();
   };
   if (wait > 0) yearRaf = window.setTimeout(start, wait);
@@ -642,7 +646,8 @@ function renderSummary(summary: WikiSummary): void {
 }
 
 function renderFacts(facts: WikiFacts | null, extraFacts: WikiFact[] = []): void {
-  const rows = [...extraFacts, ...(facts?.facts ?? [])];
+  // For polities the fixed stat sheet replaces the Wikidata list.
+  const rows = [...extraFacts, ...(profileActive ? [] : facts?.facts ?? [])];
   pFacts.replaceChildren();
   for (const fact of rows) {
     const dt = document.createElement('dt');
@@ -723,10 +728,19 @@ function leaderKey(leader: Leader): string {
   return `${leader.name}|${leader.office ?? ''}|${leader.start}`;
 }
 
+let leadersExpanded = false;
+let leadersSnapshot: { leaders: Leader[]; year: number; history: Leader[] } | null = null;
+pLeadersMore.addEventListener('click', () => {
+  leadersExpanded = !leadersExpanded;
+  if (leadersSnapshot) renderLeaders(leadersSnapshot.leaders, leadersSnapshot.year, leadersSnapshot.history);
+});
+
 function renderLeaders(leaders: Leader[], panelYear: number, history: Leader[]): void {
+  leadersSnapshot = { leaders, year: panelYear, history };
   pLeadersList.replaceChildren();
   pLeadersHistoryList.replaceChildren();
   pLeadersHistory.hidden = true;
+  pLeadersMore.hidden = true;
 
   if (leaders.length) {
     pLeadersHead.textContent =
@@ -744,30 +758,34 @@ function renderLeaders(leaders: Leader[], panelYear: number, history: Leader[]):
     pLeadersHead.textContent = `Reigns around ${fmtYear(panelYear)}`;
   }
 
-  const dated = history
-    .filter((leader) => leader.end !== undefined)
-    .sort((a, b) => a.start - b.start || a.name.localeCompare(b.name));
-  if (dated.length) {
+  const ordered = [...history].sort((a, b) => a.start - b.start || a.name.localeCompare(b.name));
+  if (ordered.length) {
     const currentKeys = new Set(leaders.map(leaderKey));
-    let index = dated.findIndex((leader) => currentKeys.has(leaderKey(leader)));
+    let index = ordered.findIndex((leader) => currentKeys.has(leaderKey(leader)));
     if (index < 0) {
-      index = dated.findIndex((leader) => leader.start > panelYear);
-      if (index < 0) index = dated.length - 1;
+      index = ordered.findIndex((leader) => leader.start > panelYear);
+      if (index < 0) index = ordered.length - 1;
     }
-    const first = Math.max(0, index - 2);
-    for (const leader of dated.slice(first, first + 6)) {
+    const WINDOW = 7;
+    const first = Math.max(0, Math.min(index - 3, ordered.length - WINDOW));
+    const shown = leadersExpanded ? ordered : ordered.slice(first, first + WINDOW);
+    pLeadersHistoryList.classList.toggle('all', leadersExpanded);
+    for (const leader of shown) {
       const item = document.createElement('li');
       if (currentKeys.has(leaderKey(leader))) item.classList.add('current');
       const name = document.createElement('span');
       name.className = 'ruler-name';
-      name.textContent = leader.name;
+      name.textContent = leader.office && /government/i.test(leader.office) ? `${leader.name} (head of government)` : leader.name;
       const years = document.createElement('span');
       years.className = 'ruler-years';
       years.textContent = fmtReign(leader);
       item.append(name, years);
       pLeadersHistoryList.append(item);
     }
-    pLeadersHistory.hidden = false;
+    pLeadersMore.hidden = ordered.length <= WINDOW;
+    pLeadersMore.textContent = leadersExpanded ? 'Show fewer' : `Full timeline (${ordered.length})`;
+    // One ruler is already listed above; a sequence of one adds nothing.
+    pLeadersHistory.hidden = ordered.length <= 1;
   }
 
   pLeaders.hidden = !leaders.length && pLeadersHistory.hidden;
@@ -882,10 +900,12 @@ function renderInfobox(sections: InfoboxSection[] | null): void {
     pInfobox.hidden = true;
     return;
   }
-  const head = document.createElement('div');
-  head.className = 'infobox-head';
-  head.textContent = 'From the Wikipedia infobox';
-  pInfobox.append(head);
+  const all = document.createElement('details');
+  all.className = 'ib-all';
+  const allSummary = document.createElement('summary');
+  allSummary.textContent = 'More from the Wikipedia infobox';
+  all.append(allSummary);
+  pInfobox.append(all);
   sections.forEach((section, index) => {
     const details = document.createElement('details');
     details.open = section.rows.length <= 10 && (index < 4 || section.rows.length <= 4);
@@ -911,7 +931,7 @@ function renderInfobox(sections: InfoboxSection[] | null): void {
       list.append(dd);
     }
     details.append(list);
-    pInfobox.append(details);
+    all.append(details);
   });
   pInfobox.hidden = false;
 }
@@ -976,6 +996,74 @@ async function loadSubdivisions(qid: string, ticket: number, signal: AbortSignal
     renderSubdivisions();
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') return;
+  }
+}
+
+// ---- Polity stat sheet (fixed rows, fixed order; see src/profile.ts) ----------------------------
+let profileActive = false;
+let panelProfile: { data: ProfileData | null; wb: WorldBank | null; curated: Curated[string] | undefined; realm?: string } | null = null;
+
+function drawSheet(groups: ProfileGroup[]): void {
+  pProfile.replaceChildren();
+  for (const group of groups) {
+    const section = document.createElement('section');
+    section.className = 'prof-sec';
+    const title = document.createElement('h4');
+    title.textContent = group.title;
+    const list = document.createElement('dl');
+    list.className = 'prof';
+    for (const row of group.rows) {
+      const dt = document.createElement('dt');
+      dt.textContent = row.label;
+      const dd = document.createElement('dd');
+      if (row.value === '—' || row.value === '…') dd.className = 'empty';
+      dd.textContent = row.value;
+      if (row.note) {
+        const note = document.createElement('small');
+        note.textContent = row.note;
+        if (row.far) note.className = 'far';
+        dd.append(' ', note);
+      }
+      if (row.source) dd.title = `Source: ${row.source}`;
+      list.append(dt, dd);
+    }
+    section.append(title, list);
+    pProfile.append(section);
+  }
+  const fine = document.createElement('p');
+  fine.className = 'prof-fine';
+  fine.textContent = 'Dashes mean no figure is on record. Years in grey are the nearest year with data. Sources: Wikidata (CC0), World Bank (CC BY 4.0, modern states).';
+  pProfile.append(fine);
+  pProfile.hidden = false;
+}
+
+function renderProfile(): void {
+  if (!profileActive || !panelProfile) return;
+  drawSheet(buildSheet({
+    year,
+    data: panelProfile.data,
+    wb: panelProfile.wb,
+    curated: panelProfile.curated,
+    realm: panelProfile.realm,
+  }));
+}
+
+async function loadProfile(qid: string | null, realm: string | undefined, ticket: number, signal: AbortSignal): Promise<void> {
+  profileActive = true;
+  panelProfile = null;
+  drawSheet(emptySheet());
+  try {
+    const [data, curatedAll] = await Promise.all([qid ? getProfileData(qid, signal) : Promise.resolve(null), getCurated(BASE)]);
+    if (ticket !== panelTicket) return;
+    const wb = await getWorldBank(data?.iso, signal);
+    if (ticket !== panelTicket) return;
+    panelProfile = { data, wb, curated: qid ? curatedAll[qid] : undefined, realm };
+    renderProfile();
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') return;
+    if (ticket !== panelTicket) return;
+    panelProfile = { data: null, wb: null, curated: undefined, realm };
+    renderProfile();
   }
 }
 
@@ -1047,6 +1135,12 @@ function resetPanel(): number {
   hideFigure();
   pInfobox.hidden = true;
   pInfobox.replaceChildren();
+  pProfile.hidden = true;
+  pProfile.replaceChildren();
+  panelProfile = null;
+  profileActive = false;
+  leadersExpanded = false;
+  leadersSnapshot = null;
   pSubs.hidden = true;
   pSubs.replaceChildren();
   panelFacts = null;
@@ -1181,13 +1275,21 @@ function pickStanding(stack: Props[]): Props {
 
 const TIER_NAMES: Record<number, string> = { 3: 'Local identity', 2: 'People', 1: 'Wider sphere' };
 
+pOthersHead.addEventListener('click', () => {
+  if (pOthers.classList.contains('foldable')) pOthers.classList.toggle('folded');
+});
+
 function renderOthers(current: Props): void {
   pOthersList.replaceChildren();
   const others = overlapSet.filter((item) => item.k !== current.k);
   pOthers.hidden = others.length === 0;
   const civilizations = activeLens === 'civilizations';
   const provinces = !civilizations && others.length > 0 && current.k < SUB_K && others.every((item) => item.k >= SUB_K);
-  pOthersHead.textContent = activeLens === 'societies' ? 'Networks here' : civilizations ? 'Where you stand · peer identities' : provinces ? 'Provinces (approximate)' : 'Also here';
+  pOthersHead.textContent = activeLens === 'societies' ? 'Networks here' : civilizations ? 'Where you stand · peer identities' : provinces ? `Provinces (approximate) · ${others.length}` : 'Also here';
+  // A long list of provinces would push the stat sheet off the screen: fold it up until asked for.
+  const foldable = provinces && others.length > 4;
+  pOthers.classList.toggle('foldable', foldable);
+  pOthers.classList.toggle('folded', foldable);
   let tier = -1;
   for (const item of others) {
     const level = item.lv ?? 2;
@@ -1318,11 +1420,10 @@ function openPanel(p: Props): void {
     if (p.fg) extraFacts.push({ label: 'Family group', value: p.fg });
   } else if (province) {
     extraFacts.push({ label: 'Part of', value: p.p ?? '' });
-  } else if (p.m) {
-    extraFacts.push({ label: 'Realm', value: p.m });
   }
   if (qid && !civilizations && !societies && !p.g) void loadLeaders(qid, year, ticket);
   if (qid && !civilizations && !societies) void loadSubdivisions(qid, ticket, controller.signal);
+  if (activeLens === 'polities' && !province) void loadProfile(qid, p.m, ticket, controller.signal);
   void loadPanel(rawTitle, qid, name, ticket, controller.signal, extraFacts);
 }
 

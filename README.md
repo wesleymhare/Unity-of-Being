@@ -5,7 +5,7 @@
 An interactive map of human history: polities, civilizations, biomes and worldviews, with a year slider.
 Tier 1 (this version) is a Paradox-style political map of 3400 BCE to 2026 CE with three lenses:
 
-- **Polities:** who governed (states, empires, realms). Cliopatria to 2015, cleaned so realms are not drawn on top of their own parts; from 2016 to 2026 the current de jure map from Natural Earth. See [docs/POLITIES.md](docs/POLITIES.md).
+- **Polities:** who governed (states, empires, realms). Cliopatria to 2015, cleaned so realms are not drawn on top of their own parts; from 2016 to 2026 the current de jure map from Natural Earth. See [docs/POLITIES.md](docs/POLITIES.md). Each polity panel has a fixed stat sheet, see [docs/POLITY-STATS.md](docs/POLITY-STATS.md).
 - **Civilizations:** who lived there. A people held together by shared language and way of life, whatever state ruled them. See [docs/CIVILIZATIONS.md](docs/CIVILIZATIONS.md).
 - **Societies:** who actually controls things on the ground. Big de facto networks of any kind (states and confederacies, churches, companies, blocs, parties, international organisations, trade and logistics systems), drawn as areas, routes and hubs. See [docs/SOCIETIES.md](docs/SOCIETIES.md).
 - **Biomes:** WWF-style ecoregions split by Köppen–Geiger climate class, with the climate shifted slightly through time (for example "Am North Western Ghats montane rain forests"). See [docs/BIOMES.md](docs/BIOMES.md).

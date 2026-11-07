@@ -1142,3 +1142,65 @@ a { color: var(--brass); }
 .legend-key .mk { width: 16px; height: 16px; color: #f4ecd8; flex: none; }
 .legend-key .k-line { width: 16px; height: 0; border-top: 3px solid #d9a441; border-radius: 2px; flex: none; }
 .legend-key .k-dot { width: 9px; height: 9px; margin: 0 3px; border-radius: 50%; background: #d9a441; border: 1.5px solid #1d1710; flex: none; }
+
+/* ---- Polity stat sheet: same rows, same order, every polity ----------------- */
+.profile { margin: 0 0 14px; }
+.prof-sec { margin: 0 0 10px; }
+.prof-sec h4 {
+  margin: 0 0 4px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--line);
+  font: 700 9px/1.2 system-ui, sans-serif;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+.prof {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 4px 10px;
+  margin: 0;
+}
+.prof dt {
+  padding-top: 1px;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+.prof dd {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: #ded7c7;
+  overflow-wrap: anywhere;
+}
+.prof dd.empty { color: #55616b; }
+.prof dd small { font-size: 10.5px; color: var(--muted); }
+.prof dd small.far { color: #7d6a4a; }
+.prof-fine { margin: 6px 0 0; font-size: 10px; line-height: 1.45; color: var(--faint); }
+
+.ib-all { margin: 0 0 12px; }
+.ib-all > summary {
+  cursor: pointer;
+  font-size: 11.5px;
+  color: var(--muted);
+  padding: 4px 0;
+}
+.ib-all > summary:hover { color: var(--brass-lt); }
+
+.leaders-more {
+  margin-top: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--brass);
+  font-size: 10.5px;
+  cursor: pointer;
+}
+.leaders-more:hover { color: var(--brass-lt); background: rgba(210, 173, 100, 0.1); }
+.leaders-history ol.all { max-height: 240px; overflow-y: auto; }
+
+.others.foldable .others-head { cursor: pointer; }
+.others.foldable .others-head::after { content: ' ▾'; }
+.others.folded .others-head::after { content: ' ▸'; }
+.others.folded .others-list { display: none; }

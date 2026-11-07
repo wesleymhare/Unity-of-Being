@@ -70,20 +70,21 @@ interface SummaryResponse {
   wikibase_item?: string;
 }
 
-interface WikidataClaim {
+export interface WikidataClaim {
   rank?: string;
   mainsnak?: { datavalue?: { value?: unknown } };
-  qualifiers?: Record<string, WikidataClaim[]>;
+  /** Qualifiers are bare snaks (they have `datavalue` directly, not a `mainsnak`). */
+  qualifiers?: Record<string, { datavalue?: { value?: unknown } }[]>;
 }
 
-interface SnakValue {
+export interface SnakValue {
   id?: string;
   amount?: string;
   unit?: string;
   time?: string;
 }
 
-interface WikidataEntity {
+export interface WikidataEntity {
   missing?: string;
   labels?: Record<string, { value?: string }>;
   descriptions?: Record<string, { value?: string }>;
@@ -162,7 +163,7 @@ export function commonsPageForImage(src?: string): string | null {
   return null;
 }
 
-async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
+export async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(url, {
     signal,
     headers: { Accept: 'application/json' },
@@ -177,7 +178,7 @@ function stripHtml(html: string): string {
   return (doc.body.textContent ?? '').replace(/\s+/g, ' ').trim();
 }
 
-function isAbort(error: unknown): boolean {
+export function isAbort(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'AbortError';
 }
 
@@ -262,7 +263,7 @@ export async function searchArticles(
   }
 }
 
-function preferredClaims(
+export function preferredClaims(
   claims: Record<string, WikidataClaim[]>,
   property: string,
 ): WikidataClaim[] {
@@ -271,7 +272,13 @@ function preferredClaims(
   return preferred.length ? preferred : all.filter((claim) => claim.rank !== 'deprecated');
 }
 
-function snakValue(claim: WikidataClaim | undefined): SnakValue | undefined {
+/** The value of a claim's first qualifier for a property (for example P580 start time). */
+export function qualifierValue(claim: WikidataClaim | undefined, property: string): SnakValue | undefined {
+  const value = claim?.qualifiers?.[property]?.[0]?.datavalue?.value;
+  return value && typeof value === 'object' ? (value as SnakValue) : undefined;
+}
+
+export function snakValue(claim: WikidataClaim | undefined): SnakValue | undefined {
   const value = claim?.mainsnak?.datavalue?.value;
   return value && typeof value === 'object' ? (value as SnakValue) : undefined;
 }
@@ -288,8 +295,8 @@ function datedImages(claims: Record<string, WikidataClaim[]>, property: string):
     if (!file) continue;
     result.push({
       file,
-      start: yearFromTime(snakValue(claim.qualifiers?.P580?.[0])?.time) ?? undefined,
-      end: yearFromTime(snakValue(claim.qualifiers?.P582?.[0])?.time) ?? undefined,
+      start: yearFromTime(qualifierValue(claim, 'P580')?.time) ?? undefined,
+      end: yearFromTime(qualifierValue(claim, 'P582')?.time) ?? undefined,
     });
   }
   return result;
@@ -408,7 +415,7 @@ export async function getWikidata(
   if (population?.amount) {
     const amount = Number.parseFloat(population.amount);
     if (Number.isFinite(amount) && amount > 0) {
-      const time = snakValue(populationClaim?.qualifiers?.P585?.[0])?.time;
+      const time = qualifierValue(populationClaim, 'P585')?.time;
       const year = time ? formatWikidataYear(time) : '';
       add('Population', `${nf.format(Math.round(amount))}${year ? ` (${year})` : ''}`);
     }
@@ -435,7 +442,7 @@ interface SparqlBinding {
   end?: { value?: string };
 }
 
-function yearFromTime(time: string | undefined): number | null {
+export function yearFromTime(time: string | undefined): number | null {
   if (!time) return null;
   const match = /^([+-]?)(\d{1,6})-/.exec(time);
   if (!match) return null;
@@ -511,12 +518,12 @@ async function fetchDirectLeaders(
   ] as const) {
     for (const claim of preferredClaims(claims, property)) {
       const id = snakValue(claim)?.id;
-      const start = yearFromTime(snakValue(claim.qualifiers?.P580?.[0])?.time);
+      const start = yearFromTime(qualifierValue(claim, 'P580')?.time);
       if (!id || start === null) continue;
       candidates.push({
         id,
         start,
-        end: yearFromTime(snakValue(claim.qualifiers?.P582?.[0])?.time) ?? undefined,
+        end: yearFromTime(qualifierValue(claim, 'P582')?.time) ?? undefined,
         office,
       });
     }

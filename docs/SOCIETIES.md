@@ -8,7 +8,9 @@ banks and companies, alliances and blocs, orders, NGOs and international organis
 roads, ports and cables they run. A state can be a Society, but only when it works as a network of
 control, and it is one kind among many.
 
-Status: revised 7 November 2026 with Wes. This replaces the earlier version of this page.
+Status: **settled for now** (8 November 2026). The definition, the test, the spheres and the checks below
+are in place and enforced when the data is built. What is deliberately left for later is listed under
+"Next".
 
 ## Where the idea comes from
 Three bodies of thought, used as lenses and not as doctrine:
@@ -33,8 +35,13 @@ Something is a Society only if it passes all four:
    by what the law says.
 3. **Network.** It is made of nodes (hubs) and links (routes, kin ties, credit lines, command
    chains), so it can be drawn as dots, lines and areas, with years.
-4. **Scale.** A continent, a major region, or the whole world. A single family firm, one market
-   town or one local movement does not count (yet).
+4. **Scale.** A continent, a major region, or the whole world. In practice: its farthest points are
+   **at least 1,000 km apart**, with at least two hubs and a route or an area. A single family firm,
+   one market town or one local movement does not count (yet).
+
+`python3 data/build-societies.py` checks this for every network and stops with a list if one fails.
+It also checks that each has a sphere, a power type, a note saying what it controls, a Wikipedia
+title, years in order and a unique name.
 
 ## What can be a Society (there is no closed list)
 | Form | Examples |
@@ -65,11 +72,12 @@ This revises an earlier plan to move the church and diaspora entries out of Soci
 organisation or network that passes the test stays; the belief or identity it carries goes to the
 other lens.
 
-## Power type (planned tag)
-Each network will be tagged by which kinds of power it wields, after Mann: **I**deological (meaning,
+## Power type
+Each network is tagged with the kinds of power it wields, after Mann: **I**deological (meaning,
 legitimacy), **E**conomic (production, exchange, credit), **M**ilitary (force), **P**olitical
-(territorial rule). Most have more than one: the Church is I and E, the Hanseatic League E and M, a
-dynasty P and E. The tag will let the legend filter by what a group controls, not only by its sphere.
+(territorial rule). Most have more than one: the Hanseatic League is E and M, a dynasty E and P, the
+Templars I, E and M. The tag is in `POWER_OF` in `data/societies_groups.py` and shows as "Power" in
+the panel. A legend filter by power is not built yet.
 
 ## The modern era
 Societies run to the present, including **big corporations and criminal networks**, under stricter
@@ -81,27 +89,34 @@ rules because the evidence is thinner and the stakes higher:
   reports, or major investigative reporting. Name the organisation, never a living person. Describe
   hubs and routes as reported and label the uncertainty. When in doubt, leave it out.
 
-## Spheres: colour by lineage through time
+## Spheres: colour by lineage
 Colour is the **sphere of influence** (the affinity group), not the kind of network. A sphere is a
 lineage or bloc that its own members would recognise: Latin Christendom, Orthodox Christendom, the
 Chinese sphere, the Western bloc.
 
-Spheres have a **history**: they split, merge and are renamed, and the colours follow.
-- A sphere has an id, a name, dates and optional parents and children (early Christendom splits
-  into Latin and Orthodox, and Latin later divides again).
-- The hue family stays with the root lineage; a child keeps the hue and shifts its lightness, so
-  relatives read as relatives. A merger takes the dominant parent's hue.
-- A network belongs to the sphere that applies **in each year**.
-- The legend lists the spheres present in the year shown; the panel will show the sphere's lineage
-  and later a family-tree view.
+Spheres descend from one another, and that is recorded (`SPHERE_DEFS` in `data/societies_groups.py`):
+- Christendom (before the schisms) gives Latin Christendom and Orthodox and Eastern Christendom.
+- Latin Christendom gives the Italian maritime republics, Northern and Baltic trade, the dynastic and
+  banking houses, the Iberian empires and the Northwest European chartered companies.
+- The chartered companies give the Western bloc, which gives the global institutions; the Iberian
+  empires give the Atlantic slave system.
+- Orthodox Christendom gives the Russian empire, which gives the Communist movement.
+- Other spheres (Steppe and Inner Asia, Maritime Asia, the Chinese sphere, the Islamic world, the Buddhist
+  and Indic world, Indigenous American systems, the ancient Near East) have no parent yet.
 
-Today there are 19 flat spheres in `data/societies_groups.py`. Turning them into lineages is a next step.
+A family shares a hue neighbourhood (Christendom: indigo, blues and lilacs), with lightness and hue
+spaced so relatives read as relatives but can still be told apart. Colours are chosen by hand; the
+panel shows a network's lineage ("Christendom → Latin Christendom → Italian maritime republics").
+
+What is not built: a network keeps **one** sphere for its whole life (it does not change sphere
+when its sphere splits), and there is no family-tree view. The lineages are interpretive (for
+example, the Western bloc as a descendant of the chartered companies) and are open to argument.
 
 ## Adding a Society: checklist
 1. Passes the four-part test (write one sentence: *who* the group is and *what it controls*).
 2. At least three hubs or a route or an area of control, with years.
-3. A sphere (`GROUP_OF` in `data/societies_groups.py`), a kind (`KINDS` in `data/societies_data.py`)
-   and a Wikipedia title.
+3. A sphere (`GROUP_OF`) and a power type (`POWER_OF`), both in `data/societies_groups.py`; a kind
+   (`KINDS` in `data/societies_data.py`); a note saying what it controls; a Wikipedia title.
 4. Nothing living-person-specific; modern criminal networks follow the rules above.
 
 ## How it is drawn
@@ -155,13 +170,12 @@ Wikipedia titles are unchecked against live Wikipedia; the panel falls back to a
   its ideology is an Ideology).
 - **Worth a second look:** Haudenosaunee Confederacy and Aztec Triple Alliance (close to Polities).
 
-## Next
-1. Spheres as lineages, with the colour rule above.
-2. The power-type tag (I, E, M, P) and a legend filter for it.
-3. Modern corporations and documented criminal networks, under the rules above.
+## Next (deliberately left for later)
+1. A legend filter by power type, and a family-tree view of the spheres.
+2. A network changing sphere over its life (per-year sphere assignment).
+3. Modern corporations and documented criminal networks, under the rules above (none added yet).
 4. More dynasties, banking houses, guilds, leagues and orders; more of the Americas, Africa and the Pacific.
 5. Edges with weight (volume) and direction, once open datasets exist; areas that change shape by year.
 
 ## Open questions
-- Numbers for "scale" (for example a minimum number of countries or throughput), so the test is applied the same way each time.
 - How Ideologies and Worldviews will be defined; their docs should say where they meet Societies.

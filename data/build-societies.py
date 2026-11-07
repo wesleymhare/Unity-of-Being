@@ -23,7 +23,7 @@ from shapely.ops import unary_union  # noqa: E402
 
 from geo_labels import label_anchor, polygons, tidy  # noqa: E402
 from societies_data import ENTITIES, KINDS  # noqa: E402
-from societies_groups import GROUP_OF, GROUPS, MARKS  # noqa: E402
+from societies_groups import GROUP_OF, GROUPS, MARKS, POWER_OF, POWERS, lineage  # noqa: E402
 
 DST = 'public/data/societies.geojson'
 NE0 = 'data/raw/ne/ne_10m_admin_0_countries.geojson'
@@ -112,6 +112,9 @@ def main():
         if group is None:
             raise SystemExit(f"no sphere/group for network {ent['name']!r} in data/societies_groups.py")
         colour = GROUPS[group][0]
+        power = POWER_OF.get(ent['name'])
+        if not power or any(ch not in POWERS for ch in power):
+            raise SystemExit(f"no (valid) power type for network {ent['name']!r} in data/societies_groups.py")
         s, e = ent['s'], ent['e']
         xs, ys = [], []
 
@@ -210,6 +213,7 @@ def main():
         major_first = [n[0] for n in node_defs if n[3]] + [n[0] for n in node_defs if not n[3]]
         entities.append({
             'k': k, 'n': ent['name'], 'kind': ent['kind'], 'grp': group, 's': s, 'e': e, 'c': colour,
+            'pw': ', '.join(POWERS[ch] for ch in 'IEMP' if ch in power), 'lin': ' > '.join(lineage(group)),
             'w': ent['wiki'], 'q': '', 'nt': ent['note'],
             'lx': round(lx, 3), 'ly': round(ly, 3), 'sz': round(max(0.8, min(40.0, title_sz or extent * 0.4)), 2),
             'hubs': ', '.join(major_first),
@@ -239,6 +243,30 @@ def main():
                 'cw': 6, 'ch': 2.5, 'oy': 14, 'lcls': 'net-hub mark', 'ent': k,
             })
             next_label += 1
+
+    # ---- checks: the definition in docs/SOCIETIES.md, applied to every network
+    errors = []
+    names = set()
+    for ent, rec in zip(ENTITIES, entities):
+        name = ent['name']
+        if name in names:
+            errors.append(f'{name}: duplicate network name')
+        names.add(name)
+        if not ent['s'] < ent['e']:
+            errors.append(f'{name}: years {ent["s"]}..{ent["e"]} are not in order')
+        if not ent.get('wiki'):
+            errors.append(f'{name}: no Wikipedia title')
+        if not (ent.get('note') or '').strip():
+            errors.append(f'{name}: no note saying what it controls')
+        hubs = len(ent['nodes'])
+        if hubs < 2 or not (ent['routes'] or ent['zones']):
+            errors.append(f'{name}: needs at least two hubs and a route or an area (has {hubs} hubs)')
+        x0, y0, x1, y1 = rec['box']
+        diag = math.hypot((x1 - x0) * math.cos(math.radians((y0 + y1) / 2)), y1 - y0) * 111.2
+        if diag < 1000:
+            errors.append(f'{name}: only {diag:.0f} km across; a Society must span at least 1,000 km')
+    if errors:
+        raise SystemExit('Societies checks failed:\n  ' + '\n  '.join(errors))
 
     unused = [(o, n) for (o, n, *_rest) in MARKS if (o, n) not in marks_used]
     if unused:

@@ -1,38 +1,61 @@
-"""Spheres and groups for the Societies lens, and the symbols (marks) on it.
+"""Spheres, lineages, power types and symbols for the Societies lens (see docs/SOCIETIES.md).
 
-Colour is by SPHERE OF INFLUENCE or GROUP, not by what kind of network it is: Latin
-Christendom is one colour and Orthodox Christendom another, the Chinese tributary
-system and the Overseas Chinese share a colour, and so on. Kind (trade network,
-company, church...) is still stored and shown as the "Type" fact in the panel.
+Colour is by SPHERE OF INFLUENCE (the affinity group), not by kind of network. Spheres have a
+LINEAGE: a sphere can descend from another (Christendom splits into Latin and Orthodox; Latin
+Christendom gives rise to the Italian republics, the chartered companies and later the Western
+bloc). A family of spheres shares a hue neighbourhood, so relatives read as relatives.
+
+Each network belongs to one sphere (GROUP_OF) and has a power type (POWER_OF), after Mann: which
+of Ideological, Economic, Military and Political power it wields.
 
 Marks are symbols on top of the lines, dots and areas:
     'c'  crossed swords   a frontier or conflict zone
     'x'  handshake        a trade or syncretism zone (a place where peoples, faiths or
                           goods met and blended)
-Lines are logistical networks and dots are hubs (see docs/SOCIETIES.md).
+Lines are logistical networks and dots are hubs.
 """
+import colorsys
 
-GROUPS = {
-    'Ancient Near East and Mediterranean': ('#d9a441', 'Bronze and Iron Age trade, road and post systems of the Near East and Mediterranean'),
-    'Steppe and Inner Asia': ('#b79f6e', 'Nomadic confederations and the caravan and relay systems that crossed their lands'),
-    'Maritime Asia and the Pacific': ('#35b3c4', 'Monsoon trade, Srivijaya and the voyaging peoples of the Indian and Pacific oceans'),
-    'Chinese sphere': ('#e0453f', 'The Chinese tributary order, its canal and its diaspora'),
-    'Islamic world and the Sahel': ('#38b06a', 'Pilgrimage and caravan systems of the Muslim world, the Sahara and the Swahili coast'),
-    'Buddhist and Indic world': ('#f0782a', 'The spread of Buddhism along the roads of Asia'),
-    'Orthodox and Eastern Christendom': ('#9a6fd0', 'The Orthodox churches, the Church of the East and the early and Aksumite church'),
-    'Latin Christendom and the Catholic world': ('#5468e0', 'The Latin church, the Catholic Church worldwide and the Jesuit missions'),
-    'Italian maritime republics': ('#e06fb0', 'Venice and Genoa'),
-    'Northern and Baltic trade': ('#6fa0a8', 'The Hanseatic League and the Varangian and Volga river routes'),
-    'Iberian empires': ('#b8683a', 'Portuguese and Spanish oceanic routes'),
-    'Northwest European chartered companies': ('#3f8bd9', 'The VOC, the British East India Company and Hudson\'s Bay, and the opium trade'),
-    'Atlantic slave system': ('#8a4f8a', 'The transatlantic slave trade'),
-    'Indigenous American systems': ('#8c6a3a', 'The Inca road system, the Aztec Triple Alliance and the Haudenosaunee'),
-    'Russian empire': ('#8a9a2e', 'The Russian-American Company and the Trans-Siberian Railway'),
-    'Communist movement': ('#b5123a', 'The Comintern, the Chinese Communist base areas and the Warsaw Pact'),
-    'Western bloc': ('#7fd0e8', 'NATO and the European Union'),
-    'Dynastic and banking houses': ('#c8b6e2', 'Families and houses whose marriages, credit and courts held parts of Europe together'),
-    'Global institutions and infrastructure': ('#d4d9de', 'The United Nations, the Red Cross, telegraph cables and container shipping'),
-}
+# (name, parent or None, colour, what it is). Parents come before children. Colours are chosen by
+# hand: a family stays in one hue neighbourhood (Christendom: indigo, blues and lilacs), with
+# lightness and hue spaced so relatives read as relatives but can still be told apart.
+SPHERE_DEFS = [
+    ('Ancient Near East and Mediterranean', None, '#d9a441', 'Bronze and Iron Age trade, road and post systems of the Near East and Mediterranean'),
+    ('Steppe and Inner Asia', None, '#b79f6e', 'Nomadic confederations and the caravan and relay systems that crossed their lands'),
+    ('Maritime Asia and the Pacific', None, '#2bd4b4', 'Monsoon trade, Srivijaya and the voyaging peoples of the Indian and Pacific oceans'),
+    ('Chinese sphere', None, '#e0453f', 'The Chinese tributary order, its canal and its diaspora'),
+    ('Islamic world and the Sahel', None, '#38b06a', 'Pilgrimage and caravan systems of the Muslim world, the Sahara and the Swahili coast'),
+    ('Buddhist and Indic world', None, '#f0782a', 'The spread of Buddhism along the roads of Asia'),
+    ('Indigenous American systems', None, '#8c6a3a', 'The Inca road system, the Aztec Triple Alliance and the Haudenosaunee'),
+    ('Christendom (before the schisms)', None, '#6f63d6', 'The early church before it divided into Latin and Eastern branches'),
+    ('Latin Christendom and the Catholic world', 'Christendom (before the schisms)', '#4f6fe0', 'The Latin church, the Catholic Church worldwide and the Jesuit missions'),
+    ('Orthodox and Eastern Christendom', 'Christendom (before the schisms)', '#a77ee0', 'The Orthodox churches, the Church of the East and the Aksumite church'),
+    ('Italian maritime republics', 'Latin Christendom and the Catholic world', '#4fb3e8', 'Venice and Genoa'),
+    ('Northern and Baltic trade', 'Latin Christendom and the Catholic world', '#4fa6a0', 'The Hanseatic League and the Varangian and Volga river routes'),
+    ('Dynastic and banking houses', 'Latin Christendom and the Catholic world', '#e8a8d8', 'Families and houses whose marriages, credit and courts held parts of Europe together'),
+    ('Iberian empires', 'Latin Christendom and the Catholic world', '#3a56b8', 'Portuguese and Spanish oceanic routes'),
+    ('Northwest European chartered companies', 'Latin Christendom and the Catholic world', '#2f9fd6', "The VOC, the British East India Company and Hudson's Bay, and the opium trade"),
+    ('Atlantic slave system', 'Iberian empires', '#26398a', 'The transatlantic slave trade, begun by the Iberian empires and run by every Atlantic power'),
+    ('Western bloc', 'Northwest European chartered companies', '#78d0ee', 'NATO and the European Union'),
+    ('Global institutions and infrastructure', 'Western bloc', '#c4e4ef', 'The United Nations, the Red Cross, telegraph cables and container shipping'),
+    ('Russian empire', 'Orthodox and Eastern Christendom', '#7a4fc0', 'The Russian-American Company and the Trans-Siberian Railway'),
+    ('Communist movement', 'Russian empire', '#d03a6a', 'The Comintern, the Chinese Communist base areas and the Warsaw Pact'),
+]
+
+
+PARENT_OF = {name: parent for name, parent, _colour, _about in SPHERE_DEFS}
+GROUPS = {name: (colour, about) for name, _parent, colour, about in SPHERE_DEFS}   # name -> (colour, about)
+
+
+def lineage(name):
+    """From the root sphere down to this one."""
+    path = [name]
+    while PARENT_OF.get(path[0]):
+        path.insert(0, PARENT_OF[path[0]])
+    return path
+
+
+POWERS = {'I': 'Ideological', 'E': 'Economic', 'M': 'Military', 'P': 'Political'}
 
 GROUP_OF = {}
 for _group, _names in {
@@ -46,8 +69,9 @@ for _group, _names in {
     'Chinese sphere': ['Grand Canal (China)', 'Overseas Chinese networks', 'Chinese tributary system'],
     'Islamic world and the Sahel': ['Hajj caravans', 'Trans-Saharan trade', 'Swahili coast trade network'],
     'Buddhist and Indic world': ['Spread of Buddhism'],
+    'Christendom (before the schisms)': ['Early Christian communities'],
     'Orthodox and Eastern Christendom': [
-        'Early Christian communities', 'Church of the East', 'Orthodox Christendom', 'Kingdom of Aksum trade network'],
+        'Church of the East', 'Orthodox Christendom', 'Kingdom of Aksum trade network'],
     'Latin Christendom and the Catholic world': [
         'Latin Christendom (the medieval Church)', 'Catholic Church worldwide', 'Society of Jesus missions', 'Knights Templar'],
     'Italian maritime republics': ['Venetian maritime network', 'Genoese trading network'],
@@ -71,6 +95,30 @@ for _group, _names in {
 }.items():
     for _name in _names:
         GROUP_OF[_name] = _group
+
+# Power type per network: Ideological, Economic, Military, Political (Mann's four sources of power).
+POWER_OF = {
+    'Uruk expansion': 'E', 'Indus–Mesopotamia trade (Meluhha)': 'E', 'Phoenician and Carthaginian network': 'EM',
+    'Greek colonial network': 'EP', 'Incense Route': 'E', 'Royal Road': 'MP', 'Silk Road (overland)': 'IE',
+    'Indian Ocean trade network': 'IE', 'Hajj caravans': 'IE', 'Trans-Saharan trade': 'IE', 'Swahili coast trade network': 'E',
+    'Varangian and Volga river routes': 'EM', 'Hanseatic League': 'EM', 'Venetian maritime network': 'EMP',
+    'Genoese trading network': 'EM', 'Mongol yam relay system': 'MP', 'Qhapaq Ñan (Inca road system)': 'MP',
+    'Carreira da Índia (Portuguese India route)': 'EM', 'Spanish treasure fleets (Carrera de Indias)': 'EM',
+    'Manila galleon route': 'E', 'Dutch East India Company network (VOC)': 'EMP', "Hudson's Bay fur-trade network": 'E',
+    'Transatlantic slave trade': 'EM', 'Communist International (Comintern)': 'IP',
+    'Chinese Communist base areas and Long March': 'MP', 'Roman road and post network': 'MP',
+    'Kingdom of Aksum trade network': 'EP', 'Early Christian communities': 'I', 'Spread of Buddhism': 'I',
+    'Church of the East': 'IE', 'Society of Jesus missions': 'I', 'Srivijaya': 'EMP', 'Grand Canal (China)': 'EP',
+    'Ancient Tea Horse Road': 'E', 'Overseas Chinese networks': 'E', 'British East India Company': 'EMP',
+    'Opium trade to China': 'E', 'Trans-Siberian Railway': 'EMP', 'Container shipping network': 'E',
+    'Aztec Triple Alliance and pochteca': 'EMP', 'Haudenosaunee Confederacy': 'MP', 'Lapita and Polynesian voyaging': 'IE',
+    'Submarine telegraph cables': 'EP', 'International Red Cross and Red Crescent Movement': 'I',
+    'United Nations system': 'IP', 'Latin Christendom (the medieval Church)': 'IEP', 'Catholic Church worldwide': 'IE',
+    'Orthodox Christendom': 'IP', 'Steppe nomadic confederations': 'MP', 'Chinese tributary system': 'EP',
+    'Russian-American Company': 'EM', 'NATO': 'MP', 'Warsaw Pact and Soviet bloc': 'MP', 'European Union': 'EP',
+    'Habsburg dynastic network (1477-1700)': 'EP', 'Medici banking network': 'EP', 'Knights Templar': 'IEM',
+}
+
 
 # (network, place or zone, longitude, latitude, 'c' conflict or 'x' exchange, first year, last year)
 MARKS = [

@@ -68,6 +68,9 @@ interface Props extends LabelProps {
   hubs?: string;
   /** Societies: the sphere or group a network belongs to (sets its colour). */
   grp?: string;
+  /** Societies: power types it wields, and the lineage of its sphere. */
+  pw?: string;
+  lin?: string;
 }
 
 interface MapFeature {
@@ -1332,6 +1335,8 @@ function openPanel(p: Props): void {
   const extraFacts: WikiFact[] = [];
   if (societies) {
     if (p.grp) extraFacts.push({ label: 'Sphere', value: p.grp });
+    if (p.lin && p.lin.includes(' > ')) extraFacts.push({ label: 'Lineage', value: p.lin.replace(/ > /g, ' → ') });
+    if (p.pw) extraFacts.push({ label: 'Power', value: p.pw });
     if (p.kind) extraFacts.push({ label: 'Type', value: p.kind });
     if (p.hubs) {
       const list = p.hubs.split(', ');

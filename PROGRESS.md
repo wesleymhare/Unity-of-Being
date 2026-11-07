@@ -74,6 +74,7 @@
 - **Placeholders (nothing built behind them):** a left-pointing triangle at the start of the timeline for deep time before 3400 BCE (continental drift, ice ages), a **Tiles** button for the Tier 2 tile view, and an **Edit** button for worldbuilding, to the left of Help.
 
 ## Planned
+- **Edit mode** (plan agreed 8 Nov, see `docs/PLAN-EDIT-MODE.md`): alt-history on top of the real data, branches saved in the browser and exportable, multi-year spans, start from real shapes, separate Markdown mode for notes.
 - Deep time before 3400 BCE (continental drift, ice ages, sea level).
 - Tier 2 tile view; Tier 3 hex dioramas.
 - Edit mode for worldbuilding.

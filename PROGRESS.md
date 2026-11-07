@@ -97,6 +97,13 @@
 - **Edit mode phase 1 built** (`src/edit.ts`, `src/edit-ui.ts`, hooks in `src/main.ts`): worlds (branches) saved in IndexedDB, new/copy/rename/delete/export/import, and per-polity rename, recolour, change years and remove. Changed records are redrawn from a small source with an amber outline; the real data is never touched. Tested headless on a phone-sized screen: select, edit, hide, reload (persists), export, import, bad file, delete.
 - **Not yet in Edit mode:** drawing shapes, splitting and merging, Markdown notes, undo/redo, Civilizations/Societies/Biomes edits (see `docs/PLAN-EDIT-MODE.md`).
 
+### 8 November 2026: phones ran out of memory ("Webpage reloaded because a problem occurred")
+- **Cause, measured** (headless Chromium, phone-sized): the page parsed the 26 MB polities and 14 MB provinces GeoJSON, then MapLibre's worker parsed and indexed them again. The renderer reached about 3.2 GB (3.4 GB with all processes) and settled near 1.9 GB; with those two sources empty it used 0.3 to 0.4 GB. A phone tab is killed far below that, so the map never finished building.
+- **Fix:** polities and provinces are now **static vector tiles** (`data/build-tiles.mjs`, zoom 0 to 6, stretched beyond) read by MapLibre as a vector source, and the page loads only small property lists (`polities-props.json` 2 MB, `subdivisions-props.json` 0.8 MB) for labels, clicks and the panel. `data/split-web-data.py` gives every shape its key `k` and writes those lists plus 84 small shape chunks (`polity-shapes/`) that Edit mode fetches only when an edit needs a shape. Run both with `npm run data:web` whenever the shapes are rebuilt.
+- **Result:** renderer about 0.44 GB while loading and 0.29 GB after (was 3.2 and 1.9 GB); all processes peak 0.84 GB (was 3.4 GB). The map, labels, clicks and Edit mode (select, edit, hide, reload, export, import, delete) all pass the headless test.
+- **Not verified:** real iOS Safari or Android Chrome. The numbers are from desktop Chromium with software rendering, so check on a phone.
+- The full GeoJSON files are still in `public/data` (build inputs, no longer loaded by the page); they could be kept out of the deployed site later. The repo grew by about 90 MB of tiles and chunks.
+
 ## Next
 - Grow Societies: more networks (Americas, Africa, Pacific), weighted edges, modern parties and factions.
 - Haplogroup layer for Civilizations (open ancient-DNA data only, with uncertainty).

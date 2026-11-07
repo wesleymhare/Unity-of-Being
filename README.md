@@ -26,6 +26,7 @@ The pipeline needs Node and Python 3 (`pip install -r data/requirements.txt`).
 npm run data:download            # Cliopatria + Natural Earth rivers/lakes into data/raw/ (git-ignored)
 npm run data:build               # simplifies Cliopatria, runs data/clean-polities.py (about 3 minutes), builds land, rivers, lakes
 npm run data:water               # rebuild only the Natural Earth water layers
+npm run data:web                 # after data:build / data:polities:modern / subdivisions: keys, property lists and vector tiles (see PROGRESS.md, 8 Nov)
 npm run data:civilizations           # data/civilizations_data.py -> public/data/civilizations.geojson
 npm run data:polities:modern     # data/build-modern-polities.py: 2016 onward de jure map (run after data:build)
 npm run data:biomes:download     # Köppen-Geiger raster and RESOLVE ecoregions into data/raw/

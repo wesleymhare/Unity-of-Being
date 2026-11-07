@@ -36,6 +36,8 @@ import {
 maplibregl.setWorkerUrl(workerUrl);
 
 const BASE = import.meta.env.BASE_URL;
+/** Absolute base for the vector tiles MapLibre's worker loads itself (a worker cannot resolve a page-relative path). */
+const dataBase = new URL(BASE, location.href).href;
 /** Zoom at which local civilization identities (level 3) fade in. */
 const LOCAL_ZOOM = 3.6;
 /** Hub label keys start here; network keys are small indexes. */
@@ -377,7 +379,20 @@ let subParents = new Set<string>();
 let polityProps: Props[] = [];
 /** The real polity records and their shapes by index k; edit mode never changes these. */
 let basePolityProps: Props[] = [];
-let polityShapes: unknown[] = [];
+/** Shapes of real polities by record index, fetched in small chunks only when an edit needs one. */
+const SHAPE_CHUNK = 150;
+const shapeChunks = new Map<number, Promise<unknown[]>>();
+function polityShape(k: number): Promise<unknown> {
+  const chunk = Math.floor(k / SHAPE_CHUNK);
+  let loading = shapeChunks.get(chunk);
+  if (!loading) {
+    loading = getJson<unknown[]>(`${BASE}data/polity-shapes/${chunk}.json`);
+    shapeChunks.set(chunk, loading);
+    loading.catch(() => shapeChunks.delete(chunk));
+  }
+  return loading.then((list) => list[k - chunk * SHAPE_CHUNK]);
+}
+let editSeq = 0;
 let editActive = false;
 let editUi: ReturnType<typeof initEditUi> | null = null;
 let civilizationProps: Props[] = [];
@@ -1112,7 +1127,18 @@ function showPanel(): void {
  * Draw a world on top of the real polities. Changed records are taken out of the base layers and
  * drawn from their own small source; hidden ones are just taken out. The real data is untouched.
  */
-function applyEdits(ops: Map<number, Override>): void {
+async function applyEdits(ops: Map<number, Override>): Promise<number> {
+  const seq = ++editSeq;
+  const shapes = new Map<number, unknown>();
+  let failed = 0;
+  await Promise.all([...ops].filter(([k, o]) => basePolityProps[k] && !o.hide).map(async ([k]) => {
+    try {
+      shapes.set(k, await polityShape(k));
+    } catch {
+      failed++;
+    }
+  }));
+  if (seq !== editSeq) return failed; // a newer change superseded this one
   const features: unknown[] = [];
   const hidden = new Set<number>();
   editExcluded = [];
@@ -1120,12 +1146,14 @@ function applyEdits(ops: Map<number, Override>): void {
   for (const [k, o] of ops) {
     const real = basePolityProps[k];
     if (!real) continue;
+    if (o.hide) { hidden.add(k); editExcluded.push(k); continue; }
+    const geometry = shapes.get(k);
+    if (!geometry) continue; // shape unavailable: leave the real polity showing rather than lose it
     editExcluded.push(k);
-    if (o.hide) { hidden.add(k); continue; }
     const years = effectiveYears(real, o);
     const props: Props = { ...real, n: o.name ?? real.n, c: o.colour ?? real.c, s: years.s, e: years.e };
     polityProps[k] = props;
-    features.push({ type: 'Feature', properties: props, geometry: polityShapes[k] });
+    features.push({ type: 'Feature', properties: props, geometry });
   }
   const source = map.getSource('polities-edit') as maplibregl.GeoJSONSource | undefined;
   source?.setData({ type: 'FeatureCollection', features } as GeoData);
@@ -1133,6 +1161,7 @@ function applyEdits(ops: Map<number, Override>): void {
   if (selectedKey >= 0 && selectedKey < SUB_K) selectedProps = polityProps[selectedKey] ?? selectedProps;
   applyYearFilters();
   polityLabels.setYear(year, activeLens === 'polities');
+  return failed;
 }
 
 /** Re-run every year filter (the year changed, or edit mode changed what is hidden). */
@@ -1701,20 +1730,9 @@ function checkSources(): void {
 
 map.on('load', async () => {
   try {
-    const [land, polityData, civilizationData, societyData, rivers, lakes, koppen, ecoBin, ecoMeta, ecoLines, ocean, subData] = await Promise.all([
+    const [land, polityList, civilizationData, societyData, rivers, lakes, koppen, ecoBin, ecoMeta, ecoLines, ocean, subList] = await Promise.all([
       getJson(`${BASE}data/land.geojson`),
-      getJson<FeatureCollection>(`${BASE}data/polities.geojson`, (loaded, total) => {
-        const megabytes = loaded / 1048576;
-        const percent = total > 0 ? Math.min(100, (loaded / total) * 100) : 0;
-        loadingText.textContent = total > 0
-          ? `Downloading borders… ${Math.round(percent)}%`
-          : `Downloading borders… ${megabytes.toFixed(1)} MB`;
-        if (total > 0) loadingProgress.style.width = `${percent}%`;
-        if (total > 0 && loaded >= total) {
-          loadingText.textContent = 'Building map…';
-          loadingProgress.style.width = '100%';
-        }
-      }),
+      getJson<Props[]>(`${BASE}data/polities-props.json`),
       getJson<FeatureCollection>(`${BASE}data/civilizations.geojson`).catch((error) => {
         console.error('Civilizations data:', error);
         return null;
@@ -1733,34 +1751,26 @@ map.on('load', async () => {
       getJson<EcoMeta>(`${BASE}data/ecoregions.json`).catch(() => null),
       getJson(`${BASE}data/ecoregion-lines.geojson`).catch(() => null),
       getJson(`${BASE}data/ocean.geojson`).catch(() => null),
-      getJson<FeatureCollection>(`${BASE}data/subdivisions.geojson`).catch(() => null),
+      getJson<Props[]>(`${BASE}data/subdivisions-props.json`).catch(() => null),
     ]);
 
     loadingText.textContent = 'Building map…';
     loadingProgress.style.width = '100%';
 
-    const polityFeatures = polityData.features;
+    // The big shape files are fetched by MapLibre's own worker (see the sources below), never parsed
+    // here: doing both held several copies in memory and phones killed the tab (data/split-web-data.py).
     const civilizationFeatures = civilizationData?.features ?? [];
-    polityFeatures.forEach((feature, index) => {
-      feature.properties.k = index;
-    });
     civilizationFeatures.forEach((feature, index) => {
       feature.properties.k = index;
     });
-    // Provinces: polygons get keys from SUB_K up; internal border lines (bd) carry none.
-    const subFeatures = subData?.features ?? [];
-    subProps = [];
-    for (const feature of subFeatures) {
-      const props = feature.properties as Props & { bd?: number };
-      if (props.bd) continue;
-      props.k = SUB_K + subProps.length;
-      props.q = '';
-      props.nt = `Provinces as in ${props.era}; borders are approximated from modern boundaries, so edges are rough.`;
-      subProps.push(props);
-    }
-    polityProps = polityFeatures.map((feature) => feature.properties);
+    // Provinces: polygons carry keys from SUB_K up (set in the data file); border lines (bd) carry none.
+    subProps = (subList ?? []).map((props) => ({
+      ...props,
+      q: '',
+      nt: `Provinces as in ${props.era}; borders are approximated from modern boundaries, so edges are rough.`,
+    }));
+    polityProps = polityList;
     basePolityProps = polityProps.slice();
-    polityShapes = polityFeatures.map((feature) => feature.geometry);
     civilizationProps = civilizationFeatures.map((feature) => feature.properties);
     civilizationFootprints = buildFootprints(civilizationFeatures);
     societyProps = societyData?.entities ?? [];
@@ -1803,9 +1813,13 @@ map.on('load', async () => {
     }
 
     map.addSource('land', { type: 'geojson', data: land as GeoData });
+    // Polities and provinces are static vector tiles (data/build-tiles.mjs), not GeoJSON: parsing and
+    // indexing the 40 MB of shapes took 2 GB or more and phones killed the tab.
     map.addSource('polities', {
-      type: 'geojson',
-      data: { type: 'FeatureCollection', features: polityFeatures } as GeoData,
+      type: 'vector',
+      tiles: [`${dataBase}data/tiles/polities/{z}/{x}/{y}.pbf`],
+      minzoom: 0,
+      maxzoom: 6,
     });
     map.addSource('polities-edit', {
       type: 'geojson',
@@ -1820,8 +1834,10 @@ map.on('load', async () => {
       data: { type: 'FeatureCollection', features: societyData?.features ?? [] } as GeoData,
     });
     map.addSource('subdivisions', {
-      type: 'geojson',
-      data: { type: 'FeatureCollection', features: subFeatures } as GeoData,
+      type: 'vector',
+      tiles: [`${dataBase}data/tiles/subdivisions/{z}/{x}/{y}.pbf`],
+      minzoom: 0,
+      maxzoom: 6,
     });
 
     const visible = (lens: Lens): 'visible' | 'none' => (activeLens === lens ? 'visible' : 'none');
@@ -1837,6 +1853,7 @@ map.on('load', async () => {
       id: 'polity-fill',
       type: 'fill',
       source: 'polities',
+      'source-layer': 'polities',
       filter: leafFilter(year),
       paint: { 'fill-color': ['get', 'c'], 'fill-opacity': 0.84 },
       layout: { visibility: visible('polities') },
@@ -1935,6 +1952,7 @@ map.on('load', async () => {
       id: 'polity-line',
       type: 'line',
       source: 'polities',
+      'source-layer': 'polities',
       filter: leafFilter(year),
       paint: {
         'line-color': '#2a2118',
@@ -1947,6 +1965,7 @@ map.on('load', async () => {
       id: 'polity-realm-casing',
       type: 'line',
       source: 'polities',
+      'source-layer': 'polities',
       filter: realmFilter(year),
       paint: {
         'line-color': '#201811',
@@ -1959,6 +1978,7 @@ map.on('load', async () => {
       id: 'polity-realm-line',
       type: 'line',
       source: 'polities',
+      'source-layer': 'polities',
       filter: realmFilter(year),
       paint: {
         'line-color': '#2a2118',
@@ -1971,6 +1991,7 @@ map.on('load', async () => {
       id: 'polity-hl',
       type: 'line',
       source: 'polities',
+      'source-layer': 'polities',
       filter: NO_FEATURE,
       paint: { 'line-color': '#f6e7b8', 'line-width': 2.4, 'line-opacity': 0.95 },
       layout: { 'line-join': 'round', visibility: visible('polities') },
@@ -2007,6 +2028,7 @@ map.on('load', async () => {
       id: 'sub-fill',
       type: 'fill',
       source: 'subdivisions',
+      'source-layer': 'subdivisions',
       filter: ['all', yearFilter(year), ['!', ['has', 'bd']]],
       paint: { 'fill-color': ['get', 'c'], 'fill-opacity': 0.02 },
       layout: { visibility: visible('polities') },
@@ -2015,6 +2037,7 @@ map.on('load', async () => {
       id: 'sub-line',
       type: 'line',
       source: 'subdivisions',
+      'source-layer': 'subdivisions',
       filter: ['all', yearFilter(year), ['has', 'bd']],
       paint: {
         'line-color': '#2a2118',
@@ -2028,6 +2051,7 @@ map.on('load', async () => {
       id: 'sub-hl',
       type: 'line',
       source: 'subdivisions',
+      'source-layer': 'subdivisions',
       filter: NO_FEATURE,
       paint: { 'line-color': '#f6e7b8', 'line-width': 2.2, 'line-opacity': 0.95 },
       layout: { 'line-join': 'round', visibility: visible('polities') },

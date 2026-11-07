@@ -17,7 +17,7 @@ export interface RealRecord extends RecordLike {
 export interface EditHost {
   records(): (RealRecord | undefined)[];
   /** Draw the branch: overrides keyed by the real record's index. */
-  apply(ops: Map<number, Override>): void;
+  apply(ops: Map<number, Override>): Promise<number>;
   year(): number;
   fmtYear(year: number): string;
   setActive(on: boolean): void;
@@ -67,7 +67,9 @@ export function initEditUi(host: EditHost): { toggle(): void; select(p: RealReco
   }
 
   function redraw(): void {
-    host.apply(opsByIndex());
+    void host.apply(opsByIndex()).then((failed) => {
+      if (failed) say(`${failed} changed shape(s) could not be loaded just now, so the real polity is shown instead. Check your connection.`);
+    });
     const count = current ? Object.keys(current.ops).length : 0;
     tag.hidden = !current || open;
     tag.textContent = current ? `Alt-history: ${current.name}${count ? ` · ${count} edit${count === 1 ? '' : 's'}` : ''}` : '';

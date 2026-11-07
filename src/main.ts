@@ -5,6 +5,8 @@ import './style.css';
 import { BiomeModel, CLASSES, GROUPS, climateShift, type EcoMeta, type EcoPatch } from './biomes';
 import { LabelLayer, type LabelProps } from './labels';
 import { GROUP_ORDER, organiseInfobox, type ExtraRow, type OrganisedInfobox } from './infobox-map';
+import { effectiveYears, type Override } from './edit';
+import { initEditUi } from './edit-ui';
 import { buildSheet, emptySheet, fmtReign, getCurated, getMaddison, getProfileData, getWorldBank, maddisonCode, type Curated, type MaddisonCountry, type ProfileData, type ProfileGroup, type WorldBank } from './profile';
 import {
   getArticlePhoto,
@@ -208,10 +210,6 @@ const SOON: Record<string, { title: string; body: string }> = {
     title: 'Tile view (Tier 2)',
     body: 'A planned zoom from the political map down to terrain and tiles for the place and year you are looking at: relief, settlements and, later, tile and hex dioramas.',
   },
-  edit: {
-    title: 'Edit mode: worldbuilding',
-    body: 'A planned mode for drawing and changing polities, civilizations, societies and biomes, keeping your own timelines and, later, sharing them.',
-  },
 };
 const soonBox = $('soon');
 const soonButtons = [...document.querySelectorAll<HTMLButtonElement>('.soon-btn')];
@@ -290,9 +288,16 @@ new ResizeObserver(() => {
 type Filter = maplibregl.ExpressionSpecification;
 type GeoData = maplibregl.GeoJSONSourceSpecification['data'];
 
-const yearFilter = (value: number): Filter => [
+/** Real polity records that edit mode hides or redraws from the edit source (by record index k). */
+let editExcluded: number[] = [];
+const rawYearFilter = (value: number): Filter => [
   'all', ['<=', ['get', 's'], value], ['>=', ['get', 'e'], value],
 ];
+const yearFilter = (value: number): Filter => editExcluded.length
+  ? ['all', rawYearFilter(value), ['!', ['in', ['get', 'k'], ['literal', editExcluded]]]]
+  : rawYearFilter(value);
+/** Polities drawn from the edit source: no exclusion, and never realm-only groups. */
+const editLayerFilter = (value: number): Filter => ['all', rawYearFilter(value), ['!', ['has', 'g']]];
 /** Shapes that are filled: everything except label-only realm groups. */
 const leafFilter = (value: number): Filter => ['all', yearFilter(value), ['!', ['has', 'g']]];
 /** Outlines of realms: groups and polities that are not part of a realm. */
@@ -330,6 +335,8 @@ const socFilter = (value: number, type: string, ...extra: Filter[]): Filter => {
 const YEAR_FILTERS: Record<string, (value: number) => Filter> = {
   'lake-fill': lakeFilter,
   'lake-line': lakeFilter,
+  'edit-fill': editLayerFilter,
+  'edit-line': editLayerFilter,
   'polity-fill': leafFilter,
   'polity-line': leafFilter,
   'polity-realm-casing': realmFilter,
@@ -350,7 +357,7 @@ const YEAR_FILTERS: Record<string, (value: number) => Filter> = {
 };
 
 const LENS_LAYERS: Record<Lens, string[]> = {
-  polities: ['polity-fill', 'polity-line', 'polity-realm-casing', 'polity-realm-line', 'polity-hl', 'sub-fill', 'sub-line', 'sub-hl'],
+  polities: ['polity-fill', 'polity-line', 'polity-realm-casing', 'polity-realm-line', 'polity-hl', 'edit-fill', 'edit-line', 'edit-hl', 'sub-fill', 'sub-line', 'sub-hl'],
   civilizations: ['civilization-fill', 'civilization-casing', 'civilization-line', 'civilization-hl'],
   societies: ['soc-zone-fill', 'soc-zone-line', 'soc-route-casing', 'soc-route', 'soc-route-sea', 'soc-node', 'soc-mark-badge', 'soc-mark', 'soc-hl-route', 'soc-hl-zone', 'soc-hl-node'],
   biomes: ['biome-raster', 'eco-lines', 'ocean-mask'],
@@ -368,6 +375,11 @@ const SUB_ZOOM = 3.4;
 let subProps: Props[] = [];
 let subParents = new Set<string>();
 let polityProps: Props[] = [];
+/** The real polity records and their shapes by index k; edit mode never changes these. */
+let basePolityProps: Props[] = [];
+let polityShapes: unknown[] = [];
+let editActive = false;
+let editUi: ReturnType<typeof initEditUi> | null = null;
 let civilizationProps: Props[] = [];
 /** Societies: one record per network, and the label items (titles and hubs). */
 let societyProps: Props[] = [];
@@ -582,10 +594,7 @@ function setYear(next: number): void {
     slider.value = String(year);
     yearLabel.textContent = fmtYear(year);
 
-    for (const [id, make] of Object.entries(YEAR_FILTERS)) {
-      if (map.getLayer(id)) map.setFilter(id, make(year));
-    }
-    setHighlight(selectedKey >= 0 ? selectedProps : null);
+    applyYearFilters();
 
     if (activeLens === 'biomes') renderBiomes();
     subParents = new Set(subProps.filter((item) => item.s <= year && item.e >= year).map((item) => item.p as string));
@@ -1099,8 +1108,43 @@ function showPanel(): void {
   });
 }
 
+/**
+ * Draw a world on top of the real polities. Changed records are taken out of the base layers and
+ * drawn from their own small source; hidden ones are just taken out. The real data is untouched.
+ */
+function applyEdits(ops: Map<number, Override>): void {
+  const features: unknown[] = [];
+  const hidden = new Set<number>();
+  editExcluded = [];
+  polityProps = basePolityProps.slice();
+  for (const [k, o] of ops) {
+    const real = basePolityProps[k];
+    if (!real) continue;
+    editExcluded.push(k);
+    if (o.hide) { hidden.add(k); continue; }
+    const years = effectiveYears(real, o);
+    const props: Props = { ...real, n: o.name ?? real.n, c: o.colour ?? real.c, s: years.s, e: years.e };
+    polityProps[k] = props;
+    features.push({ type: 'Feature', properties: props, geometry: polityShapes[k] });
+  }
+  const source = map.getSource('polities-edit') as maplibregl.GeoJSONSource | undefined;
+  source?.setData({ type: 'FeatureCollection', features } as GeoData);
+  polityLabels.setFeatures(hidden.size ? polityProps.filter((_, k) => !hidden.has(k)) : polityProps);
+  if (selectedKey >= 0 && selectedKey < SUB_K) selectedProps = polityProps[selectedKey] ?? selectedProps;
+  applyYearFilters();
+  polityLabels.setYear(year, activeLens === 'polities');
+}
+
+/** Re-run every year filter (the year changed, or edit mode changed what is hidden). */
+function applyYearFilters(): void {
+  for (const [id, make] of Object.entries(YEAR_FILTERS)) {
+    if (map.getLayer(id)) map.setFilter(id, make(year));
+  }
+  setHighlight(selectedKey >= 0 ? selectedProps : null);
+}
+
 function setHighlight(p: Props | null): void {
-  for (const id of ['polity-hl', 'civilization-hl', 'sub-hl', 'soc-hl-route', 'soc-hl-zone', 'soc-hl-node']) {
+  for (const id of ['edit-hl', 'polity-hl', 'civilization-hl', 'sub-hl', 'soc-hl-route', 'soc-hl-zone', 'soc-hl-node']) {
     if (map.getLayer(id)) map.setFilter(id, NO_FEATURE);
   }
   if (!p) return;
@@ -1113,6 +1157,9 @@ function setHighlight(p: Props | null): void {
   }
   const id = p.k >= SUB_K ? 'sub-hl' : highlightLayerOf(activeLens);
   if (id && map.getLayer(id)) map.setFilter(id, highlightFilter(year, p.k));
+  if (id === 'polity-hl' && map.getLayer('edit-hl')) {
+    map.setFilter('edit-hl', ['all', rawYearFilter(year), ['==', ['get', 'k'], p.k]]);
+  }
 }
 
 function updateSelection(): void {
@@ -1293,6 +1340,15 @@ function renderLineage(p: Props): void {
 
 function openPanel(p: Props): void {
   if (activeLens === 'biomes') return;
+  if (editActive && activeLens === 'polities' && p.k < SUB_K) {
+    // Edit mode: selecting a polity opens the inspector instead of the article.
+    selectedKey = p.k;
+    selectedProps = p;
+    editUi?.select({ k: p.k, n: (basePolityProps[p.k] ?? p).n, s: (basePolityProps[p.k] ?? p).s, e: (basePolityProps[p.k] ?? p).e, c: (basePolityProps[p.k] ?? p).c });
+    setHighlight(p);
+    updateSelection();
+    return;
+  }
   const name = p.n;
   const rawTitle = wikiTitle(p.w);
   const qid = /^Q\d+$/.test(p.q) ? p.q : null;
@@ -1703,6 +1759,8 @@ map.on('load', async () => {
       subProps.push(props);
     }
     polityProps = polityFeatures.map((feature) => feature.properties);
+    basePolityProps = polityProps.slice();
+    polityShapes = polityFeatures.map((feature) => feature.geometry);
     civilizationProps = civilizationFeatures.map((feature) => feature.properties);
     civilizationFootprints = buildFootprints(civilizationFeatures);
     societyProps = societyData?.entities ?? [];
@@ -1748,6 +1806,10 @@ map.on('load', async () => {
     map.addSource('polities', {
       type: 'geojson',
       data: { type: 'FeatureCollection', features: polityFeatures } as GeoData,
+    });
+    map.addSource('polities-edit', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] } as GeoData,
     });
     map.addSource('civilizations', {
       type: 'geojson',
@@ -1914,6 +1976,32 @@ map.on('load', async () => {
       layout: { 'line-join': 'round', visibility: visible('polities') },
     });
 
+    // Edit mode: records the user's world changed are drawn from their own small source, outlined in amber.
+    map.addLayer({
+      id: 'edit-fill',
+      type: 'fill',
+      source: 'polities-edit',
+      filter: editLayerFilter(year),
+      paint: { 'fill-color': ['get', 'c'], 'fill-opacity': 0.84 },
+      layout: { visibility: visible('polities') },
+    });
+    map.addLayer({
+      id: 'edit-line',
+      type: 'line',
+      source: 'polities-edit',
+      filter: editLayerFilter(year),
+      paint: { 'line-color': '#d99a2b', 'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.8, 5, 1.4, 9, 2.2], 'line-opacity': 0.9 },
+      layout: { ...roundLines, visibility: visible('polities') },
+    });
+    map.addLayer({
+      id: 'edit-hl',
+      type: 'line',
+      source: 'polities-edit',
+      filter: NO_FEATURE,
+      paint: { 'line-color': '#f6e7b8', 'line-width': 2.4, 'line-opacity': 0.95 },
+      layout: { 'line-join': 'round', visibility: visible('polities') },
+    });
+
     // Provinces inside big polities: same colour as the parent, so only their borders show.
     map.addLayer({
       id: 'sub-fill',
@@ -2060,6 +2148,20 @@ map.on('load', async () => {
       layout: { visibility: visible('societies') },
     });
 
+    editUi = initEditUi({
+      records: () => basePolityProps.map((p) => ({ k: p.k, n: p.n, s: p.s, e: p.e, c: p.c })),
+      apply: applyEdits,
+      year: () => year,
+      fmtYear,
+      setActive: (on) => { editActive = on; if (!on) { closePanel(); } },
+      isPolityLens: () => activeLens === 'polities',
+      highlight: (k) => setHighlight(k === null ? null : polityProps[k] ?? null),
+    });
+    $('edit-btn').addEventListener('click', (event) => {
+      event.stopPropagation();
+      editUi?.toggle();
+    });
+
     map.on('click', (event) => {
       if (activeLens === 'biomes') {
         openBiomePanel(event.lngLat.lng, event.lngLat.lat);
@@ -2100,7 +2202,9 @@ map.on('load', async () => {
         return;
       }
       const fill = fillLayerOf(activeLens);
-      const hits = fill ? map.queryRenderedFeatures(event.point, { layers: [fill] }) : [];
+      const hits = fill
+        ? map.queryRenderedFeatures(event.point, { layers: fill === 'polity-fill' && map.getLayer('edit-fill') ? [fill, 'edit-fill'] : [fill] })
+        : [];
       if (!hits.length) {
         closePanel();
         return;
@@ -2126,7 +2230,7 @@ map.on('load', async () => {
         const item = typeof key === 'number' ? subProps[key - SUB_K] : undefined;
         if (item && !subs.includes(item)) subs.push(item);
       }
-      const ordered = map.getZoom() >= SUB_ZOOM - 0.2 ? [...subs, ...stack] : [...stack, ...subs];
+      const ordered = editActive ? stack : map.getZoom() >= SUB_ZOOM - 0.2 ? [...subs, ...stack] : [...stack, ...subs];
       overlapSet = ordered;
       if (ordered.length) openPanel(ordered[0]);
     });

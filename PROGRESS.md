@@ -91,6 +91,12 @@
 - Rulers depend on Wikidata modelling and dates; coverage is sparse for many non-European and ancient polities.
 - `public/data/land.geojson` stores Afro-Eurasia in a frame shifted by -360 degrees (MapLibre draws it fine). The Python tools normalise it in `geo_labels.load_land`; the cleaner fix is in `data/build-land.mjs`.
 
+### 7 November 2026: data licences, Maddison, Edit mode phase 1
+- **Licences checked** against the sources' own pages (`docs/DATA-SOURCES.md`): Cliopatria is CC BY 4.0 (repo LICENSE.md and the Zenodo record), Maddison Project 2023 is CC BY 4.0, HYDE 3.3 is CC BY 4.0, CHELSA-TraCE21k is CC BY-SA (its page also says CC BY 2.0). **Not commercial-safe:** Seshat's other data (CC BY-NC-SA reported), Correlates of War, CShapes, Euratlas.
+- **Maddison Project added** (`data/build-maddison.py`, `public/data/maddison.json`, 540 kB): population and GDP per person from 1 CE for 169 countries, used by the Population and Economy rows when the World Bank has nothing, with a visible "today's borders" note. Verified against France, the USSR and the year edge cases with a build-time test; live Wikidata ids were not testable here.
+- **Edit mode phase 1 built** (`src/edit.ts`, `src/edit-ui.ts`, hooks in `src/main.ts`): worlds (branches) saved in IndexedDB, new/copy/rename/delete/export/import, and per-polity rename, recolour, change years and remove. Changed records are redrawn from a small source with an amber outline; the real data is never touched. Tested headless on a phone-sized screen: select, edit, hide, reload (persists), export, import, bad file, delete.
+- **Not yet in Edit mode:** drawing shapes, splitting and merging, Markdown notes, undo/redo, Civilizations/Societies/Biomes edits (see `docs/PLAN-EDIT-MODE.md`).
+
 ## Next
 - Grow Societies: more networks (Americas, Africa, Pacific), weighted edges, modern parties and factions.
 - Haplogroup layer for Civilizations (open ancient-DNA data only, with uncertainty).

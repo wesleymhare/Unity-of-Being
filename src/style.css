@@ -1151,3 +1151,73 @@ a { color: var(--brass); }
   text-transform: uppercase;
   color: var(--faint);
 }
+
+/* ---- Edit mode ---- */
+.top-btn#edit-btn[aria-pressed="true"] { border-style: solid; }
+.top-btn#edit-btn.on-branch { color: #ffd98a; border-color: #d99a2b; }
+.alt-tag {
+  position: fixed;
+  top: 64px;
+  left: 60px;
+  z-index: 8;
+  max-width: min(300px, calc(100vw - 32px));
+  padding: 4px 9px;
+  border: 1px solid #d99a2b;
+  border-radius: 7px;
+  background: rgba(40, 28, 10, 0.92);
+  color: #ffd98a;
+  font-size: 11px;
+  pointer-events: none;
+}
+.edit {
+  position: fixed;
+  top: 64px;
+  left: 60px;
+  z-index: 10;
+  width: min(340px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px - 140px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 10px 12px 12px;
+  border: 1px solid #d99a2b;
+  border-radius: 10px;
+  background: rgba(26, 35, 44, 0.97);
+  color: var(--text);
+  font-size: 12.5px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.5);
+}
+.edit-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.edit-head strong { font-family: Georgia, serif; font-size: 15px; color: #f6eedb; }
+.edit-badge { padding: 1px 6px; border-radius: 5px; background: #4a3411; color: #ffd98a; font-size: 10px; }
+.edit-head button { width: 28px; height: 28px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; }
+.edit-head button:hover { background: #2a3642; border-color: var(--line); color: var(--text); }
+#edit-min { margin-left: auto; }
+.edit-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; color: var(--muted); }
+.edit-row select, .edit-row input[type="text"], .edit-row input[type="number"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg2);
+  color: var(--text);
+  font: inherit;
+}
+.edit-row input[type="color"] { width: 48px; height: 32px; padding: 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg2); }
+.edit-years { display: flex; gap: 8px; }
+.edit-years .edit-row { flex: 1 1 0; min-width: 0; }
+.edit-btns { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.edit-btns button { height: 32px; padding: 0 11px; border: 1px solid var(--line); border-radius: 7px; background: #212c36; color: var(--text); font: inherit; cursor: pointer; }
+.edit-btns button:hover:not(:disabled) { border-color: var(--brass); }
+.edit-btns button:disabled { opacity: 0.4; cursor: default; }
+.edit-btns .primary { background: #6b4a12; border-color: #d99a2b; color: #fff1cf; }
+.edit-note { margin: 6px 0; color: var(--muted); line-height: 1.45; overflow-wrap: anywhere; }
+.edit-fine { margin: 6px 0; color: var(--faint); font-size: 10.5px; line-height: 1.45; }
+.edit-check { display: flex; align-items: center; gap: 7px; margin: 8px 0 2px; color: var(--muted); }
+.edit-sep { height: 1px; margin: 8px 0; background: var(--line); }
+@media (max-width: 760px) {
+  .edit { left: 8px; }
+  /* On a phone the card docks above the timeline so the top of the map stays clickable. */
+  .edit { top: auto; bottom: 112px; width: calc(100vw - 16px); max-height: 40vh; }
+}

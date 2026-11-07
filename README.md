@@ -44,6 +44,7 @@ One-time setup: repo Settings, Pages, Source = GitHub Actions.
 - Coastlines, rivers and lakes: Natural Earth (public domain), simplified for the web.
 - Population and GDP per person from 1 CE: Maddison Project Database 2023, Bolt and van Zanden (CC BY 4.0), present-day borders; built by `npm run data:maddison:download` then `data:maddison:build` into `public/data/maddison.json`. Other datasets considered and their licences: `docs/DATA-SOURCES.md`.
 - Panel: live Wikipedia summaries and search (CC BY-SA), Wikidata facts and year-specific rulers (CC0), and an OpenStreetMap embed (ODbL).
+- Edit mode (alt-history worlds, saved in your browser): `src/edit.ts`, `src/edit-ui.ts`, `docs/PLAN-EDIT-MODE.md`.
 - Map engine: MapLibre GL JS.
 
 Borders are one scholarly reading of the evidence and are often disputed.

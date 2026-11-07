@@ -21,7 +21,7 @@
     </div>
     <div class="era">3400 BCE – 2026 CE</div>
     <button id="tiles-btn" class="top-btn soon-btn" type="button" data-soon="tiles" aria-label="Tile view (planned)" title="Tile view (planned)"><span class="top-ico" aria-hidden="true">▦</span><span class="top-txt">Tiles</span></button>
-    <button id="edit-btn" class="top-btn soon-btn" type="button" data-soon="edit" aria-label="Edit mode for worldbuilding (planned)" title="Edit mode (planned)"><span class="top-ico" aria-hidden="true">✎</span><span class="top-txt">Edit</span></button>
+    <button id="edit-btn" class="top-btn" type="button" aria-pressed="false" aria-controls="edit" aria-label="Edit mode: alt-history worlds" title="Edit mode: make your own alt-history"><span class="top-ico" aria-hidden="true">✎</span><span class="top-txt">Edit</span></button>
     <button id="help-btn" class="help-btn" type="button" aria-label="Help and sources" aria-expanded="false" aria-controls="help">?</button>
   </header>
 
@@ -102,6 +102,47 @@
     </div>
   </aside>
 
+  <div id="alt-tag" class="alt-tag" hidden></div>
+  <section id="edit" class="edit" aria-label="Edit mode" hidden>
+    <div class="edit-head">
+      <strong>Edit mode</strong><span class="edit-badge">alt-history</span>
+      <button id="edit-min" type="button" aria-label="Fold or unfold">–</button>
+      <button id="edit-close" type="button" aria-label="Close edit mode">×</button>
+    </div>
+    <div id="edit-body">
+      <label class="edit-row">World
+        <select id="edit-branch" aria-label="World to edit"></select>
+      </label>
+      <div class="edit-btns">
+        <button id="edit-new" type="button">New</button>
+        <button id="edit-copy" type="button">Copy</button>
+        <button id="edit-rename" type="button">Rename</button>
+        <button id="edit-delete" type="button">Delete</button>
+        <button id="edit-export" type="button">Export</button>
+        <button id="edit-import" type="button">Import</button>
+        <input id="edit-file" type="file" accept="application/json,.json" hidden>
+      </div>
+      <p id="edit-status" class="edit-note" role="status"></p>
+      <div class="edit-sep"></div>
+      <p id="edit-sel" class="edit-note"></p>
+      <form id="edit-form" hidden>
+        <label class="edit-row">Name <input id="edit-name" type="text" maxlength="80" autocomplete="off"></label>
+        <label class="edit-row">Colour <input id="edit-colour" type="color"></label>
+        <div class="edit-years">
+          <label class="edit-row">From <input id="edit-from" type="number" inputmode="numeric" step="1"></label>
+          <label class="edit-row">To <input id="edit-to" type="number" inputmode="numeric" step="1"></label>
+        </div>
+        <p class="edit-fine">Years are whole numbers; negative means BCE (-500 is 500 BCE). The edit applies from the first to the last year.</p>
+        <label class="edit-check"><input id="edit-hide" type="checkbox"> Remove this polity (for those years)</label>
+        <div class="edit-btns">
+          <button type="submit" class="primary">Apply</button>
+          <button id="edit-reset" type="button">Reset to real</button>
+        </div>
+      </form>
+      <p class="edit-fine">Your worlds are saved in this browser only. Export one to keep or share it. The real map is never changed, and a changed polity is outlined in amber. This first version edits polities; drawing and Markdown notes come next.</p>
+    </div>
+  </section>
+
   <div id="soon" class="soon" role="dialog" aria-modal="false" aria-labelledby="soon-title" hidden>
     <div class="soon-card">
       <div class="soon-head">
@@ -127,7 +168,7 @@
         <li>Zoom in to see the provinces inside big polities and local identities inside peoples.</li>
         <li>In Societies, click a kind in the legend to hide or show it.</li>
         <li>In Civilizations, a click lists every identity you stand inside; none sits above the others.</li>
-        <li>Planned (placeholders for now): the left arrow on the timeline for deep time before 3400 BCE, <b>Tiles</b> for the tile view, and <b>Edit</b> for worldbuilding.</li>
+        <li><b>Edit</b> opens alt-history worlds: rename, recolour, change the years of, or remove a polity, and save the world in your browser. Planned (placeholders): the left arrow on the timeline for deep time before 3400 BCE, and <b>Tiles</b> for the tile view.</li>
       </ul>
       <h3>Sources</h3>
       <ul class="sources">

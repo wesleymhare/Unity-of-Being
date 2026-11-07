@@ -5,7 +5,7 @@ import './style.css';
 import { BiomeModel, CLASSES, GROUPS, climateShift, type EcoMeta, type EcoPatch } from './biomes';
 import { LabelLayer, type LabelProps } from './labels';
 import { GROUP_ORDER, organiseInfobox, type ExtraRow, type OrganisedInfobox } from './infobox-map';
-import { buildSheet, emptySheet, fmtReign, getCurated, getProfileData, getWorldBank, type Curated, type ProfileData, type ProfileGroup, type WorldBank } from './profile';
+import { buildSheet, emptySheet, fmtReign, getCurated, getMaddison, getProfileData, getWorldBank, maddisonCode, type Curated, type MaddisonCountry, type ProfileData, type ProfileGroup, type WorldBank } from './profile';
 import {
   getArticlePhoto,
   getInfobox,
@@ -893,7 +893,7 @@ async function loadSubdivisions(qid: string, ticket: number, signal: AbortSignal
 // ---- Polity stat sheet (fixed rows, fixed order; see src/profile.ts) ----------------------------
 let profileActive = false;
 let panelInfobox: OrganisedInfobox | null = null;
-let panelProfile: { data: ProfileData | null; wb: WorldBank | null; curated: Curated[string] | undefined; realm?: string; leaders?: Leader[] } | null = null;
+let panelProfile: { data: ProfileData | null; wb: WorldBank | null; maddison?: MaddisonCountry; curated: Curated[string] | undefined; realm?: string; leaders?: Leader[] } | null = null;
 
 let rulersOpen = false;
 
@@ -955,7 +955,7 @@ function drawSheet(groups: ProfileGroup[]): void {
   }
   const fine = document.createElement('p');
   fine.className = 'prof-fine';
-  fine.textContent = 'Dashes mean no figure is on record. Years in grey are the nearest year with data. Sources: Wikidata (CC0), World Bank (CC BY 4.0, modern states).';
+  fine.textContent = 'Dashes mean no figure is on record. Years in grey are the nearest year with data. Sources: Wikidata (CC0), World Bank (CC BY 4.0, modern states), Maddison Project (CC BY 4.0, from 1 CE).';
   pProfile.append(fine);
   pProfile.hidden = false;
 }
@@ -966,6 +966,7 @@ function renderProfile(): void {
     year,
     data: panelProfile.data,
     wb: panelProfile.wb,
+    maddison: panelProfile.maddison,
     curated: panelProfile.curated,
     realm: panelProfile.realm,
     infobox: panelInfobox ?? undefined,
@@ -984,9 +985,10 @@ async function loadProfile(qid: string | null, realm: string | undefined, ticket
     }) : Promise.resolve([] as Leader[]);
     const [data, curatedAll] = await Promise.all([qid ? getProfileData(qid, signal) : Promise.resolve(null), getCurated(BASE)]);
     if (ticket !== panelTicket) return;
-    const wb = await getWorldBank(data?.iso, signal);
+    const [wb, maddisonAll] = await Promise.all([getWorldBank(data?.iso, signal), getMaddison(BASE)]);
     if (ticket !== panelTicket) return;
-    panelProfile = { data, wb, curated: qid ? curatedAll[qid] : undefined, realm };
+    const code = maddisonCode(qid ?? undefined, data?.iso);
+    panelProfile = { data, wb, maddison: code ? maddisonAll[code] : undefined, curated: qid ? curatedAll[qid] : undefined, realm };
     renderProfile();
     const leaders = await rulers;
     if (ticket !== panelTicket) return;

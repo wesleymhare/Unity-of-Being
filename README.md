@@ -42,6 +42,7 @@ One-time setup: repo Settings, Pages, Source = GitHub Actions.
 - Civilizations: curated footprints in `data/civilizations_data.py` (project data, CC BY 4.0). They are approximations, not scholarly boundaries.
 - Biomes: Köppen–Geiger climate classes, Rubel et al. 2017 (1951–2000), via the `kgcpy` PyPI package; ecoregions from RESOLVE Ecoregions 2017 (Dinerstein et al., CC BY 4.0), a revision of WWF's Terrestrial Ecoregions of the World, via the Catalogue of Life gazetteers repo. Past climates are a schematic shift of the Köppen map; ecoregions stay modern. See docs/BIOMES.md.
 - Coastlines, rivers and lakes: Natural Earth (public domain), simplified for the web.
+- Population and GDP per person from 1 CE: Maddison Project Database 2023, Bolt and van Zanden (CC BY 4.0), present-day borders; built by `npm run data:maddison:download` then `data:maddison:build` into `public/data/maddison.json`. Other datasets considered and their licences: `docs/DATA-SOURCES.md`.
 - Panel: live Wikipedia summaries and search (CC BY-SA), Wikidata facts and year-specific rulers (CC0), and an OpenStreetMap embed (ODbL).
 - Map engine: MapLibre GL JS.
 

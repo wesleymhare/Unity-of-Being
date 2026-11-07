@@ -53,7 +53,19 @@ Tried in this order, per row (`src/profile.ts`):
 ```
 `v` is shown as written; `y` is the year it is for; the entry nearest the slider year is used.
 
-## Datasets worth ingesting next (to verify before use)
+## Maddison Project (added)
+`public/data/maddison.json` (built by `data/build-maddison.py` from the Maddison Project Database 2023,
+CC BY 4.0) gives population and GDP per person for 169 countries from 1 CE: sparse before 1820
+(1, 1000, 1500, 1600, 1700), yearly after. It is used when a state has an ISO code in Wikidata (or is
+the USSR, Yugoslavia or Czechoslovakia), in these rows:
+- **Population:** after the World Bank and curated figures; chosen over Wikidata or the infobox when its
+  year is at least as close to the slider.
+- **Economy:** after the World Bank; GDP per person in 2011 international dollars, plus a total GDP when a
+  population figure within 5 years exists.
+Its series follow **present-day borders**, so the row's visible note says "today's borders" and a figure
+more than 120 years from the slider is greyed. It never uses a figure more than 150 years away.
+
+## Datasets worth ingesting next (licences checked 7 Nov 2026, see `docs/DATA-SOURCES.md`)
 Names, coverage and licences are from memory and must be checked when web access is open:
 - Correlates of War National Material Capabilities: military personnel and expenditure, 1816-2016.
 - Maddison Project Database: GDP per person and population, from 1 CE.

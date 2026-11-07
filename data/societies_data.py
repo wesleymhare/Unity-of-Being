@@ -28,6 +28,9 @@ KINDS = {
     'Religious network': '#6fc47e',
     'NGO or international organisation': '#e58bb8',
     'Clandestine network': '#d8d4c8',
+    'Dynasty or house network': '#c8b6e2',
+    'Banking house': '#e0c36a',
+    'Military or religious order': '#9aa7e0',
 }
 
 ENTITIES = []

@@ -4,7 +4,8 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import './style.css';
 import { BiomeModel, CLASSES, GROUPS, climateShift, type EcoMeta, type EcoPatch } from './biomes';
 import { LabelLayer, type LabelProps } from './labels';
-import { buildSheet, emptySheet, getCurated, getProfileData, getWorldBank, type Curated, type ProfileData, type ProfileGroup, type WorldBank } from './profile';
+import { GROUP_ORDER, organiseInfobox, type ExtraRow, type OrganisedInfobox } from './infobox-map';
+import { buildSheet, emptySheet, fmtReign, getCurated, getProfileData, getWorldBank, type Curated, type ProfileData, type ProfileGroup, type WorldBank } from './profile';
 import {
   getArticlePhoto,
   getInfobox,
@@ -13,7 +14,6 @@ import {
   getSummary,
   getWikidata,
   imageAtYear,
-  leadersAtYear,
   looksLikeMap,
   subdivisionsAtYear,
   commonsFilePath,
@@ -165,11 +165,6 @@ const pKind = $('p-kind');
 const pSource = $('p-source');
 const pFine = $('p-fine');
 const pSwatch = $('p-swatch');
-const pLeaders = $('p-leaders');
-const pLeadersHead = $('p-leaders-head');
-const pLeadersList = $<HTMLUListElement>('p-leaders-list');
-const pLeadersHistory = $('p-leaders-history');
-const pLeadersHistoryList = $<HTMLOListElement>('p-leaders-history-list');
 const pSummary = $<HTMLParagraphElement>('p-summary');
 const pFallback = $('p-fallback');
 const pFigure = $('p-figure');
@@ -178,7 +173,6 @@ const pFigureKind = $('p-figure-kind');
 const pFigureLink = $<HTMLAnchorElement>('p-figure-link');
 const pInfobox = $('p-infobox');
 const pProfile = $('p-profile');
-const pLeadersMore = $<HTMLButtonElement>('p-leaders-more');
 const pSubs = $('p-subs');
 const pFacts = $<HTMLDListElement>('p-facts');
 const pOsm = $('p-osm');
@@ -598,7 +592,7 @@ function setYear(next: number): void {
     societyLabels.setYear(year, activeLens === 'societies');
     renderLegend();
     if (activeLens === 'biomes' && !panel.hidden && biomePoint) scheduleBiomePanel();
-    if (!panel.hidden && panelQid && activeLens === 'polities') scheduleLeaderRefresh();
+    if (!panel.hidden && panelQid && activeLens === 'polities') refreshPanelForYear();
     if (profileActive && !panel.hidden) renderProfile();
     scheduleHash();
   };
@@ -634,8 +628,6 @@ function renderBiomes(force = false): void {
 let panelTicket = 0;
 let panelAbort: AbortController | null = null;
 let panelQid: string | null = null;
-let leaderAbort: AbortController | null = null;
-let leaderTimer = 0;
 
 function renderSummary(summary: WikiSummary): void {
   pSummary.classList.remove('muted', 'error');
@@ -719,107 +711,11 @@ function renderOsm(lng: number, lat: number, span: number, label: string): void 
   pOsm.hidden = false;
 }
 
-function fmtReign(leader: Leader): string {
-  const start = fmtYear(leader.start);
-  return leader.end === undefined ? `from ${start}` : `${start} – ${fmtYear(leader.end)}`;
-}
-
-function leaderKey(leader: Leader): string {
-  return `${leader.name}|${leader.office ?? ''}|${leader.start}`;
-}
-
-let leadersExpanded = false;
-let leadersSnapshot: { leaders: Leader[]; year: number; history: Leader[] } | null = null;
-pLeadersMore.addEventListener('click', () => {
-  leadersExpanded = !leadersExpanded;
-  if (leadersSnapshot) renderLeaders(leadersSnapshot.leaders, leadersSnapshot.year, leadersSnapshot.history);
-});
-
-function renderLeaders(leaders: Leader[], panelYear: number, history: Leader[]): void {
-  leadersSnapshot = { leaders, year: panelYear, history };
-  pLeadersList.replaceChildren();
-  pLeadersHistoryList.replaceChildren();
-  pLeadersHistory.hidden = true;
-  pLeadersMore.hidden = true;
-
-  if (leaders.length) {
-    pLeadersHead.textContent =
-      `${leaders.length === 1 ? 'Ruler' : 'Rulers'} in ${fmtYear(panelYear)}`;
-    for (const leader of leaders) {
-      const item = document.createElement('li');
-      const name = document.createElement('strong');
-      name.textContent = leader.name;
-      const meta = document.createElement('span');
-      meta.textContent = [leader.office, `r. ${fmtReign(leader)}`].filter(Boolean).join(' · ');
-      item.append(name, meta);
-      pLeadersList.append(item);
-    }
-  } else {
-    pLeadersHead.textContent = `Reigns around ${fmtYear(panelYear)}`;
-  }
-
-  const ordered = [...history].sort((a, b) => a.start - b.start || a.name.localeCompare(b.name));
-  if (ordered.length) {
-    const currentKeys = new Set(leaders.map(leaderKey));
-    let index = ordered.findIndex((leader) => currentKeys.has(leaderKey(leader)));
-    if (index < 0) {
-      index = ordered.findIndex((leader) => leader.start > panelYear);
-      if (index < 0) index = ordered.length - 1;
-    }
-    const WINDOW = 7;
-    const first = Math.max(0, Math.min(index - 3, ordered.length - WINDOW));
-    const shown = leadersExpanded ? ordered : ordered.slice(first, first + WINDOW);
-    pLeadersHistoryList.classList.toggle('all', leadersExpanded);
-    for (const leader of shown) {
-      const item = document.createElement('li');
-      if (currentKeys.has(leaderKey(leader))) item.classList.add('current');
-      const name = document.createElement('span');
-      name.className = 'ruler-name';
-      name.textContent = leader.office && /government/i.test(leader.office) ? `${leader.name} (head of government)` : leader.name;
-      const years = document.createElement('span');
-      years.className = 'ruler-years';
-      years.textContent = fmtReign(leader);
-      item.append(name, years);
-      pLeadersHistoryList.append(item);
-    }
-    pLeadersMore.hidden = ordered.length <= WINDOW;
-    pLeadersMore.textContent = leadersExpanded ? 'Show fewer' : `Full timeline (${ordered.length})`;
-    // One ruler is already listed above; a sequence of one adds nothing.
-    pLeadersHistory.hidden = ordered.length <= 1;
-  }
-
-  pLeaders.hidden = !leaders.length && pLeadersHistory.hidden;
-}
-
-async function loadLeaders(qid: string, panelYear: number, ticket: number): Promise<void> {
-  if (activeLens !== 'polities' || ticket !== panelTicket) {
-    pLeaders.hidden = true;
-    return;
-  }
-  leaderAbort?.abort();
-  const controller = new AbortController();
-  leaderAbort = controller;
-  try {
-    const history = await getLeaderHistory(qid, controller.signal);
-    if (ticket !== panelTicket || controller.signal.aborted) return;
-    renderLeaders(leadersAtYear(history, panelYear), panelYear, history);
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') return;
-    console.error(error);
-    if (ticket === panelTicket) pLeaders.hidden = true;
-  }
-}
-
-function scheduleLeaderRefresh(): void {
+/** The flag and the province list follow the year; the stat sheet is redrawn right after. */
+function refreshPanelForYear(): void {
   if (!panelQid || panel.hidden || activeLens !== 'polities') return;
   applyPolityFlag();
   renderSubdivisions();
-  const ticket = panelTicket;
-  const qid = panelQid;
-  if (leaderTimer) window.clearTimeout(leaderTimer);
-  leaderTimer = window.setTimeout(() => {
-    if (ticket === panelTicket) void loadLeaders(qid, year, ticket);
-  }, 220);
 }
 
 // ---- Panel figure, infobox, subdivisions ---------------------------------------
@@ -894,45 +790,35 @@ function fillInfoboxCell(target: HTMLElement, source: Node): void {
   target.append(source.cloneNode(true));
 }
 
-function renderInfobox(sections: InfoboxSection[] | null): void {
+function renderInfobox(extras: ExtraRow[]): void {
   pInfobox.replaceChildren();
-  if (!sections?.length) {
+  if (!extras.length) {
     pInfobox.hidden = true;
     return;
   }
   const all = document.createElement('details');
   all.className = 'ib-all';
-  const allSummary = document.createElement('summary');
-  allSummary.textContent = 'More from the Wikipedia infobox';
-  all.append(allSummary);
-  pInfobox.append(all);
-  sections.forEach((section, index) => {
-    const details = document.createElement('details');
-    details.open = section.rows.length <= 10 && (index < 4 || section.rows.length <= 4);
-    const summary = document.createElement('summary');
-    summary.textContent = section.title || 'Overview';
-    if (section.rows.length > 4) {
-      const count = document.createElement('span');
-      count.textContent = String(section.rows.length);
-      summary.append(count);
-    }
-    details.append(summary);
+  const summary = document.createElement('summary');
+  summary.textContent = 'More from the Wikipedia infobox';
+  all.append(summary);
+  for (const group of GROUP_ORDER) {
+    const rows = extras.filter((row) => row.group === group);
+    if (!rows.length) continue;
+    const head = document.createElement('h5');
+    head.className = 'ib-group';
+    head.textContent = group;
     const list = document.createElement('dl');
     list.className = 'ib';
-    for (const row of section.rows) {
-      if (row.label) {
-        const dt = document.createElement('dt');
-        fillInfoboxCell(dt, row.label);
-        list.append(dt);
-      }
+    for (const row of rows) {
+      const dt = document.createElement('dt');
+      dt.textContent = row.label;
       const dd = document.createElement('dd');
-      if (!row.label) dd.className = 'wide';
       fillInfoboxCell(dd, row.value);
-      list.append(dd);
+      list.append(dt, dd);
     }
-    details.append(list);
-    all.append(details);
-  });
+    all.append(head, list);
+  }
+  pInfobox.append(all);
   pInfobox.hidden = false;
 }
 
@@ -941,7 +827,9 @@ async function loadInfobox(title: string | null, ticket: number, signal: AbortSi
   try {
     const sections = await getInfobox(title, signal);
     if (ticket !== panelTicket) return;
-    renderInfobox(sections);
+    panelInfobox = organiseInfobox(sections);
+    renderInfobox(panelInfobox.extras);
+    renderProfile();
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') return;
   }
@@ -1001,7 +889,38 @@ async function loadSubdivisions(qid: string, ticket: number, signal: AbortSignal
 
 // ---- Polity stat sheet (fixed rows, fixed order; see src/profile.ts) ----------------------------
 let profileActive = false;
-let panelProfile: { data: ProfileData | null; wb: WorldBank | null; curated: Curated[string] | undefined; realm?: string } | null = null;
+let panelInfobox: OrganisedInfobox | null = null;
+let panelProfile: { data: ProfileData | null; wb: WorldBank | null; curated: Curated[string] | undefined; realm?: string; leaders?: Leader[] } | null = null;
+
+let rulersOpen = false;
+
+/** Every ruler on record in order, with the ones in office this year highlighted. */
+function rulerTimeline(history: Leader[], current: Leader[]): HTMLElement {
+  const details = document.createElement('details');
+  details.className = 'prof-timeline';
+  details.open = rulersOpen;
+  details.addEventListener('toggle', () => {
+    rulersOpen = details.open;
+  });
+  const summary = document.createElement('summary');
+  summary.textContent = `Rulers through time (${history.length})`;
+  details.append(summary);
+  const keys = new Set(current.map((l) => `${l.name}|${l.office ?? ''}|${l.start}`));
+  const ol = document.createElement('ol');
+  for (const leader of [...history].sort((a, b) => a.start - b.start || a.name.localeCompare(b.name))) {
+    const li = document.createElement('li');
+    if (keys.has(`${leader.name}|${leader.office ?? ''}|${leader.start}`)) li.className = 'current';
+    const name = document.createElement('span');
+    name.textContent = leader.office && /government/i.test(leader.office) ? `${leader.name} (head of government)` : leader.name;
+    const years = document.createElement('span');
+    years.className = 'years';
+    years.textContent = fmtReign(leader);
+    li.append(name, years);
+    ol.append(li);
+  }
+  details.append(ol);
+  return details;
+}
 
 function drawSheet(groups: ProfileGroup[]): void {
   pProfile.replaceChildren();
@@ -1028,6 +947,7 @@ function drawSheet(groups: ProfileGroup[]): void {
       list.append(dt, dd);
     }
     section.append(title, list);
+    if (group.timeline) section.append(rulerTimeline(group.timeline.history, group.timeline.current));
     pProfile.append(section);
   }
   const fine = document.createElement('p');
@@ -1045,6 +965,8 @@ function renderProfile(): void {
     wb: panelProfile.wb,
     curated: panelProfile.curated,
     realm: panelProfile.realm,
+    infobox: panelInfobox ?? undefined,
+    leaders: panelProfile.leaders,
   }));
 }
 
@@ -1053,16 +975,24 @@ async function loadProfile(qid: string | null, realm: string | undefined, ticket
   panelProfile = null;
   drawSheet(emptySheet());
   try {
+    const rulers = qid ? getLeaderHistory(qid, signal).catch((error) => {
+      if (error instanceof DOMException && error.name === 'AbortError') throw error;
+      return [] as Leader[];
+    }) : Promise.resolve([] as Leader[]);
     const [data, curatedAll] = await Promise.all([qid ? getProfileData(qid, signal) : Promise.resolve(null), getCurated(BASE)]);
     if (ticket !== panelTicket) return;
     const wb = await getWorldBank(data?.iso, signal);
     if (ticket !== panelTicket) return;
     panelProfile = { data, wb, curated: qid ? curatedAll[qid] : undefined, realm };
     renderProfile();
+    const leaders = await rulers;
+    if (ticket !== panelTicket) return;
+    panelProfile = { ...panelProfile, leaders };
+    renderProfile();
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') return;
     if (ticket !== panelTicket) return;
-    panelProfile = { data: null, wb: null, curated: undefined, realm };
+    panelProfile = { data: null, wb: null, curated: undefined, realm, leaders: [] };
     renderProfile();
   }
 }
@@ -1127,7 +1057,6 @@ function resetPanel(): number {
   panelTicket++;
   panelAbort?.abort();
   panelAbort = new AbortController();
-  leaderAbort?.abort();
   pFallback.hidden = true;
   pFallback.replaceChildren();
   pFacts.hidden = true;
@@ -1139,16 +1068,11 @@ function resetPanel(): number {
   pProfile.replaceChildren();
   panelProfile = null;
   profileActive = false;
-  leadersExpanded = false;
-  leadersSnapshot = null;
+  panelInfobox = null;
   pSubs.hidden = true;
   pSubs.replaceChildren();
   panelFacts = null;
   panelSubs = [];
-  pLeaders.hidden = true;
-  pLeadersList.replaceChildren();
-  pLeadersHistory.hidden = true;
-  pLeadersHistoryList.replaceChildren();
   pOsm.hidden = true;
   pOsmFrame.src = 'about:blank';
   pOsmLink.href = '#';
@@ -1421,7 +1345,6 @@ function openPanel(p: Props): void {
   } else if (province) {
     extraFacts.push({ label: 'Part of', value: p.p ?? '' });
   }
-  if (qid && !civilizations && !societies && !p.g) void loadLeaders(qid, year, ticket);
   if (qid && !civilizations && !societies) void loadSubdivisions(qid, ticket, controller.signal);
   if (activeLens === 'polities' && !province) void loadProfile(qid, p.m, ticket, controller.signal);
   void loadPanel(rawTitle, qid, name, ticket, controller.signal, extraFacts);
@@ -1527,10 +1450,6 @@ function closePanel(): void {
   panel.hidden = true;
   overlapSet = [];
   panelQid = null;
-  leaderAbort?.abort();
-  leaderAbort = null;
-  pLeaders.hidden = true;
-  pLeadersHistory.hidden = true;
   pOsmFrame.src = 'about:blank';
   selectedKey = -1;
   selectedProps = null;

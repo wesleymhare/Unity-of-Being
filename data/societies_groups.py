@@ -30,6 +30,7 @@ GROUPS = {
     'Russian empire': ('#8a9a2e', 'The Russian-American Company and the Trans-Siberian Railway'),
     'Communist movement': ('#b5123a', 'The Comintern, the Chinese Communist base areas and the Warsaw Pact'),
     'Western bloc': ('#7fd0e8', 'NATO and the European Union'),
+    'Dynastic and banking houses': ('#c8b6e2', 'Families and houses whose marriages, credit and courts held parts of Europe together'),
     'Global institutions and infrastructure': ('#d4d9de', 'The United Nations, the Red Cross, telegraph cables and container shipping'),
 }
 
@@ -48,7 +49,7 @@ for _group, _names in {
     'Orthodox and Eastern Christendom': [
         'Early Christian communities', 'Church of the East', 'Orthodox Christendom', 'Kingdom of Aksum trade network'],
     'Latin Christendom and the Catholic world': [
-        'Latin Christendom (the medieval Church)', 'Catholic Church worldwide', 'Society of Jesus missions'],
+        'Latin Christendom (the medieval Church)', 'Catholic Church worldwide', 'Society of Jesus missions', 'Knights Templar'],
     'Italian maritime republics': ['Venetian maritime network', 'Genoese trading network'],
     'Northern and Baltic trade': ['Varangian and Volga river routes', 'Hanseatic League'],
     'Iberian empires': [
@@ -63,6 +64,7 @@ for _group, _names in {
     'Communist movement': [
         'Communist International (Comintern)', 'Chinese Communist base areas and Long March', 'Warsaw Pact and Soviet bloc'],
     'Western bloc': ['NATO', 'European Union'],
+    'Dynastic and banking houses': ['Habsburg dynastic network (1477-1700)', 'Medici banking network'],
     'Global institutions and infrastructure': [
         'Container shipping network', 'Submarine telegraph cables',
         'International Red Cross and Red Crescent Movement', 'United Nations system'],

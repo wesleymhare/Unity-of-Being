@@ -60,6 +60,9 @@
 - **Wikipedia infobox moved to the bottom and folded** ("More from the Wikipedia infobox"); it was the scrambled block after the description.
 - **Rulers:** fuller reign sequence with a "Full timeline" button. Fixed a bug: Wikidata qualifier dates were read as if they were whole claims, so the direct head-of-state fallback and dated flags, population and capital never matched real data.
 - Long province lists fold into one line so the stat sheet is not pushed off screen.
+- **Ruler box removed.** Head of state and head of government are rows in the Government section, with a "Rulers through time" fold-out. The flag or coat of arms is now directly under the title.
+- **Infobox reordered** (`src/infobox-map.ts`): rows are classified by label, fill sheet rows as fallbacks (dated ones chosen by the year nearest the slider), and the rest are grouped in a fixed order.
+- **Societies redefined** (`docs/SOCIETIES.md`): affinity groups that hold de facto control as logistical networks (world-society theory, Marxist group analysis, Mann's four powers). Added Habsburg, Medici and Templars as examples; 57 networks.
 - Not verified against live Wikidata or the World Bank (the build sandbox cannot reach them); checked with mocked responses.
 
 ### 3 November 2026: last decade, water, Societies colour, placeholders

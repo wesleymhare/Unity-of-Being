@@ -220,3 +220,35 @@ net('European Union', NGO, 1993, 2026, 'European Union',
                         'Slovakia', 'Hungary', 'Slovenia', 'Croatia', 'Romania', 'Bulgaria', 'Estonia', 'Latvia', 'Lithuania', 'Malta', 'Cyprus'])],
     nodes=[('Brussels', 4.35, 50.85, 'major'), ('Strasbourg', 7.75, 48.58), ('Luxembourg', 6.13, 49.61), ('Frankfurt (ECB)', 8.68, 50.11)])
 
+
+
+# ---- Dynasties, banking houses and orders: affinity groups that held things together ----------------------------
+net('Habsburg dynastic network (1477-1700)', 'Dynasty or house network', 1477, 1700, 'House of Habsburg',
+    'A family that held its lands by marriage as much as by war: Austria, Bohemia, Hungary, Spain with its Italian and Burgundian possessions, joined by '
+    'kin, credit and the Spanish Road, the military supply corridor from Milan to Brussels.',
+    routes=[R([(9.19, 45.46), (7.0, 45.5), (5.9, 47.2), (6.2, 48.7), (5.4, 49.6), (4.35, 50.85)], s=1567, e=1700),
+            R([(16.37, 48.21), (14.42, 50.08), (8.7, 50.1), (6.1, 50.78), (4.35, 50.85)]),
+            R([(16.37, 48.21), (11.4, 47.27), (9.19, 45.46)]),
+            R([(-3.7, 40.42), (2.17, 41.39)]),
+            R([(2.17, 41.39), (8.93, 44.41), (14.27, 40.85)], sea=True),
+            R([(-3.7, 40.42), (-6.0, 37.39)])],
+    nodes=[('Vienna', 16.37, 48.21, 'major'), ('Madrid', -3.7, 40.42, 'major'), ('Brussels', 4.35, 50.85, 'major'), ('Prague', 14.42, 50.08), ('Innsbruck', 11.4, 47.27),
+           ('Milan', 9.19, 45.46), ('Naples', 14.27, 40.85), ('Barcelona', 2.17, 41.39), ('Seville', -6.0, 37.39), ('Budapest', 19.04, 47.5)])
+
+net('Medici banking network', 'Banking house', 1397, 1494, 'Medici Bank',
+    'A family bank with branches in the great trading cities, moving papal revenue and merchant credit by bills of exchange across Latin Europe.',
+    routes=[R([(11.25, 43.77), (12.5, 41.9)]), R([(11.25, 43.77), (12.33, 45.44)]),
+            R([(11.25, 43.77), (9.19, 45.46), (6.14, 46.2), (4.83, 45.76), (3.22, 51.21)]),
+            R([(4.83, 45.76), (4.81, 43.95)]), R([(3.22, 51.21), (-0.12, 51.51)], sea=True)],
+    nodes=[('Florence', 11.25, 43.77, 'major'), ('Rome', 12.5, 41.9, 'major'), ('Venice', 12.33, 45.44), ('Milan', 9.19, 45.46), ('Geneva', 6.14, 46.2),
+           ('Lyon', 4.83, 45.76), ('Avignon', 4.81, 43.95), ('Bruges', 3.22, 51.21, 'major'), ('London', -0.12, 51.51)])
+
+net('Knights Templar', 'Military or religious order', 1119, 1312, 'Knights Templar',
+    'A military order that was also an international bank and landowner: commanderies across Europe fed money, men and horses to the Holy Land and held deposits for kings and pilgrims.',
+    routes=[R([(5.37, 43.3), (8.9, 40.0), (12.5, 37.5), (18.0, 35.5), (25.0, 34.5), (33.04, 34.68), (35.07, 32.93)], sea=True),
+            R([(2.36, 48.86), (4.83, 45.76), (4.8, 43.9), (5.37, 43.3)]),
+            R([(2.36, 48.86), (1.85, 50.95), (-0.11, 51.51)]),
+            R([(2.36, 48.86), (-0.55, 47.3), (-1.0, 44.8), (-1.98, 43.32), (-4.0, 41.5), (-8.41, 39.6)]),
+            R([(35.07, 32.93), (35.23, 31.78)])],
+    nodes=[('Jerusalem', 35.23, 31.78, 'major'), ('Acre', 35.07, 32.93, 'major'), ('Limassol', 33.04, 34.68), ('Paris (the Temple)', 2.36, 48.86, 'major'),
+           ('London (the Temple)', -0.11, 51.51), ('Marseille', 5.37, 43.3), ('Tomar', -8.41, 39.6)])

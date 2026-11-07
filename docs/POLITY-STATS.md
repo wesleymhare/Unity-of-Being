@@ -5,15 +5,19 @@ glance. A row with no figure shows a dash instead of disappearing. Order:
 
 | Section | Rows |
 |---|---|
-| Rulers (above the description) | Head of state and head of government for the year; reign sequence with "Full timeline" |
-| **Government** | Government form, Capital (for the year), Existed |
+| **Government** | Government form, **Head of state**, **Head of government** (for the year), Capital (for the year), Existed; a fold-out "Rulers through time" lists every ruler on record |
 | **People** | Population, Languages, Religion |
 | **Land and economy** | Area, Economy (GDP and per person), Currency (for the year) |
 | **Military** | Armed forces, Military spending |
 | **Lineage** | Preceded by, Succeeded by, Part of (realm) |
 
-The Wikipedia infobox is still there, but at the bottom and folded ("More from the Wikipedia
-infobox"), because each article orders it differently.
+The flag or coat of arms (for the year) is the first thing under the title; there is no separate
+ruler box. The Wikipedia infobox is no longer shown in the article's own order: each row is
+classified by its label and either fills a sheet row where Wikidata and the World Bank have
+nothing (dated rows such as "Population • 150 CE" are chosen by the year nearest the slider), or is
+sorted into fixed groups (Government and rulers, Dates and events, Geography, People, Economy,
+Military, Reference) in the folded "More from the Wikipedia infobox" at the bottom
+(`src/infobox-map.ts`).
 
 ## Where each figure comes from
 Tried in this order, per row (`src/profile.ts`):
@@ -22,7 +26,8 @@ Tried in this order, per row (`src/profile.ts`):
 2. **World Bank open data (CC BY 4.0):** modern states, about 1960 on: population, GDP and GDP per
    person, armed forces personnel (about 1985 on), military spending. Looked up by the state's ISO
    code from Wikidata (P298).
-3. **Wikidata (CC0):** population and area (dated values: the nearest year to the slider is shown,
+3. **Wikipedia infobox:** fallback text for a row, or a dated value when it is nearer the slider year.
+4. **Wikidata (CC0):** population and area (dated values: the nearest year to the slider is shown,
    marked "c. 1520" and greyed when more than 120 years away), capital and currency (the one in use
    that year), government, languages, religion, predecessors and successors.
 

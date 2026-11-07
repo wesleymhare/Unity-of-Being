@@ -691,6 +691,13 @@ function cleanCell(cell: Element): DocumentFragment {
     }
     if (!(node instanceof Element)) return;
     const tag = node.tagName;
+    if (tag === 'SUP' && !node.matches('.reference, .noprint')) {
+      // Units like km² and ordinals are superscripts; footnote marks (.reference) are dropped.
+      const SUPER = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+      const text = (node.textContent ?? '').replace(/\d/g, (d) => SUPER[Number(d)]).replace(/[−-]/g, '⁻');
+      if (text.trim() && !/^\[/.test(node.textContent ?? '')) target.appendChild(document.createTextNode(text));
+      return;
+    }
     if (['STYLE', 'SCRIPT', 'SUP', 'IMG', 'FIGURE', 'SVG'].includes(tag)) return;
     if (node.matches('.reference, .noprint, .mw-empty-elt, .nowrap-hidden, .navbar, [style*="display:none"]')) return;
     if (tag === 'BR') {

@@ -308,72 +308,7 @@ a { color: var(--brass); }
   overflow-wrap: anywhere;
 }
 
-.leaders {
-  margin: 0 0 14px;
-  padding: 9px 11px;
-  background: rgba(210, 173, 100, 0.07);
-  border: 1px solid rgba(210, 173, 100, 0.22);
-  border-radius: 8px;
-}
-.leaders-head {
-  margin-bottom: 6px;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 1.4px;
-  text-transform: uppercase;
-  color: var(--brass);
-}
-.leaders ul { margin: 0; padding: 0; list-style: none; }
-.leaders li {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 3px 0;
-  font-size: 12.5px;
-  line-height: 1.35;
-}
-.leaders li + li { border-top: 1px solid rgba(210, 173, 100, 0.12); }
-.leaders strong { font-weight: 600; color: #e8dfcb; }
-.leaders li span { color: var(--faint); text-align: right; font-size: 10.5px; }
 
-.leaders-history {
-  margin-top: 8px;
-  padding-top: 7px;
-  border-top: 1px solid rgba(210, 173, 100, 0.15);
-}
-.leaders-subhead {
-  margin-bottom: 4px;
-  font-size: 8.5px;
-  font-weight: 700;
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
-  color: var(--faint);
-}
-.leaders-history ol { margin: 0; padding: 0; list-style: none; }
-.leaders-history li {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 4px 8px;
-  padding: 2px 0;
-  font-size: 11.5px;
-}
-.leaders-history li + li { border-top: 0; }
-.leaders-history .ruler-name {
-  overflow: hidden;
-  color: #cfc6b3;
-  font-weight: 600;
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.leaders-history .ruler-years {
-  color: var(--faint);
-  font-size: 10px;
-  text-align: right;
-  white-space: nowrap;
-}
-.leaders-history li.current .ruler-name,
-.leaders-history li.current .ruler-years { color: var(--brass-lt); }
 
 .embed {
   margin: 0 0 14px;
@@ -1187,20 +1122,32 @@ a { color: var(--brass); }
 }
 .ib-all > summary:hover { color: var(--brass-lt); }
 
-.leaders-more {
-  margin-top: 6px;
-  padding: 2px 8px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--brass);
-  font-size: 10.5px;
-  cursor: pointer;
-}
-.leaders-more:hover { color: var(--brass-lt); background: rgba(210, 173, 100, 0.1); }
-.leaders-history ol.all { max-height: 240px; overflow-y: auto; }
 
 .others.foldable .others-head { cursor: pointer; }
 .others.foldable .others-head::after { content: ' ▾'; }
 .others.folded .others-head::after { content: ' ▸'; }
 .others.folded .others-list { display: none; }
+
+/* Rulers live in the stat sheet's Government section */
+.prof-timeline { margin: 6px 0 0; }
+.prof-timeline > summary { cursor: pointer; font-size: 11.5px; color: var(--muted); padding: 2px 0; }
+.prof-timeline > summary:hover { color: var(--brass-lt); }
+.prof-timeline ol { margin: 4px 0 0; padding: 0; list-style: none; max-height: 220px; overflow-y: auto; }
+.prof-timeline li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: 11.5px;
+  color: #cfc6b3;
+}
+.prof-timeline li .years { color: var(--faint); font-size: 10.5px; white-space: nowrap; }
+.prof-timeline li.current { color: var(--brass-lt); }
+.prof-timeline li.current .years { color: var(--brass-lt); }
+.ib-group {
+  margin: 10px 0 3px;
+  font: 700 9px/1.2 system-ui, sans-serif;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+  color: var(--faint);
+}

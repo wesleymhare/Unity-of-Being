@@ -10,6 +10,8 @@
  */
 import {
   getJson,
+  leadersAtYear,
+  type Leader,
   isAbort,
   preferredClaims,
   qualifierValue,
@@ -18,6 +20,7 @@ import {
   type WikidataClaim,
   type WikidataEntity,
 } from './wiki';
+import { bestCandidate, type OrganisedInfobox } from './infobox-map';
 
 const WD_API = 'https://www.wikidata.org/w/api.php';
 const WB_API = 'https://api.worldbank.org/v2';
@@ -36,6 +39,8 @@ export interface ProfileRow {
 export interface ProfileGroup {
   title: string;
   rows: ProfileRow[];
+  /** Rulers through time, drawn as a fold-out under the group. */
+  timeline?: { history: Leader[]; current: Leader[] };
 }
 
 interface DatedItem {
@@ -285,6 +290,19 @@ function curatedAt(entries: CuratedEntry[] | undefined, year: number): { row: Pr
   return { row: { label: '', value: best.v, note, far: distance > 120, source: best.src ?? 'Curated' } };
 }
 
+// ---- Rulers -----------------------------------------------------------------------------------
+export function fmtReign(leader: Leader): string {
+  const start = fmtYear(leader.start);
+  return leader.end === undefined ? `from ${start}` : `${start} – ${fmtYear(leader.end)}`;
+}
+
+export const isHeadOfGovernment = (leader: Leader): boolean =>
+  /government|prime minister|premier|chancellor|president of the council|vizier|regent/i.test(leader.office ?? '');
+
+function rulerText(list: Leader[]): string {
+  return list.slice(0, 3).map((l) => `${l.name} (${fmtReign(l)})`).join('; ');
+}
+
 // ---- The sheet ----------------------------------------------------------------------------------
 const DASH = '—';
 
@@ -295,14 +313,24 @@ export interface SheetInput {
   curated: Curated[string] | undefined;
   /** Realm this polity belongs to, from the map data. */
   realm?: string;
+  /** The Wikipedia infobox, sorted into sheet rows (fallbacks and dated values). */
+  infobox?: OrganisedInfobox;
+  /** Full ruler history from Wikidata. */
+  leaders?: Leader[];
 }
 
 export function buildSheet(input: SheetInput): ProfileGroup[] {
-  const { year, data, wb, curated, realm } = input;
+  const { year, data, wb, curated, realm, infobox, leaders } = input;
   const label = (id: string): string => data?.labels.get(id) ?? id;
   const list = (ids: string[] | undefined): string => (ids ?? []).map(label).filter((x) => !/^Q\d+$/.test(x)).join(', ');
   const row = (name: string, value: string | undefined, extra: Partial<ProfileRow> = {}): ProfileRow =>
     ({ label: name, value: value || DASH, ...(value ? extra : {}) });
+
+  /** Text from the infobox for a row when no structured source has one. */
+  const fromInfobox = (key: keyof OrganisedInfobox['mapped']): string | undefined => {
+    const best = bestCandidate(infobox?.mapped[key], year);
+    return best ? best.c.text : undefined;
+  };
 
   // capital and currency: the dated entry covering the year, else the undated one
   const dated = (items: DatedItem[] | undefined): string => {
@@ -323,9 +351,14 @@ export function buildSheet(input: SheetInput): ProfileGroup[] {
     population = { ...curatedPop.row, label: 'Population' };
   } else {
     const pick = data ? nearest(data.population, year) : null;
-    population = pick
-      ? row('Population', fmtCount(pick.item.value), { ...noteFor(pick, year), source: 'Wikidata' })
-      : row('Population', undefined);
+    const box = bestCandidate(infobox?.mapped.population, year);
+    if (box && box.c.year !== undefined && (!pick || (box.distance < pick.distance && box.distance <= 200))) {
+      population = row('Population', box.c.text, { ...noteFor({ distance: box.distance, item: { year: box.c.year } }, year), source: 'Wikipedia infobox' });
+    } else if (pick) {
+      population = row('Population', fmtCount(pick.item.value), { ...noteFor(pick, year), source: 'Wikidata' });
+    } else {
+      population = row('Population', box ? box.c.text : undefined, { source: 'Wikipedia infobox', ...(box?.c.year === undefined ? {} : { note: `c. ${fmtYear(box.c.year)}` }) });
+    }
   }
 
   let area: ProfileRow;
@@ -333,9 +366,14 @@ export function buildSheet(input: SheetInput): ProfileGroup[] {
   if (curatedArea) area = { ...curatedArea.row, label: 'Area' };
   else {
     const pick = data ? nearest(data.area, year) : null;
-    area = pick
-      ? row('Area', `${nf.format(Math.round(pick.item.value))} km²`, { ...noteFor(pick, year), source: 'Wikidata' })
-      : row('Area', undefined);
+    const box = bestCandidate(infobox?.mapped.area, year);
+    if (box && box.c.year !== undefined && (!pick || (box.distance < pick.distance && box.distance <= 200))) {
+      area = row('Area', box.c.text, { ...noteFor({ distance: box.distance, item: { year: box.c.year } }, year), source: 'Wikipedia infobox' });
+    } else if (pick) {
+      area = row('Area', `${nf.format(Math.round(pick.item.value))} km²`, { ...noteFor(pick, year), source: 'Wikidata' });
+    } else {
+      area = row('Area', box ? box.c.text : undefined, { source: 'Wikipedia infobox', ...(box?.c.year === undefined ? {} : { note: `c. ${fmtYear(box.c.year)}` }) });
+    }
   }
 
   const gdp = wbAt(wb?.gdp, year);
@@ -346,7 +384,7 @@ export function buildSheet(input: SheetInput): ProfileGroup[] {
   else if (gdp && year - gdp.at <= 3) {
     const pc = gdpPc ? `, $${nf.format(Math.round(gdpPc.value))} per person` : '';
     economy = row('Economy', `GDP $${fmtCount(gdp.value)}${pc}`, { note: gdp.at === year ? undefined : String(gdp.at), source: 'World Bank' });
-  } else economy = row('Economy', undefined);
+  } else economy = row('Economy', fromInfobox('economy'), { source: 'Wikipedia infobox' });
 
   const armed = wbAt(wb?.armed, year);
   const curatedArmy = curatedAt(curated?.army, year);
@@ -354,7 +392,7 @@ export function buildSheet(input: SheetInput): ProfileGroup[] {
   if (curatedArmy) army = { ...curatedArmy.row, label: 'Armed forces' };
   else if (armed && year - armed.at <= 6) {
     army = row('Armed forces', `${fmtCount(armed.value)} personnel`, { note: armed.at === year ? undefined : String(armed.at), source: 'World Bank' });
-  } else army = row('Armed forces', undefined);
+  } else army = row('Armed forces', fromInfobox('army'), { source: 'Wikipedia infobox' });
 
   const share = wbAt(wb?.spendShare, year);
   const usd = wbAt(wb?.spendUsd, year);
@@ -370,26 +408,33 @@ export function buildSheet(input: SheetInput): ProfileGroup[] {
     ? `${data.inception !== undefined ? fmtYear(data.inception) : '?'} – ${data.dissolved !== undefined ? fmtYear(data.dissolved) : 'present'}`
     : undefined;
 
+  const current = leaders ? leadersAtYear(leaders, year) : [];
+  const heads = current.filter((l) => !isHeadOfGovernment(l));
+  const govs = current.filter(isHeadOfGovernment);
+  const waiting = leaders === undefined;
+
   return [
-    { title: 'Government', rows: [
-      row('Government', list(data?.government), { source: 'Wikidata' }),
-      row('Capital', dated(data?.capital), { source: 'Wikidata' }),
-      row('Existed', existed, { source: 'Wikidata' }),
+    { title: 'Government', timeline: leaders && leaders.length > 1 ? { history: leaders, current } : undefined, rows: [
+      row('Government', list(data?.government) || fromInfobox('government'), { source: 'Wikidata / Wikipedia infobox' }),
+      waiting ? { label: 'Head of state', value: '…' } : row('Head of state', rulerText(heads), { source: 'Wikidata' }),
+      waiting ? { label: 'Head of government', value: '…' } : row('Head of government', rulerText(govs), { source: 'Wikidata' }),
+      row('Capital', dated(data?.capital) || fromInfobox('capital'), { source: 'Wikidata / Wikipedia infobox' }),
+      row('Existed', existed || fromInfobox('existed'), { source: 'Wikidata / Wikipedia infobox' }),
     ] },
     { title: 'People', rows: [
       population,
-      row('Languages', list(data?.languages), { source: 'Wikidata' }),
-      row('Religion', list(data?.religion), { source: 'Wikidata' }),
+      row('Languages', list(data?.languages) || fromInfobox('languages'), { source: 'Wikidata / Wikipedia infobox' }),
+      row('Religion', list(data?.religion) || fromInfobox('religion'), { source: 'Wikidata / Wikipedia infobox' }),
     ] },
     { title: 'Land and economy', rows: [
       area,
       economy,
-      row('Currency', dated(data?.currency), { source: 'Wikidata' }),
+      row('Currency', dated(data?.currency) || fromInfobox('currency'), { source: 'Wikidata / Wikipedia infobox' }),
     ] },
     { title: 'Military', rows: [army, spending] },
     { title: 'Lineage', rows: [
-      row('Preceded by', list(data?.before), { source: 'Wikidata' }),
-      row('Succeeded by', list(data?.after), { source: 'Wikidata' }),
+      row('Preceded by', list(data?.before) || fromInfobox('before'), { source: 'Wikidata / Wikipedia infobox' }),
+      row('Succeeded by', list(data?.after) || fromInfobox('after'), { source: 'Wikidata / Wikipedia infobox' }),
       row('Part of', realm),
     ] },
   ];

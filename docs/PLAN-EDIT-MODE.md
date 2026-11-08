@@ -9,7 +9,8 @@ How phase 1 differs from the plan below:
   merge and copy operations come with phase 2 and 3.
 - Changed records are taken out of the real layers with a filter on their index and drawn from the small
   `polities-edit` source, outlined in amber. Realm outlines of a changed record are not redrawn.
-- Code: `src/edit.ts` (model, validation, storage), `src/edit-ui.ts` (panel), `applyEdits` in `src/main.ts`.
+- Provinces (administrative subdivisions) are edited separately from their polity, keyed `sub:parent|name|start|end`; a polity can be split into its provinces (`split`). The editor is a toolbar along the top.
+- Code: `src/edit.ts` (model, validation, storage), `src/edit-ui.ts` (toolbar), `applyEdits` in `src/main.ts`.
 
 ## Decisions
 | Question | Decision |

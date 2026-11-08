@@ -104,6 +104,14 @@
 - **Not verified:** real iOS Safari or Android Chrome. The numbers are from desktop Chromium with software rendering, so check on a phone.
 - The full GeoJSON files are still in `public/data` (build inputs, no longer loaded by the page); they could be kept out of the deployed site later. The repo grew by about 90 MB of tiles and chunks.
 
+### 8 November 2026 (later): infobox in the one box, edit toolbar and provinces, factions in Societies
+- **Wikipedia infobox rows** no longer sit in a folded "More from the Wikipedia infobox" box: for polities they are sections of the one stat sheet ("... (Wikipedia)"), always open. Other lenses show them open under the article.
+- **Edit mode toolbar** now runs along the top (under the top bar), so it no longer covers the info panel or the map on a phone; the article panel is not used while editing. A fold button hides the editor.
+- **Provinces vs polities:** provinces (administrative subdivisions) are edited separately from their polity (cyan "Province" badge, amber "Polity"); a province edit never changes the polity, and a polity edit says its provinces keep their own edits. A polity can be **split into its provinces**: each is drawn as a polity of its own (own colour and label), the polity itself is removed, and you can rename, recolour or remove each one. Province shapes come in chunks (`data/subdivision-shapes`), province tiles carry the parent name (`p`).
+- **Bug fixed on the way:** the first edit in a new world saved the real name and colour instead of your typed ones (the form was redrawn before it was read).
+- **Societies: factions and movements** (`data/societies_factions.py`, 49 new entries, 106 in all): sects and schismatics (Cathars, Waldensians, Hussites, Old Believers, Donatists, Western Schism...), rebels and risings (Red Turbans, Zanj, Boxers, Zapatistas, Libyan rebels, Makhnovshchina, Maroons...), communes and leagues (Paris Commune, Lombard League), warlords, pirates and the underworld (Chinese warlords, Barbary corsairs, Sicilian Mafia, Medellín, Cali and Sinaloa cartels...), and parties that held ground (Khmer Rouge, FARC, Tamil Tigers, Muslim Brotherhood, Ba'ath, Hezbollah, Hamas). The 1,000 km rule now sorts entries into `network` (81) and `faction` (25); a faction needs a hub or an area. Three new spheres colour them. See `docs/SOCIETIES.md`, "Factions and movements".
+- **Check these facts:** the coordinates, years and notes of the new Societies entries are from memory, not a source I could open. Hamas, Hezbollah, Libya, the Sinaloa Cartel and the Muslim Brotherhood end in 2026 only as "still exists as far as known"; please review them.
+
 ## Next
 - Grow Societies: more networks (Americas, Africa, Pacific), weighted edges, modern parties and factions.
 - Haplogroup layer for Civilizations (open ancient-DNA data only, with uncertainty).

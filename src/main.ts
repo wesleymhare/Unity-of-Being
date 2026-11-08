@@ -74,6 +74,8 @@ interface Props extends LabelProps {
   hubs?: string;
   /** Societies: the sphere or group a network belongs to (sets its colour). */
   grp?: string;
+  /** Societies: 'network' (1,000 km or more) or 'faction' (smaller, or a single hub or area). */
+  sc?: string;
   /** Societies: power types it wields, and the lineage of its sphere. */
   pw?: string;
   lin?: string;
@@ -1519,6 +1521,7 @@ function openPanel(p: Props): void {
     if (p.lin && p.lin.includes(' > ')) extraFacts.push({ label: 'Lineage', value: p.lin.replace(/ > /g, ' → ') });
     if (p.pw) extraFacts.push({ label: 'Power', value: p.pw });
     if (p.kind) extraFacts.push({ label: 'Type', value: p.kind });
+    if (p.sc) extraFacts.push({ label: 'Scale', value: p.sc === 'faction' ? 'Faction or local movement (under 1,000 km, or one hub or area)' : 'Network (1,000 km or more)' });
     if (p.hubs) {
       const list = p.hubs.split(', ');
       extraFacts.push({ label: 'Connects', value: list.slice(0, 10).join(', ') + (list.length > 10 ? ' …' : '') });

@@ -222,7 +222,7 @@ def main():
         # entity title label
         labels.append({
             'k': k, 'n': ent['name'], 's': s, 'e': e, 'c': colour, 'w': ent['wiki'], 'q': '',
-            'lx': round(lx, 3), 'ly': round(ly, 3), 'sz': round(max(2.0, min(40.0, title_sz or extent * 0.4)), 2),
+            'lx': round(lx, 3), 'ly': round(ly, 3), 'sz': round(max(2.0 if extent >= 9 else 0.9, min(40.0, title_sz or extent * 0.4)), 2),
             'cw': 30, 'ch': 8, 'oy': -13, 'lcls': 'net-title', 'ent': k,
         })
         # hub labels
@@ -252,19 +252,21 @@ def main():
         if name in names:
             errors.append(f'{name}: duplicate network name')
         names.add(name)
-        if not ent['s'] < ent['e']:
+        if not ent['s'] <= ent['e']:
             errors.append(f'{name}: years {ent["s"]}..{ent["e"]} are not in order')
         if not ent.get('wiki'):
             errors.append(f'{name}: no Wikipedia title')
         if not (ent.get('note') or '').strip():
             errors.append(f'{name}: no note saying what it controls')
         hubs = len(ent['nodes'])
-        if hubs < 2 or not (ent['routes'] or ent['zones']):
-            errors.append(f'{name}: needs at least two hubs and a route or an area (has {hubs} hubs)')
         x0, y0, x1, y1 = rec['box']
         diag = math.hypot((x1 - x0) * math.cos(math.radians((y0 + y1) / 2)), y1 - y0) * 111.2
-        if diag < 1000:
-            errors.append(f'{name}: only {diag:.0f} km across; a Society must span at least 1,000 km')
+        # A network spans at least 1,000 km with two hubs and a route or area; anything smaller is a
+        # faction (docs/SOCIETIES.md), which still needs a hub or an area and a note on what it controls.
+        network = hubs >= 2 and bool(ent['routes'] or ent['zones']) and diag >= 1000
+        rec['sc'] = 'network' if network else 'faction'
+        if not network and hubs < 1 and not ent['zones']:
+            errors.append(f'{name}: needs at least one hub or an area of control')
     if errors:
         raise SystemExit('Societies checks failed:\n  ' + '\n  '.join(errors))
 

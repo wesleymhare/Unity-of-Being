@@ -39,7 +39,10 @@ SPHERE_DEFS = [
     ('Western bloc', 'Northwest European chartered companies', '#78d0ee', 'NATO and the European Union'),
     ('Global institutions and infrastructure', 'Western bloc', '#c4e4ef', 'The United Nations, the Red Cross, telegraph cables and container shipping'),
     ('Russian empire', 'Orthodox and Eastern Christendom', '#7a4fc0', 'The Russian-American Company and the Trans-Siberian Railway'),
-    ('Communist movement', 'Russian empire', '#d03a6a', 'The Comintern, the Chinese Communist base areas and the Warsaw Pact'),
+    ('Communist movement', 'Russian empire', '#d03a6a', 'The Comintern, the Chinese Communist base areas, the Warsaw Pact and Communist guerrilla movements'),
+    ('Dissenting and schismatic movements', 'Christendom (before the schisms)', '#8fa0f0', 'Heretics, sects and schismatic churches that broke from Latin or Orthodox Christendom'),
+    ('Insurgents, rebels and breakaway movements', None, '#c04fa0', 'Revolts, insurgent armies, communes and movements that held ground without a state'),
+    ('Warlords, cartels and the underworld', None, '#8d949c', 'Warlords, pirates, mafias and cartels that ran ground, routes and markets outside the law'),
 ]
 
 

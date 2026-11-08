@@ -1749,6 +1749,42 @@ playBtn.addEventListener('click', () => {
   requestAnimationFrame(tick);
 });
 
+// Step buttons: a tap moves the year by the amount on the button; holding repeats.
+function stepYear(amount: number): void {
+  if (playing) stopPlaying();
+  setYear(year + amount);
+  writeHash();
+}
+for (const button of document.querySelectorAll<HTMLButtonElement>('.step button')) {
+  const amount = Number(button.dataset.step);
+  let hold = 0;
+  let repeat = 0;
+  const stop = (): void => {
+    window.clearTimeout(hold);
+    window.clearInterval(repeat);
+  };
+  button.addEventListener('pointerdown', (event) => {
+    if (event.button > 0) return;
+    stepYear(amount);
+    stop();
+    // After a short hold, keep stepping (small steps repeat faster than big ones).
+    hold = window.setTimeout(() => {
+      repeat = window.setInterval(() => stepYear(amount), Math.abs(amount) >= 100 ? 220 : 90);
+    }, 380);
+  });
+  for (const type of ['pointerup', 'pointercancel', 'pointerleave']) button.addEventListener(type, stop);
+  // Keyboard activation (Enter or Space) arrives as a click with no pointer.
+  button.addEventListener('click', (event) => { if (event.detail === 0) stepYear(amount); });
+}
+document.addEventListener('keydown', (event) => {
+  const target = event.target as HTMLElement | null;
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA')) return;
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+    stepYear((event.key === 'ArrowLeft' ? -1 : 1) * (event.shiftKey ? 10 : 1));
+    event.preventDefault();
+  }
+});
+
 // ---- Data -------------------------------------------------------------------
 async function getResponse(
   url: string,

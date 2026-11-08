@@ -165,6 +165,7 @@
       <h3>Using it</h3>
       <ul>
         <li><b>Polities</b> are states and empires (who governs). <b>Civilizations</b> are peoples and shared cultural identities (who you belong to). <b>Societies</b> are affinity groups that hold de facto control as logistical networks, how the world is actually run: states as networks, dynasties, trade routes, banks and companies, alliances, orders, NGOs, drawn as routes (lines), hubs (dots) and areas, and coloured by sphere of influence. <b>Biomes</b> are climate and ecoregions.</li>
+        <li>Tap the −100 to +100 buttons above the slider to step the year (hold to keep going; arrow keys step by 1, with Shift by 10).</li>
         <li>Drag the year slider or press play. Click any area for its Wikipedia summary, infobox and facts.</li>
         <li>Zoom in to see the provinces inside big polities and local identities inside peoples.</li>
         <li>In Societies, click a kind in the legend to hide or show it.</li>
@@ -205,6 +206,16 @@
         <div class="year-kicker">Year</div>
         <div id="year-label" aria-live="off">150 CE</div>
       </div>
+    </div>
+    <div class="step" role="group" aria-label="Change the year by steps">
+      <button type="button" data-step="-100" aria-label="100 years earlier">−100</button>
+      <button type="button" data-step="-10" aria-label="10 years earlier">−10</button>
+      <button type="button" data-step="-5" aria-label="5 years earlier">−5</button>
+      <button type="button" data-step="-1" aria-label="1 year earlier">−1</button>
+      <button type="button" data-step="1" aria-label="1 year later">+1</button>
+      <button type="button" data-step="5" aria-label="5 years later">+5</button>
+      <button type="button" data-step="10" aria-label="10 years later">+10</button>
+      <button type="button" data-step="100" aria-label="100 years later">+100</button>
     </div>
     <div class="scrub">
       <button id="deep-btn" class="deep-btn soon-btn" type="button" data-soon="deep" aria-label="Deep time before 3400 BCE (planned)" title="Deep time: before 3400 BCE (planned)"></button>

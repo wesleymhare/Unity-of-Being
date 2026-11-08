@@ -112,6 +112,8 @@
 - **Societies: factions and movements** (`data/societies_factions.py`, 49 new entries, 106 in all): sects and schismatics (Cathars, Waldensians, Hussites, Old Believers, Donatists, Western Schism...), rebels and risings (Red Turbans, Zanj, Boxers, Zapatistas, Libyan rebels, Makhnovshchina, Maroons...), communes and leagues (Paris Commune, Lombard League), warlords, pirates and the underworld (Chinese warlords, Barbary corsairs, Sicilian Mafia, Medellín, Cali and Sinaloa cartels...), and parties that held ground (Khmer Rouge, FARC, Tamil Tigers, Muslim Brotherhood, Ba'ath, Hezbollah, Hamas). The 1,000 km rule now sorts entries into `network` (81) and `faction` (25); a faction needs a hub or an area. Three new spheres colour them. See `docs/SOCIETIES.md`, "Factions and movements".
 - **Check these facts:** the coordinates, years and notes of the new Societies entries are from memory, not a source I could open. Hamas, Hezbollah, Libya, the Sinaloa Cartel and the Muslim Brotherhood end in 2026 only as "still exists as far as known"; please review them.
 
+- **Year step buttons** (8 Nov): a row above the slider with −100, −10, −5, −1, +1, +5, +10, +100; a tap steps the year, holding repeats, tapping pauses play; arrow keys step by 1 (Shift 10). The timeline grew 36 px, so the map and panel offsets moved with it.
+
 ## Next
 - Grow Societies: more networks (Americas, Africa, Pacific), weighted edges, modern parties and factions.
 - Haplogroup layer for Civilizations (open ancient-DNA data only, with uncertainty).

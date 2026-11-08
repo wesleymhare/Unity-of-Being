@@ -6,13 +6,15 @@
  * data model, validation, import/export and storage; it knows nothing about the map.
  */
 
-/** Overrides for one real polity record. Absent fields mean "as in the real data". */
+/** Overrides for one real polity or province record. Absent fields mean "as in the real data". */
 export interface Override {
   name?: string;
   colour?: string;
   from?: number;
   to?: number;
   hide?: boolean;
+  /** Polities only: replace the polity with its provinces, each drawn as a polity of its own. */
+  split?: boolean;
 }
 
 export interface Branch {
@@ -24,7 +26,7 @@ export interface Branch {
   parent?: string;
   /** Size of the real polity data when the branch was last saved, to warn after a rebuild. */
   baseVersion: string;
-  /** Overrides keyed by `recordKey` (name, start and end of the real record). */
+  /** Overrides keyed by `recordKey` (polities) or `subKey` (provinces). */
   ops: Record<string, Override>;
 }
 
@@ -43,14 +45,16 @@ export interface RecordLike {
 
 /** Stable name of a real polity record; it survives rebuilds that keep the record's name and years. */
 export const recordKey = (p: RecordLike): string => `${p.n}|${p.s}|${p.e}`;
+/** The same for a province (administrative subdivision): parent polity, name and years. */
+export const subKey = (p: RecordLike & { p: string }): string => `sub:${p.p}|${p.n}|${p.s}|${p.e}`;
 
 const COLOUR = /^#[0-9a-f]{6}$/i;
 
 export const isEmptyOverride = (o: Override): boolean =>
-  o.name === undefined && o.colour === undefined && o.from === undefined && o.to === undefined && !o.hide;
+  o.name === undefined && o.colour === undefined && o.from === undefined && o.to === undefined && !o.hide && !o.split;
 
 /** A clean copy of an override with only valid fields, or null when nothing is left. */
-export function cleanOverride(input: unknown, real?: RecordLike): Override | null {
+export function cleanOverride(input: unknown, real?: RecordLike & { c?: string }): Override | null {
   if (typeof input !== 'object' || input === null) return null;
   const raw = input as Record<string, unknown>;
   const out: Override = {};
@@ -58,7 +62,7 @@ export function cleanOverride(input: unknown, real?: RecordLike): Override | nul
     const name = raw.name.replace(/\s+/g, ' ').trim().slice(0, MAX_NAME);
     if (name && (!real || name !== real.n)) out.name = name;
   }
-  if (typeof raw.colour === 'string' && COLOUR.test(raw.colour)) out.colour = raw.colour.toLowerCase();
+  if (typeof raw.colour === 'string' && COLOUR.test(raw.colour) && (!real?.c || raw.colour.toLowerCase() !== real.c.toLowerCase())) out.colour = raw.colour.toLowerCase();
   const year = (v: unknown): number | undefined =>
     typeof v === 'number' && Number.isFinite(v) ? Math.min(MAX_YEAR, Math.max(MIN_YEAR, Math.round(v))) : undefined;
   const from = year(raw.from);
@@ -66,6 +70,7 @@ export function cleanOverride(input: unknown, real?: RecordLike): Override | nul
   if (from !== undefined && (!real || from !== real.s)) out.from = from;
   if (to !== undefined && (!real || to !== real.e)) out.to = to;
   if (raw.hide === true) out.hide = true;
+  if (raw.split === true) out.split = true;
   return isEmptyOverride(out) ? null : out;
 }
 

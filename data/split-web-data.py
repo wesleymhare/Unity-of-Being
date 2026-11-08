@@ -11,6 +11,7 @@ page only loads these small property lists (labels, clicks and the panel need no
                                    (internal border lines, marked `bd`, get none)
   public/data/polities-props.json  [properties, ...] indexed by k
   public/data/subdivisions-props.json  [properties, ...] indexed by k - SUB_K
+  public/data/polity-shapes/<n>.json and subdivision-shapes/<n>.json: 150 shapes each, for Edit mode
 
 Also writes public/data/polity-shapes/<n>.json (150 shapes each) for edit mode.
 
@@ -58,3 +59,14 @@ for n in range(0, (len(features) + CHUNK - 1) // CHUNK):
     with open(f'public/data/polity-shapes/{n}.json', 'w', encoding='utf8') as fh:
         json.dump(part, fh, separators=(',', ':'), ensure_ascii=False)
 print(f'public/data/polity-shapes: {(len(features) + CHUNK - 1) // CHUNK} chunks of {CHUNK}')
+
+# Province shapes in the same kind of chunks (index = k - SUB_K), for splitting a polity into provinces.
+os.makedirs('public/data/subdivision-shapes', exist_ok=True)
+for old in os.listdir('public/data/subdivision-shapes'):
+    os.remove(os.path.join('public/data/subdivision-shapes', old))
+sub_features = [f for f in json.load(open('public/data/subdivisions.geojson', encoding='utf8'))['features'] if not f['properties'].get('bd')]
+for n in range(0, (len(sub_features) + CHUNK - 1) // CHUNK):
+    part = [f['geometry'] for f in sub_features[n * CHUNK:(n + 1) * CHUNK]]
+    with open(f'public/data/subdivision-shapes/{n}.json', 'w', encoding='utf8') as fh:
+        json.dump(part, fh, separators=(',', ':'), ensure_ascii=False)
+print(f'public/data/subdivision-shapes: {(len(sub_features) + CHUNK - 1) // CHUNK} chunks of {CHUNK}')

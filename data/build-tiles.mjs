@@ -1,9 +1,9 @@
 // Cuts the polity and province shapes into static vector tiles, so the browser never has to hold
 // the 26 MB and 14 MB GeoJSON files in memory (phones killed the tab). Output:
 //   public/data/tiles/polities/{z}/{x}/{y}.pbf       layer "polities":     k s e c g r
-//   public/data/tiles/subdivisions/{z}/{x}/{y}.pbf   layer "subdivisions": k s e c bd
+//   public/data/tiles/subdivisions/{z}/{x}/{y}.pbf   layer "subdivisions": k s e c bd p (parent polity name)
 // Beyond MAXZOOM the map stretches the last tile (the shapes are simplified to about 25 km anyway).
-// Run after data/split-web-data.py:  node data/build-tiles.mjs
+// Run after data/split-web-data.py:  node --max-old-space-size=6000 data/build-tiles.mjs   (npm run data:web does both)
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import geojsonvt from 'geojson-vt';
 import vtpbf from 'vt-pbf';
@@ -11,7 +11,7 @@ import vtpbf from 'vt-pbf';
 const MAXZOOM = 6;
 const JOBS = [
   { name: 'polities', file: 'public/data/polities.geojson', keep: ['k', 's', 'e', 'c', 'g', 'r'] },
-  { name: 'subdivisions', file: 'public/data/subdivisions.geojson', keep: ['k', 's', 'e', 'c', 'bd'] },
+  { name: 'subdivisions', file: 'public/data/subdivisions.geojson', keep: ['k', 's', 'e', 'c', 'bd', 'p'] },
 ];
 
 for (const job of JOBS) {

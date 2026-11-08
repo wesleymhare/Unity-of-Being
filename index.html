@@ -104,43 +104,44 @@
 
   <div id="alt-tag" class="alt-tag" hidden></div>
   <section id="edit" class="edit" aria-label="Edit mode" hidden>
-    <div class="edit-head">
-      <strong>Edit mode</strong><span class="edit-badge">alt-history</span>
-      <button id="edit-min" type="button" aria-label="Fold or unfold">–</button>
+    <div class="edit-bar">
+      <span class="edit-badge">✎ Alt-history</span>
+      <select id="edit-branch" aria-label="World to edit"></select>
+      <button id="edit-menu-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="World actions">⋯</button>
       <button id="edit-close" type="button" aria-label="Close edit mode">×</button>
     </div>
-    <div id="edit-body">
-      <label class="edit-row">World
-        <select id="edit-branch" aria-label="World to edit"></select>
-      </label>
-      <div class="edit-btns">
-        <button id="edit-new" type="button">New</button>
-        <button id="edit-copy" type="button">Copy</button>
-        <button id="edit-rename" type="button">Rename</button>
-        <button id="edit-delete" type="button">Delete</button>
-        <button id="edit-export" type="button">Export</button>
-        <button id="edit-import" type="button">Import</button>
-        <input id="edit-file" type="file" accept="application/json,.json" hidden>
-      </div>
-      <p id="edit-status" class="edit-note" role="status"></p>
-      <div class="edit-sep"></div>
-      <p id="edit-sel" class="edit-note"></p>
-      <form id="edit-form" hidden>
-        <label class="edit-row">Name <input id="edit-name" type="text" maxlength="80" autocomplete="off"></label>
-        <label class="edit-row">Colour <input id="edit-colour" type="color"></label>
-        <div class="edit-years">
-          <label class="edit-row">From <input id="edit-from" type="number" inputmode="numeric" step="1"></label>
-          <label class="edit-row">To <input id="edit-to" type="number" inputmode="numeric" step="1"></label>
-        </div>
-        <p class="edit-fine">Years are whole numbers; negative means BCE (-500 is 500 BCE). The edit applies from the first to the last year.</p>
-        <label class="edit-check"><input id="edit-hide" type="checkbox"> Remove this polity (for those years)</label>
-        <div class="edit-btns">
-          <button type="submit" class="primary">Apply</button>
-          <button id="edit-reset" type="button">Reset to real</button>
-        </div>
-      </form>
-      <p class="edit-fine">Your worlds are saved in this browser only. Export one to keep or share it. The real map is never changed, and a changed polity is outlined in amber. This first version edits polities; drawing and Markdown notes come next.</p>
+    <div id="edit-menu" class="edit-menu" hidden>
+      <button id="edit-new" type="button">New</button>
+      <button id="edit-copy" type="button">Copy</button>
+      <button id="edit-rename" type="button">Rename</button>
+      <button id="edit-delete" type="button">Delete</button>
+      <button id="edit-export" type="button">Export</button>
+      <button id="edit-import" type="button">Import</button>
+      <input id="edit-file" type="file" accept="application/json,.json" hidden>
     </div>
+    <p id="edit-status" class="edit-note" role="status" hidden></p>
+    <div class="edit-selrow">
+      <span id="edit-kind" class="edit-kind"></span>
+      <span id="edit-sel" class="edit-sel"></span>
+      <button id="edit-fold" type="button" aria-expanded="true" aria-label="Fold or unfold the editor">▴</button>
+    </div>
+    <form id="edit-form" hidden>
+      <p id="edit-scope" class="edit-fine"></p>
+      <label class="edit-row">Name <input id="edit-name" type="text" maxlength="80" autocomplete="off"></label>
+      <div class="edit-years">
+        <label class="edit-row">Colour <input id="edit-colour" type="color"></label>
+        <label class="edit-row">From <input id="edit-from" type="number" inputmode="numeric" step="1"></label>
+        <label class="edit-row">To <input id="edit-to" type="number" inputmode="numeric" step="1"></label>
+      </div>
+      <label class="edit-check"><input id="edit-hide" type="checkbox"> Remove (for those years)</label>
+      <div class="edit-btns">
+        <button type="submit" class="primary">Apply</button>
+        <button id="edit-reset" type="button">Reset to real</button>
+        <button id="edit-split" type="button" hidden>Split into provinces</button>
+      </div>
+      <div id="edit-provs" class="edit-chips"></div>
+      <p class="edit-fine">Negative years are BCE. Worlds are saved in this browser only; export one to keep or share it. The real map is never changed, and changed shapes are outlined in amber.</p>
+    </form>
   </section>
 
   <div id="soon" class="soon" role="dialog" aria-modal="false" aria-labelledby="soon-title" hidden>

@@ -16,7 +16,7 @@
     "data:biomes:build": "python3 data/build-biomes.py",
     "data:maddison:download": "node data/download-maddison.mjs",
     "data:maddison:build": "python3 data/build-maddison.py",
-    "data:web": "python3 data/split-web-data.py && node data/build-tiles.mjs",
+    "data:web": "python3 data/split-web-data.py && node --max-old-space-size=6000 data/build-tiles.mjs",
     "data:polities:modern": "python3 data/build-modern-polities.py"
   },
   "dependencies": {

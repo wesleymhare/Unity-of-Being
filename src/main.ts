@@ -324,6 +324,27 @@ const localFade = (full: number): maplibregl.ExpressionSpecification => [
 ];
 const NO_FEATURE: Filter = ['==', ['get', 'k'], -1];
 
+/**
+ * The land is a pale tan (brightness about 203 of 255). Civilization fills lighter than these caps
+ * sit too close to it to be seen (Tocharians, steppe peoples, broad washes), so they are darkened
+ * toward black until they stand out. Hue is kept.
+ */
+const MAX_FILL_LIGHTNESS = 145;
+const MAX_WASH_LIGHTNESS = 160;
+function capLightness(hex: string, max: number): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const n = Number.parseInt(m[1], 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  const lightness = 0.299 * r + 0.587 * g + 0.114 * b;
+  if (lightness <= max) return hex;
+  const f = max / lightness;
+  const part = (v: number): string => Math.round(v * f).toString(16).padStart(2, '0');
+  return `#${part(r)}${part(g)}${part(b)}`;
+}
+
 /** Societies: kinds switched off in the legend (kind name), and the colour of each kind. */
 const hiddenKinds = new Set<string>();
 let socKinds: Record<string, string> = {};
@@ -1918,6 +1939,9 @@ map.on('load', async () => {
     const civilizationFeatures = civilizationData?.features ?? [];
     civilizationFeatures.forEach((feature, index) => {
       feature.properties.k = index;
+      // Broad "lighter wash" spheres and yellow or tan families nearly vanished against the land.
+      const lv = Number(feature.properties.lv);
+      feature.properties.c = capLightness(String(feature.properties.c), lv === 1 ? MAX_WASH_LIGHTNESS : MAX_FILL_LIGHTNESS);
     });
     // Provinces: polygons carry keys from SUB_K up (set in the data file); border lines (bd) carry none.
     subProps = (subList ?? []).map((props) => ({
@@ -2030,7 +2054,7 @@ map.on('load', async () => {
       filter: yearFilter(year),
       paint: {
         'fill-color': ['get', 'c'],
-        'fill-opacity': localFade(0.62),
+        'fill-opacity': localFade(0.7),
       },
       layout: { visibility: visible('civilizations') },
     });

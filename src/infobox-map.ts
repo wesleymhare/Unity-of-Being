@@ -90,15 +90,15 @@ const SECTION_RULES: [RowKey, RegExp][] = [
   ['languages', /^languages?\b/i],
 ];
 
+// Whole words only: "era" must not match "Literal meaning", nor "house" a "House of ...".
 const GROUP_RULES: [GroupName, RegExp][] = [
-  ['Government and rulers', /leader|monarch|king|queen|emperor|president|prime minister|chancellor|sultan|caliph|tsar|shah|regent|governor|viceroy|head of|executive|legislat|parliament|senate|assembly|house|council|constitution|dynasty|ruler|chief|status|government/i],
-  ['Dates and events', /established|founded|formation|dissol|independ|event|history|declared|conquest|treaty|annex|abolish|reign|period|era|from|until|ended|began/i],
-  ['Geography', /area|territor|located|location|coordinates|today part|modern|extent|border|region|continent|elevation|water|coast/i],
-  ['People', /population|density|ethnic|demonym|language|religion|official|common|literacy|life expectancy/i],
-  ['Economy', /gdp|currency|hdi|gini|income|economy|trade|per capita|unit of account/i],
-  ['Military', /army|navy|air force|military|armed|forces|personnel|war|battle|conflict|strength|troops|fleet/i],
+  ['Government and rulers', /\b(leaders?|monarchs?|kings?|queens?|emperors?|empress|presidents?|prime ministers?|chancellor|sultan|caliph|tsar|shah|regents?|governors?|viceroy|head of|executive|legislat\w*|parliament|senate|assembly|council|constitution|dynast\w*|rulers?|chief|status|government|chairman|premier|speaker|(upper|lower) house)\b/i],
+  ['Dates and events', /\b(established|establishment|founded|formation|dissol\w*|independen\w*|events?|history|historical|declared|conquests?|treat(y|ies)|annex\w*|abolish\w*|reign|period|era|proclaim\w*|ended|began)\b/i],
+  ['Geography', /\b(area|territor\w*|located|location|coordinates|today|modern|extent|borders?|region|continent|elevation|water|coast)\b/i],
+  ['People', /\b(population|density|ethnic\w*|demonym|languages?|religions?|official|common|literacy|life expectancy)\b/i],
+  ['Economy', /\b(gdp|currency|hdi|gini|income|economy|trade|per capita|unit of account)\b/i],
+  ['Military', /\b(army|navy|air force|military|armed|forces|personnel|wars?|battle|conflict|strength|troops|fleet)\b/i],
 ];
-
 /** The sheet section each infobox group is filed under (one sheet, same sections for every entity). */
 export const SECTION_OF_GROUP: Record<GroupName, string> = {
   'Government and rulers': 'Government',
@@ -147,6 +147,21 @@ export function organiseInfobox(sections: InfoboxSection[] | null): OrganisedInf
       }
       if (!label) {
         out.extras.push({ group: groupFor('', section.title), label: section.title || 'Note', value: row.value });
+        return;
+      }
+      // Bulleted or dated rows ("- 1636-1643 (proclaimed in Shenyang)  Chongde Emperor") belong to
+      // the heading above them: file them by it and keep it in the label so they still read.
+      const bulleted = /^[•·▪‣\-–]/.test(label) || /^\(?(c\.?\s*)?\d{3,4}\b/.test(label);
+      if (bulleted && section.title) {
+        const rest = label.replace(/^[•·▪‣\-–\s]+/, '');
+        out.extras.push({ group: groupFor(section.title, ''), label: `${section.title} · ${rest}`, value: row.value });
+        return;
+      }
+      if (bulleted) {
+        // No heading above it: a bullet with a date is an event; otherwise judge it by its own words.
+        const rest = label.replace(/^[•·▪‣\-–\s]+/, '');
+        const group = /\b\d{3,4}\b/.test(text) && groupFor(rest, '') === 'Reference' ? 'Dates and events' : groupFor(rest, '');
+        out.extras.push({ group, label: rest, value: row.value });
         return;
       }
       out.extras.push({ group: groupFor(label, section.title), label, value: row.value });

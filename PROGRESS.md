@@ -1,5 +1,14 @@
 # PROGRESS
 
+## Current
+*Rewritten in place; last updated 12 Nov 2026. The dated log below holds the detail.*
+- **State:** `main` is `a2a15bd` on GitHub (merge repair pushed). The working tree has **uncommitted, unseen-in-the-app changes** from 12 Nov: unified entity sheet fixes (infobox grouping in `src/infobox-map.ts`), province clicks (a province opens its own panel from `SUB_PICK_ZOOM`, `src/main.ts`), civilization labels allowed to overhang their shape (`src/labels.ts`). `tsc --noEmit` passes. No Node on the build PC, so `vite build` and the running app have not been tried on these.
+- **Side panel:** one entity sheet for every entity (`buildSheet` for polities, `buildGenericSheet` for the rest). Method and extension steps: `docs/POLITY-STATS.md`, "One sheet for every entity".
+- **Unverified:** the CSS of the sheet (clamp, "Also reported"), edit mode and year-step buttons after the main.ts merge repair, the 2.2 zoom cut-off for picking provinces, civilization label crowding.
+- **Open decision:** push to `main` (redeploys the site) once the above is checked.
+- **Next action:** run `npm run dev` somewhere with Node; check a polity, province, civilization, society and ecoregion panel, edit mode, and the Civilizations lens labels. Then build the batch prompt generator + validator for researched figures (DeepSeek/ChatGPT pasted batches into a staging file, schema check, merge only reviewed figures into `public/data/polity-stats.json`).
+- **Keep the Obsidian vault current:** after substantial work run `C:\Users\wesle\Documents\GitHub Obisidian Vault\Tools\Refresh project notes.cmd` (owner instruction, 12 Nov 2026).
+
 ## Done
 - Scaffold: Vite + TypeScript + MapLibre, GitHub Actions deploy to Pages.
 - Data: Cliopatria (CC BY 4.0) simplified and cleaned into public/data/polities.geojson (12,458 shapes, 25.6 MB raw) and land.geojson (0.9 MB).
@@ -72,6 +81,12 @@
 - **Caspian Sea added** (it was missing in every lens: the base land polygon fills it in and Natural Earth's lake file has none). The Aral Sea, Lake Chad, Lake Texcoco and Lop Nur now change with the year (`data/build-water-extra.py`).
 - **Societies are coloured by sphere/group**, not kind, with symbols: line = logistical route, dot = hub, crossed swords = frontier or conflict, handshake = trade or syncretism zone (42 marks).
 - **Placeholders (nothing built behind them):** a left-pointing triangle at the start of the timeline for deep time before 3400 BCE (continental drift, ice ages), a **Tiles** button for the Tier 2 tile view, and an **Edit** button for worldbuilding, to the left of Help.
+
+### 12 November 2026: infobox grouping, province click, civilization labels (uncommitted, not seen live)
+- **Infobox rows were jumbled** (checked on the live Qing page): bulleted rows such as "- 1636-1643  Chongde Emperor" were filed by their own words, so emperors landed in History and wars in Military, and "era" matched "Literal meaning". Now (`src/infobox-map.ts`): group rules use whole words; a bulleted or dated row is filed by the heading above it and labelled "Emperor · 1636–1643 …"; a bullet with no heading and a date in its value goes to Dates and events. Checked in headless Edge on a Qing-shaped fixture. Still rough: native-name blocks ("Chinese name Transcriptions…") sit in Reference as one long folded value, and Head of state stays a dash when Wikidata has no ruler list even though the infobox lists emperors.
+- **Province click** (`src/main.ts`, click handler): a click with no polity shape under it closed the panel before provinces were looked up. Provinces are now looked up first and open when no polity was hit. I could not reproduce a dead click inside a province on the live site (Roman and Qing clicks opened the polity with the provinces listed under it, as designed at low zoom), so this fixes the one cause I found in the code; the owner should confirm with the exact place and year if it still happens. The province tile keys match `subdivisions-props.json` (checked on the live site).
+- **Province opens its own panel (owner report, same day):** clicking inside Rome only opened the polity with a province chip. Outside edit mode a click now opens the province (its polity is listed beside it under "Also here") from `SUB_PICK_ZOOM` (= `SUB_ZOOM - 1.2`, where the dashed borders start to show); below that zoom the polity still opens first. Edit mode keeps its old rule. Not seen in the running app.
+- **Civilization names hidden until clicked** (`src/labels.ts`, `src/main.ts`): civilization labels had to fit inside their shape. They may now overhang it (slack 2.8, as societies use 3) and the minimum size is lowered from 26 to 14 px (`minScore`); collisions still decide what shows. Not looked at after the change.
 
 ### 12 November 2026: merge repair (main.ts)
 - **What went wrong:** merge commit `1afef41` (local `sss` + `claude/wizardly-heisenberg-dpfamd`) kept the entity-sheet version of `src/main.ts` whole and dropped that branch's changes to it: edit-mode wiring (`initEditUi`), vector tiles, Maddison loading, year-step buttons. Every other file merged correctly, so `index.html`, `edit.ts`, `edit-ui.ts` and the tile data were new while `main.ts` ignored them. `tsc` still passed, so it was silent.

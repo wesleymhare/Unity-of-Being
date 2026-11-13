@@ -378,6 +378,8 @@ const highlightLayerOf = (lens: Lens): string | null =>
 const SUB_K = 1_000_000;
 /** From this zoom, internal borders and province names replace the parent polity's name. */
 const SUB_ZOOM = 3.4;
+/** From this zoom the dashed province borders start to fade in, so a click inside one picks the province. */
+const SUB_PICK_ZOOM = SUB_ZOOM - 1.2;
 let subProps: Props[] = [];
 let subParents = new Set<string>();
 let polityProps: Props[] = [];
@@ -438,7 +440,10 @@ const civilizationLabels = new LabelLayer<Props>(map, (p) => {
   const stack = standingAt(p.lx, p.ly, year);
   overlapSet = stack.some((item) => item.k === p.k) ? stack : [p, ...stack];
   openPanel(p);
-});
+}, 2.8);
+// Names may overhang their shape (as for societies and ecoregions); collisions still decide what
+// shows. Fitting inside the shape hid every small identity until it was clicked.
+civilizationLabels.minScore = 14;
 const societyLabels = new LabelLayer<Props>(map, (p) => {
   const entity = societyProps[p.ent ?? p.k];
   if (!entity) return;
@@ -2436,7 +2441,19 @@ map.on('load', async () => {
       const hits = fill
         ? map.queryRenderedFeatures(event.point, { layers: fill === 'polity-fill' && map.getLayer('edit-fill') ? [fill, 'edit-fill'] : [fill] })
         : [];
-      if (!hits.length) {
+      // Provinces under the click: listed first when zoomed in, after the polity otherwise.
+      // Looked up before anything else: a province must open even where no polity shape was hit
+      // (province borders are approximate and can reach past the polity's own shape).
+      const subHits = activeLens === 'polities'
+        ? map.queryRenderedFeatures(event.point, { layers: ['sub-fill', 'subedit-fill'].filter((id) => map.getLayer(id)) })
+        : [];
+      const subs: Props[] = [];
+      for (const hit of subHits) {
+        const key = (hit.properties as { k?: number }).k;
+        const item = typeof key === 'number' ? subProps[key - SUB_K] : undefined;
+        if (item && !subs.includes(item)) subs.push(item);
+      }
+      if (!hits.length && !subs.length) {
         closePanel();
         return;
       }
@@ -2451,19 +2468,15 @@ map.on('load', async () => {
         seen.add(key);
         stack.push(all[key]);
       }
-      // Provinces under the click: listed first when zoomed in, after the polity otherwise.
-      const subHits = map.queryRenderedFeatures(event.point, { layers: ['sub-fill', 'subedit-fill'].filter((id) => map.getLayer(id)) });
-      const subs: Props[] = [];
-      for (const hit of subHits) {
-        const key = (hit.properties as { k?: number }).k;
-        const item = typeof key === 'number' ? subProps[key - SUB_K] : undefined;
-        if (item && !subs.includes(item)) subs.push(item);
-      }
       // In edit mode a province is chosen when zoomed in or when its polity was split; otherwise the polity.
       const splitHit = subHits.some((hit) => (hit.layer.id === 'subedit-fill') && (hit.properties as { split?: number }).split);
-      const ordered = editActive && !(splitHit || (subs.length && map.getZoom() >= SUB_ZOOM - 0.2))
+      // Outside edit mode a province opens as soon as its borders are drawn (SUB_PICK_ZOOM), with its
+      // polity listed beside it; below that the polity opens and the provinces are listed.
+      const pickSubs = map.getZoom() >= (editActive ? SUB_ZOOM - 0.2 : SUB_PICK_ZOOM);
+      let ordered = editActive && !(splitHit || (subs.length && pickSubs))
         ? stack
-        : map.getZoom() >= SUB_ZOOM - 0.2 || splitHit ? [...subs, ...stack] : [...stack, ...subs];
+        : pickSubs || splitHit ? [...subs, ...stack] : [...stack, ...subs];
+      if (!ordered.length) ordered = subs;
       overlapSet = ordered;
       if (ordered.length) openPanel(ordered[0]);
     });

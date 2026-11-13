@@ -130,6 +130,8 @@ export class LabelLayer<T extends LabelProps> {
   private enabled = true;
   /** Labels stay hidden below this zoom. */
   minZoom = 0;
+  /** Shapes smaller than this many pixels (square root of area) get no label unless selected. */
+  minScore = 26;
   /** Hide individual labels (used to drop a polity's name once its provinces are labelled). */
   suppress: ((feature: T) => boolean) | null = null;
 
@@ -213,7 +215,7 @@ export class LabelLayer<T extends LabelProps> {
       if (this.suppress?.(f)) continue;
       const score = f.sz * ppd;
       const isSelected = f.k === this.selectedKey;
-      if (score < 26 && !isSelected) continue;
+      if (score < this.minScore && !isSelected) continue;
       if (!bounds.contains([f.lx, f.ly])) continue;
       const point = this.map.project([f.lx, f.ly]);
       if (point.x < margin || point.x > width - margin || point.y < margin || point.y > height - margin) {

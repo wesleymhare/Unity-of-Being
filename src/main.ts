@@ -133,8 +133,8 @@ const signed = (value: number): string =>
   `${value < 0 ? '−' : '+'}${Math.abs(value).toFixed(1)}`;
 
 // ---- State from the URL hash ------------------------------------------------
-type Lens = 'polities' | 'civilizations' | 'societies' | 'ideologies' | 'worldviews' | 'biomes';
-const LENSES: Lens[] = ['polities', 'civilizations', 'societies', 'ideologies', 'worldviews', 'biomes'];
+type Lens = 'polities' | 'peoples' | 'societies' | 'ideologies' | 'worldviews' | 'biomes';
+const LENSES: Lens[] = ['polities', 'peoples', 'societies', 'ideologies', 'worldviews', 'biomes'];
 /** Lenses that recolour the polity shapes by a rule-based class (src/thematic.ts). */
 type ThemeLens = 'societies' | 'ideologies' | 'worldviews';
 const isThemeLens = (lens: Lens): lens is ThemeLens => lens === 'ideologies' || lens === 'worldviews' || lens === 'societies';
@@ -151,7 +151,8 @@ const num = (key: string, fallback: number): number => {
   return Number.isFinite(value) ? value : fallback;
 };
 let year = clamp(Math.round(num('year', 150)), MIN_YEAR, MAX_YEAR);
-const requestedLens = params.get('lens') as Lens | null;
+// Old links used lens=civilizations; the lens is called Peoples since 13 Nov 2026.
+const requestedLens = (params.get('lens') === 'civilizations' ? 'peoples' : params.get('lens')) as Lens | null;
 let activeLens: Lens = requestedLens && LENSES.includes(requestedLens) ? requestedLens : 'polities';
 let selectedKey = -1;
 let selectedProps: Props | null = null;
@@ -402,7 +403,7 @@ const YEAR_FILTERS: Record<string, (value: number) => Filter> = {
 
 const LENS_LAYERS: Record<Lens, string[]> = {
   polities: ['polity-fill', 'polity-line', 'polity-realm-casing', 'polity-realm-line', 'polity-hl', 'edit-fill', 'edit-line', 'edit-hl', 'subedit-fill', 'subedit-line', 'subedit-hl', 'sub-fill', 'sub-line', 'sub-hl'],
-  civilizations: ['civilization-fill', 'civilization-casing', 'civilization-line', 'civilization-hl'],
+  peoples: ['civilization-fill', 'civilization-casing', 'civilization-line', 'civilization-hl'],
   societies: ['ctrl-fill', 'ctrl-line', 'ctrl-hl', 'soc-zone-fill', 'soc-zone-line', 'soc-route-casing', 'soc-route', 'soc-route-sea', 'soc-node', 'soc-mark-badge', 'soc-mark', 'soc-hl-route', 'soc-hl-zone', 'soc-hl-node'],
   ideologies: ['ideo-fill', 'ideo-line', 'ideo-hl'],
   worldviews: ['world-fill', 'world-line', 'world-hl'],
@@ -410,10 +411,10 @@ const LENS_LAYERS: Record<Lens, string[]> = {
 };
 
 const fillLayerOf = (lens: Lens): string | null =>
-  lens === 'polities' ? 'polity-fill' : lens === 'civilizations' ? 'civilization-fill'
+  lens === 'polities' ? 'polity-fill' : lens === 'peoples' ? 'civilization-fill'
     : lens === 'ideologies' ? 'ideo-fill' : lens === 'worldviews' ? 'world-fill' : null;
 const highlightLayerOf = (lens: Lens): string | null =>
-  lens === 'polities' ? 'polity-hl' : lens === 'civilizations' ? 'civilization-hl'
+  lens === 'polities' ? 'polity-hl' : lens === 'peoples' ? 'civilization-hl'
     : lens === 'ideologies' ? 'ideo-hl' : lens === 'worldviews' ? 'world-hl' : null;
 
 /** Province shapes carry keys from here up, so they never clash with polity keys. */
@@ -509,14 +510,14 @@ function activeLabels(): { schedule(): void } | null {
     return { schedule: () => { polityLabels.schedule(); subLabels.schedule(); } };
   }
   if (activeLens === 'ideologies' || activeLens === 'worldviews') return polityLabels;
-  if (activeLens === 'civilizations') return civilizationLabels;
+  if (activeLens === 'peoples') return civilizationLabels;
   if (activeLens === 'societies') return societyLabels;
   return biomeLabels;
 }
 
 function lensProps(lens: Lens): Props[] {
   return lens === 'polities' || lens === 'ideologies' || lens === 'worldviews' ? polityProps
-    : lens === 'civilizations' ? civilizationProps : lens === 'societies' ? societyProps : [];
+    : lens === 'peoples' ? civilizationProps : lens === 'societies' ? societyProps : [];
 }
 
 // ---- Thematic lenses: Ideologies, Worldviews, and de facto control under Societies -------------
@@ -622,7 +623,7 @@ function themeLegendRows(limit: number): HTMLElement[] {
 function renderLegend(): void {
   renderEraNote();
   legendBody.replaceChildren();
-  if (activeLens !== 'civilizations' && activeLens !== 'societies' && activeLens !== 'ideologies' && activeLens !== 'worldviews') {
+  if (activeLens !== 'peoples' && activeLens !== 'societies' && activeLens !== 'ideologies' && activeLens !== 'worldviews') {
     legend.hidden = true;
     return;
   }
@@ -711,7 +712,7 @@ function renderLegend(): void {
     return;
   }
 
-  if (activeLens === 'civilizations') {
+  if (activeLens === 'peoples') {
     legendTitle.textContent = 'Language family or sphere';
     const present = new Map<string, { colour: string; count: number }>();
     for (const p of civilizationProps) {
@@ -799,7 +800,7 @@ function setYear(next: number): void {
     subParents = new Set(subProps.filter((item) => item.s <= year && item.e >= year).map((item) => item.p as string));
     polityLabels.setYear(year, activeLens === 'polities' || activeLens === 'ideologies' || activeLens === 'worldviews');
     subLabels.setYear(year, activeLens === 'polities');
-    civilizationLabels.setYear(year, activeLens === 'civilizations');
+    civilizationLabels.setYear(year, activeLens === 'peoples');
     societyLabels.setYear(year, activeLens === 'societies');
     renderLegend();
     if (activeLens === 'biomes' && !panel.hidden && biomePoint) scheduleBiomePanel();
@@ -861,7 +862,7 @@ function renderFacts(facts: WikiFacts | null, extraFacts: WikiFact[] = []): void
 function renderFallback(name: string, hits: { title: string; snippet: string }[]): void {
   pSummary.classList.remove('error');
   pSummary.classList.add('muted');
-  const label = activeLens === 'civilizations' ? 'civilization' : activeLens === 'biomes' ? 'ecoregion' : 'polity';
+  const label = activeLens === 'peoples' ? 'people' : activeLens === 'biomes' ? 'ecoregion' : 'polity';
   pSummary.textContent = hits.length
     ? `No single Wikipedia article matches this ${label}. Closest matches are below.`
     : `No single Wikipedia article matches this ${label}.`;
@@ -1571,7 +1572,7 @@ function renderOthers(current: Props): void {
   pOthersList.replaceChildren();
   const others = overlapSet.filter((item) => item.k !== current.k);
   pOthers.hidden = others.length === 0;
-  const civilizations = activeLens === 'civilizations';
+  const civilizations = activeLens === 'peoples';
   const provinces = !civilizations && others.length > 0 && current.k < SUB_K && others.every((item) => item.k >= SUB_K);
   pOthersHead.textContent = activeLens === 'societies' ? 'Networks here' : civilizations ? 'Where you stand · peer identities' : provinces ? `Provinces (approximate) · ${others.length}` : 'Also here';
   // A long list of provinces would push the stat sheet off the screen: fold it up until asked for.
@@ -1619,7 +1620,7 @@ function renderLineage(p: Props): void {
   const stages = p.ln ? lineages.get(p.ln) : undefined;
   pNote.hidden = !p.nt;
   pNote.textContent = p.nt ?? '';
-  if (activeLens !== 'civilizations' || !stages || stages.length < 2) {
+  if (activeLens !== 'peoples' || !stages || stages.length < 2) {
     pLineage.hidden = true;
     return;
   }
@@ -1826,13 +1827,13 @@ function openPanel(p: Props): void {
   const ticket = resetPanel();
   const controller = panelAbort as AbortController;
 
-  const civilizations = activeLens === 'civilizations';
+  const civilizations = activeLens === 'peoples';
   const societies = activeLens === 'societies';
   const province = p.k >= SUB_K;
   pName.textContent = name;
   pName.title = name;
   pYears.textContent = province ? `Part of ${p.p} · ${p.era}` : fmtRange(p.s, p.e);
-  pKind.textContent = province ? 'Province' : civilizations ? 'Civilization' : societies ? 'Society' : p.g ? 'Realm' : 'Polity';
+  pKind.textContent = province ? 'Province' : civilizations ? 'People' : societies ? 'Society' : p.g ? 'Realm' : 'Polity';
   pSource.textContent = province ? 'Approximate borders' : civilizations || societies ? 'Curated' : 'Cliopatria';
   pFine.textContent = province
     ? 'Province borders: approximated from Natural Earth (public domain) inside Cliopatria shapes (CC BY 4.0) · Text: Wikipedia (CC BY-SA) · Modern map: OpenStreetMap (ODbL)'
@@ -2014,7 +2015,7 @@ function updateLensButtons(): void {
 
 function setLens(next: Lens): void {
   if (next === activeLens) return;
-  if (next === 'civilizations' && !civilizationProps.length) return;
+  if (next === 'peoples' && !civilizationProps.length) return;
   if (next === 'societies' && !societyProps.length) return;
   if (next === 'biomes' && !biomeModel) return;
   closePanel();
@@ -2029,7 +2030,7 @@ function setLens(next: Lens): void {
   // Veil only while the new lens really has nothing to show; otherwise make sure no old one lingers.
   const source = activeSourceId();
   if (map.getSource(source) && !map.isSourceLoaded(source)) {
-    showVeil(next === 'civilizations' ? 'Drawing civilizations…' : next === 'societies' ? 'Drawing networks…' : next === 'biomes' ? 'Drawing climate…'
+    showVeil(next === 'peoples' ? 'Drawing peoples…' : next === 'societies' ? 'Drawing networks…' : next === 'biomes' ? 'Drawing climate…'
       : next === 'ideologies' ? 'Drawing governments…' : next === 'worldviews' ? 'Drawing worldviews…' : 'Drawing borders…');
   } else if (dataReady) {
     finishLoading();
@@ -2040,7 +2041,7 @@ function setLens(next: Lens): void {
 function syncLabelLayers(): void {
   polityLabels.setEnabled(activeLens === 'polities' || activeLens === 'ideologies' || activeLens === 'worldviews');
   subLabels.setEnabled(activeLens === 'polities');
-  civilizationLabels.setEnabled(activeLens === 'civilizations');
+  civilizationLabels.setEnabled(activeLens === 'peoples');
   societyLabels.setEnabled(activeLens === 'societies');
   biomeLabels.setEnabled(activeLens === 'biomes');
 }
@@ -2223,7 +2224,7 @@ function failLoading(message: string): void {
 
 function activeSourceId(): string {
   return activeLens === 'polities' || activeLens === 'ideologies' || activeLens === 'worldviews' ? 'polities'
-    : activeLens === 'civilizations' ? 'civilizations' : activeLens === 'societies' ? 'societies' : 'ocean';
+    : activeLens === 'peoples' ? 'civilizations' : activeLens === 'societies' ? 'societies' : 'ocean';
 }
 
 /** Show the veil while a lens that has not drawn yet is being tiled. */
@@ -2325,10 +2326,10 @@ map.on('load', async () => {
         button.title = message;
       }
     };
-    if (!civilizationProps.length) disable('civilizations', 'Civilizations data unavailable');
+    if (!civilizationProps.length) disable('peoples', 'Peoples data unavailable');
     if (!societyProps.length) disable('societies', 'Societies data unavailable');
     if (!biomeModel) disable('biomes', 'Biome data unavailable');
-    if (activeLens === 'civilizations' && !civilizationProps.length) activeLens = 'polities';
+    if (activeLens === 'peoples' && !civilizationProps.length) activeLens = 'polities';
     if (activeLens === 'societies' && !societyProps.length) activeLens = 'polities';
     if (activeLens === 'biomes' && !biomeModel) activeLens = 'polities';
 
@@ -2419,7 +2420,7 @@ map.on('load', async () => {
         'fill-color': ['get', 'c'],
         'fill-opacity': localFade(0.7),
       },
-      layout: { visibility: visible('civilizations') },
+      layout: { visibility: visible('peoples') },
     });
 
     if (biomeModel && ocean) {
@@ -2674,7 +2675,7 @@ map.on('load', async () => {
         'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.9, 4, 1.4, 9, 2.4],
         'line-opacity': localFade(0.26),
       },
-      layout: { ...roundLines, visibility: visible('civilizations') },
+      layout: { ...roundLines, visibility: visible('peoples') },
     });
     map.addLayer({
       id: 'civilization-line',
@@ -2686,7 +2687,7 @@ map.on('load', async () => {
         'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.35, 4, 0.65, 9, 1.3],
         'line-opacity': localFade(0.6),
       },
-      layout: { ...roundLines, visibility: visible('civilizations') },
+      layout: { ...roundLines, visibility: visible('peoples') },
     });
     map.addLayer({
       id: 'civilization-hl',
@@ -2694,7 +2695,7 @@ map.on('load', async () => {
       source: 'civilizations',
       filter: NO_FEATURE,
       paint: { 'line-color': '#f6e7b8', 'line-width': 2.2, 'line-opacity': 0.95 },
-      layout: { 'line-join': 'round', visibility: visible('civilizations') },
+      layout: { 'line-join': 'round', visibility: visible('peoples') },
     });
 
     // Societies: areas of presence, routes (solid on land, dashed at sea) and hubs.
@@ -2815,7 +2816,7 @@ map.on('load', async () => {
         openBiomePanel(event.lngLat.lng, event.lngLat.lat);
         return;
       }
-      if (activeLens === 'civilizations') {
+      if (activeLens === 'peoples') {
         const stack = standingAt(event.lngLat.lng, event.lngLat.lat, year);
         if (!stack.length) {
           closePanel();
@@ -2905,7 +2906,7 @@ map.on('load', async () => {
         if (activeLens === 'societies') map.getCanvas().style.cursor = '';
       });
     }
-    for (const lens of ['polities', 'civilizations'] as Lens[]) {
+    for (const lens of ['polities', 'peoples'] as Lens[]) {
       const layer = fillLayerOf(lens) as string;
       map.on('mousemove', layer, () => {
         if (lens === activeLens) map.getCanvas().style.cursor = 'pointer';

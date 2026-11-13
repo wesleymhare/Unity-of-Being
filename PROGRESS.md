@@ -73,6 +73,13 @@
 - **Societies are coloured by sphere/group**, not kind, with symbols: line = logistical route, dot = hub, crossed swords = frontier or conflict, handshake = trade or syncretism zone (42 marks).
 - **Placeholders (nothing built behind them):** a left-pointing triangle at the start of the timeline for deep time before 3400 BCE (continental drift, ice ages), a **Tiles** button for the Tier 2 tile view, and an **Edit** button for worldbuilding, to the left of Help.
 
+### 12 November 2026: one unified entity sheet (not yet pushed or seen in the live app)
+- **Task:** owner wants a unified, clean, ordered info box per entity that integrates existing data without dropping any Wikipedia infobox data, before researched figures (DeepSeek/ChatGPT batches) are added to `public/data/polity-stats.json`.
+- **Changed:** the side panel now has one fact block. `buildSheet` (polities, fixed rows) and new `buildGenericSheet` (provinces, civilizations, societies, ecoregions) in `src/profile.ts`; shared section order and infobox-group mapping in `src/infobox-map.ts`; renderer `drawSheet`/`renderSheet` in `src/main.ts`; styles at the end of the stat-sheet block in `src/style.css`. Removed `#p-facts` and `#p-infobox` from `index.html` and their code. Full description: `docs/POLITY-STATS.md`, section "One sheet for every entity".
+- **Behaviour:** each row shows its best value; other readings sit under "Also reported · N" (other infobox values, other dated Wikidata values); infobox rows with no fixed row are filed into their section; infobox values keep Wikipedia links; the 200-character cut is gone (long values fold behind "more").
+- **Checks:** `tsc --noEmit` passes (native tsc.exe from node_modules/@typescript, since Node is not installed on this machine). The merge/ordering logic was run in headless Edge against a Roman Empire-shaped fixture: all 12 rows, alts, extras and section order came out as intended. **Not run:** `vite build`, the real app, live Wikipedia/Wikidata, the CSS (clamp, alts) by eye.
+- **Next:** run `npm run dev`, open a polity, a province, a civilization, a society and an ecoregion, and check the sheet looks right; then decide on the researched-figures workflow (batch prompt generator + validator, see conversation of 12 Nov: staging file, schema check, merge only reviewed figures).
+
 ## Planned
 - **Edit mode** (plan agreed 8 Nov, see `docs/PLAN-EDIT-MODE.md`): alt-history on top of the real data, branches saved in the browser and exportable, multi-year spans, start from real shapes, separate Markdown mode for notes.
 - Deep time before 3400 BCE (continental drift, ice ages, sea level).

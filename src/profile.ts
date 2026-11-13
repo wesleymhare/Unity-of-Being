@@ -1,12 +1,17 @@
 /**
- * The polity stat sheet: the same rows, in the same order, for every polity.
+ * The entity sheet: the one place the panel shows an entity's facts.
+ *
+ * Polities get a fixed sheet (the same rows, in the same order, dashes where empty).
+ * Every other entity gets the same sections with only the rows that have data.
  *
  * Sources, in order of preference for each row:
  *   1. data/polity-stats.json  hand-curated figures with a source note (optional file)
  *   2. World Bank open data    modern states only: population, GDP, armed forces, spending
  *   3. Wikidata (CC0)          dated population and area, capital, government, language...
- * A row with no value shows a dash, so every polity has an identical layout. Values taken
- * from a different year than the one on the slider say so ("c. 1520").
+ *   4. Wikipedia infobox       fallback text, and the source of dated rows
+ * Nothing is dropped: the chosen value is shown, any other reading sits under it as "Also
+ * reported", and every infobox row without a fixed row is filed in its section (marked with a
+ * dimmer label). Values from a different year than the slider say so ("c. 1520").
  */
 import {
   getJson,
@@ -20,11 +25,29 @@ import {
   type WikidataClaim,
   type WikidataEntity,
 } from './wiki';
-import { bestCandidate, type OrganisedInfobox } from './infobox-map';
+import {
+  SECTION_OF_GROUP,
+  SECTION_ORDER,
+  bestCandidate,
+  nodeText,
+  type Candidate,
+  type ExtraRow,
+  type OrganisedInfobox,
+  type RowKey,
+} from './infobox-map';
 
 const WD_API = 'https://www.wikidata.org/w/api.php';
 const WB_API = 'https://api.worldbank.org/v2';
 const nf = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+
+/** Another source's reading of the same row, kept so no figure is thrown away. */
+export interface ProfileAlt {
+  source: string;
+  text: string;
+  /** The cell as safe DOM (links kept), when it came from the Wikipedia infobox. */
+  node?: Node;
+  note?: string;
+}
 
 export interface ProfileRow {
   label: string;
@@ -34,6 +57,12 @@ export interface ProfileRow {
   /** The figure is from a year far from the one shown. */
   far?: boolean;
   source?: string;
+  /** The value as safe DOM (Wikipedia links kept); `value` is its plain text. */
+  node?: Node;
+  /** Other sources that report something different for this row. */
+  alts?: ProfileAlt[];
+  /** A Wikipedia infobox row with no fixed sheet row of its own. */
+  extra?: boolean;
 }
 
 export interface ProfileGroup {
@@ -413,7 +442,7 @@ export function buildSheet(input: SheetInput): ProfileGroup[] {
   const govs = current.filter(isHeadOfGovernment);
   const waiting = leaders === undefined;
 
-  return [
+  const groups: ProfileGroup[] = [
     { title: 'Government', timeline: leaders && leaders.length > 1 ? { history: leaders, current } : undefined, rows: [
       row('Government', list(data?.government) || fromInfobox('government'), { source: 'Wikidata / Wikipedia infobox' }),
       waiting ? { label: 'Head of state', value: '…' } : row('Head of state', rulerText(heads), { source: 'Wikidata' }),
@@ -438,6 +467,168 @@ export function buildSheet(input: SheetInput): ProfileGroup[] {
       row('Part of', realm),
     ] },
   ];
+  return finishSheet(groups, infobox, year, data);
+}
+
+// ---- One sheet for every entity ----------------------------------------------------------------
+// The polity sheet above has fixed rows. Every other entity (province, civilization, society,
+// ecoregion) gets the same sections in the same order, with the rows that have data. In both,
+// nothing the sources say is dropped: a row's best value is shown, the other readings sit under
+// "Also reported", and every Wikipedia infobox row without a fixed row is filed in its section.
+
+const KEY_BY_LABEL: Record<string, RowKey> = {
+  Government: 'government', Capital: 'capital', Existed: 'existed', Population: 'population',
+  Languages: 'languages', Religion: 'religion', Area: 'area', Economy: 'economy', Currency: 'currency',
+  'Armed forces': 'army', 'Preceded by': 'before', 'Succeeded by': 'after',
+};
+
+const KEY_ORDER: RowKey[] = [
+  'government', 'capital', 'existed', 'population', 'languages', 'religion',
+  'area', 'economy', 'currency', 'army', 'before', 'after',
+];
+
+const KEY_SECTION: Record<RowKey, string> = {
+  government: 'Government', capital: 'Government', existed: 'Government',
+  population: 'People', languages: 'People', religion: 'People',
+  area: 'Land and economy', economy: 'Land and economy', currency: 'Land and economy',
+  army: 'Military', before: 'Lineage', after: 'Lineage',
+};
+
+const KEY_LABEL: Record<RowKey, string> = {
+  government: 'Government', capital: 'Capital', existed: 'Existed', population: 'Population',
+  languages: 'Languages', religion: 'Religion', area: 'Area', economy: 'Economy', currency: 'Currency',
+  army: 'Armed forces', before: 'Preceded by', after: 'Succeeded by',
+};
+
+/** Wikidata fact labels (from getWikidata) that match a sheet row. */
+const FACT_KEY: Record<string, RowKey> = {
+  Capital: 'capital', Languages: 'languages', Religion: 'religion', Government: 'government',
+  Area: 'area', Population: 'population',
+};
+
+const norm = (text: string): string => text.toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+/** Infobox readings of a row that say something the chosen value does not already say. */
+function boxAlts(primary: string, candidates: Candidate[] | undefined, year: number): ProfileAlt[] {
+  const mine = norm(primary);
+  const seen = new Set<string>();
+  const out: ProfileAlt[] = [];
+  const distance = (c: Candidate): number => (c.year === undefined ? Infinity : Math.abs(c.year - year));
+  for (const c of [...(candidates ?? [])].sort((a, b) => distance(a) - distance(b))) {
+    const n = norm(c.text);
+    if (!n || (mine && mine.includes(n)) || seen.has(n)) continue;
+    seen.add(n);
+    out.push({ source: 'Wikipedia infobox', text: c.text, node: c.node, note: c.year === undefined ? undefined : `c. ${fmtYear(c.year)}` });
+  }
+  return out;
+}
+
+/** Other dated Wikidata values for population or area, besides the one on the row. */
+function dataAlts(primary: string, list: DatedNumber[] | undefined, year: number, format: (v: number) => string): ProfileAlt[] {
+  const mine = norm(primary);
+  const out: ProfileAlt[] = [];
+  const seen = new Set<string>();
+  const sorted = [...(list ?? [])].sort((a, b) => Math.abs((a.year ?? 1e9) - year) - Math.abs((b.year ?? 1e9) - year));
+  for (const item of sorted) {
+    const text = format(item.value);
+    const n = norm(text);
+    if (!n || mine.includes(n) || seen.has(n)) continue;
+    seen.add(n);
+    out.push({ source: 'Wikidata', text, note: item.year === undefined ? undefined : `c. ${fmtYear(item.year)}` });
+    if (out.length >= 6) break;
+  }
+  return out;
+}
+
+/** Files every infobox row that has no sheet row of its own into the section it belongs to. */
+function attachExtras(groups: ProfileGroup[], extras: ExtraRow[]): void {
+  for (const extra of extras) {
+    const title = SECTION_OF_GROUP[extra.group];
+    let group = groups.find((g) => g.title === title);
+    if (!group) {
+      group = { title, rows: [] };
+      groups.push(group);
+    }
+    const value = nodeText(extra.value);
+    if (!value) continue;
+    group.rows.push({ label: extra.label, value, node: extra.value, source: 'Wikipedia infobox', extra: true });
+  }
+  const rank = (title: string): number => (SECTION_ORDER as readonly string[]).indexOf(title);
+  groups.sort((a, b) => rank(a.title) - rank(b.title));
+}
+
+/** Adds the other readings to each fixed row, then the unplaced infobox rows. */
+function finishSheet(groups: ProfileGroup[], infobox: OrganisedInfobox | undefined, year: number, data: ProfileData | null): ProfileGroup[] {
+  for (const group of groups) {
+    for (const row of group.rows) {
+      const key = KEY_BY_LABEL[row.label];
+      if (!key || row.value === DASH || row.value === '…') continue;
+      const candidates = infobox?.mapped[key];
+      const same = candidates?.find((c) => c.text === row.value);
+      if (same?.node) row.node = same.node;
+      const alts = boxAlts(row.value, candidates, year);
+      const fromData = key === 'population' ? dataAlts(row.value, data?.population, year, fmtCount)
+        : key === 'area' ? dataAlts(row.value, data?.area, year, (v) => `${nf.format(Math.round(v))} km²`)
+        : [];
+      // A Wikidata reading that the infobox already gave is not listed twice.
+      for (const alt of fromData) if (!alts.some((a) => norm(a.text).includes(norm(alt.text)))) alts.push(alt);
+      if (alts.length) row.alts = alts;
+    }
+  }
+  if (infobox?.extras.length) attachExtras(groups, infobox.extras);
+  return groups;
+}
+
+export interface GenericInput {
+  year: number;
+  /** Title of the entity's own group: "Society", "Province", "Ecoregion"... */
+  kind: string;
+  /** Facts from this project's own data (sphere, lineage, climate...). */
+  own: { label: string; value: string }[];
+  /** Facts read from Wikidata. */
+  wikidata: { label: string; value: string }[];
+  infobox?: OrganisedInfobox;
+}
+
+/** The sheet for everything that is not a polity: same sections, only the rows that have data. */
+export function buildGenericSheet(input: GenericInput): ProfileGroup[] {
+  const { year, kind, own, wikidata, infobox } = input;
+  const mine: ProfileRow[] = own.filter((f) => f.value).map((f) => ({ label: f.label, value: f.value, source: 'Project data' }));
+  const type = wikidata.find((f) => f.label === 'Type');
+  if (type) mine.push({ label: 'Instance of', value: type.value, source: 'Wikidata' });
+  const groups: ProfileGroup[] = mine.length ? [{ title: kind, rows: mine }] : [];
+
+  for (const key of KEY_ORDER) {
+    const fact = wikidata.find((f) => FACT_KEY[f.label] === key);
+    const candidates = infobox?.mapped[key];
+    let row: ProfileRow | null = null;
+    if (fact) {
+      row = { label: KEY_LABEL[key], value: fact.value, source: 'Wikidata' };
+      const same = candidates?.find((c) => c.text === fact.value);
+      if (same?.node) row.node = same.node;
+      const alts = boxAlts(fact.value, candidates, year);
+      if (alts.length) row.alts = alts;
+    } else {
+      const best = bestCandidate(candidates, year);
+      if (best) {
+        const note = best.c.year === undefined ? undefined : `c. ${fmtYear(best.c.year)}`;
+        row = { label: KEY_LABEL[key], value: best.c.text, node: best.c.node, note, source: 'Wikipedia infobox' };
+        const alts = boxAlts(best.c.text, candidates, year);
+        if (alts.length) row.alts = alts;
+      }
+    }
+    if (!row) continue;
+    const title = KEY_SECTION[key];
+    let group = groups.find((g) => g.title === title);
+    if (!group) {
+      group = { title, rows: [] };
+      groups.push(group);
+    }
+    group.rows.push(row);
+  }
+  if (infobox?.extras.length) attachExtras(groups, infobox.extras);
+  else groups.sort((a, b) => (SECTION_ORDER as readonly string[]).indexOf(a.title) - (SECTION_ORDER as readonly string[]).indexOf(b.title));
+  return groups;
 }
 
 /** The same sheet with every value empty, shown while data loads. */

@@ -8,6 +8,9 @@ This standalone project is distinct from similarly named material in The Path Fo
 
 Read the repository instructions, then the current status and task-specific documents. Search for the relevant topic before reading large directories. Source code, saved assets, builds, generated outputs and archives are not default context attachments.
 
+## Fundamentals
+- [docs/POLITY-STATS.md](docs/POLITY-STATS.md): the entity sheet (one fact block for polities, provinces, civilizations, societies and ecoregions), where each figure comes from, the curated-figures file format. Read before changing the side panel or adding researched figures.
+
 ## Consultation scope - owner clarification, 6 November 2026
 
 Gemini chat and DeepSeek web chat are quick pasted consultations for text and research, intended to reduce repeated context and token use. Send the task, necessary constraints and only the relevant excerpts; attach a full generated briefing only when its wider context is needed. Their replies are proposals for review, not accepted project decisions or tested implementation.

@@ -4,8 +4,8 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import './style.css';
 import { BiomeModel, CLASSES, GROUPS, climateShift, type EcoMeta, type EcoPatch } from './biomes';
 import { LabelLayer, type LabelProps } from './labels';
-import { GROUP_ORDER, organiseInfobox, type ExtraRow, type OrganisedInfobox } from './infobox-map';
-import { buildSheet, emptySheet, fmtReign, getCurated, getProfileData, getWorldBank, type Curated, type ProfileData, type ProfileGroup, type WorldBank } from './profile';
+import { organiseInfobox, type OrganisedInfobox } from './infobox-map';
+import { buildGenericSheet, buildSheet, emptySheet, fmtReign, getCurated, getProfileData, getWorldBank, type Curated, type ProfileData, type ProfileGroup, type ProfileRow, type WorldBank } from './profile';
 import {
   getArticlePhoto,
   getInfobox,
@@ -174,10 +174,8 @@ const pFigure = $('p-figure');
 const pImage = $<HTMLImageElement>('p-image');
 const pFigureKind = $('p-figure-kind');
 const pFigureLink = $<HTMLAnchorElement>('p-figure-link');
-const pInfobox = $('p-infobox');
 const pProfile = $('p-profile');
 const pSubs = $('p-subs');
-const pFacts = $<HTMLDListElement>('p-facts');
 const pOsm = $('p-osm');
 const pOsmFrame = $<HTMLIFrameElement>('p-osm-frame');
 const pOsmLink = $<HTMLAnchorElement>('p-osm-link');
@@ -596,7 +594,7 @@ function setYear(next: number): void {
     renderLegend();
     if (activeLens === 'biomes' && !panel.hidden && biomePoint) scheduleBiomePanel();
     if (!panel.hidden && panelQid && activeLens === 'polities') refreshPanelForYear();
-    if (profileActive && !panel.hidden) renderProfile();
+    if (!panel.hidden) renderSheet();
     scheduleHash();
   };
   if (wait > 0) yearRaf = window.setTimeout(start, wait);
@@ -640,18 +638,10 @@ function renderSummary(summary: WikiSummary): void {
   pLink.title = summary.title;
 }
 
+/** Feeds the entity sheet: this project's own facts and Wikidata's. The sheet is redrawn from them. */
 function renderFacts(facts: WikiFacts | null, extraFacts: WikiFact[] = []): void {
-  // For polities the fixed stat sheet replaces the Wikidata list.
-  const rows = [...extraFacts, ...(profileActive ? [] : facts?.facts ?? [])];
-  pFacts.replaceChildren();
-  for (const fact of rows) {
-    const dt = document.createElement('dt');
-    dt.textContent = fact.label;
-    const dd = document.createElement('dd');
-    dd.textContent = fact.value;
-    pFacts.append(dt, dd);
-  }
-  pFacts.hidden = rows.length === 0;
+  panelSheet = { own: extraFacts, wikidata: facts?.facts ?? [] };
+  renderSheet();
 
   pWdLink.hidden = !facts;
   if (facts) pWdLink.href = `https://www.wikidata.org/wiki/${facts.qid}`;
@@ -789,50 +779,13 @@ async function loadBiomeImage(titles: string[], ticket: number, signal: AbortSig
   }
 }
 
-function fillInfoboxCell(target: HTMLElement, source: Node): void {
-  target.append(source.cloneNode(true));
-}
-
-function renderInfobox(extras: ExtraRow[]): void {
-  pInfobox.replaceChildren();
-  if (!extras.length) {
-    pInfobox.hidden = true;
-    return;
-  }
-  const all = document.createElement('details');
-  all.className = 'ib-all';
-  const summary = document.createElement('summary');
-  summary.textContent = 'More from the Wikipedia infobox';
-  all.append(summary);
-  for (const group of GROUP_ORDER) {
-    const rows = extras.filter((row) => row.group === group);
-    if (!rows.length) continue;
-    const head = document.createElement('h5');
-    head.className = 'ib-group';
-    head.textContent = group;
-    const list = document.createElement('dl');
-    list.className = 'ib';
-    for (const row of rows) {
-      const dt = document.createElement('dt');
-      dt.textContent = row.label;
-      const dd = document.createElement('dd');
-      fillInfoboxCell(dd, row.value);
-      list.append(dt, dd);
-    }
-    all.append(head, list);
-  }
-  pInfobox.append(all);
-  pInfobox.hidden = false;
-}
-
 async function loadInfobox(title: string | null, ticket: number, signal: AbortSignal): Promise<void> {
   if (!title) return;
   try {
     const sections = await getInfobox(title, signal);
     if (ticket !== panelTicket) return;
     panelInfobox = organiseInfobox(sections);
-    renderInfobox(panelInfobox.extras);
-    renderProfile();
+    renderSheet();
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') return;
   }
@@ -893,6 +846,7 @@ async function loadSubdivisions(qid: string, ticket: number, signal: AbortSignal
 // ---- Polity stat sheet (fixed rows, fixed order; see src/profile.ts) ----------------------------
 let profileActive = false;
 let panelInfobox: OrganisedInfobox | null = null;
+let panelSheet: { own: WikiFact[]; wikidata: WikiFact[] } | null = null;
 let panelProfile: { data: ProfileData | null; wb: WorldBank | null; curated: Curated[string] | undefined; realm?: string; leaders?: Leader[] } | null = null;
 
 let rulersOpen = false;
@@ -925,7 +879,54 @@ function rulerTimeline(history: Leader[], current: Leader[]): HTMLElement {
   return details;
 }
 
-function drawSheet(groups: ProfileGroup[]): void {
+/** Values longer than this fold behind a "more" button so one row cannot push the sheet off screen. */
+const FOLD_AT = 240;
+
+/** A value as plain text, or as safe DOM with its Wikipedia links when the source had them. */
+function valueSpan(text: string, node?: Node): HTMLElement {
+  const span = document.createElement('span');
+  span.className = 'val';
+  if (node) span.append(node.cloneNode(true));
+  else span.textContent = text;
+  if (text.length <= FOLD_AT) return span;
+  span.classList.add('clamp');
+  const more = document.createElement('button');
+  more.type = 'button';
+  more.className = 'more';
+  more.textContent = 'more';
+  more.addEventListener('click', () => {
+    const folded = span.classList.toggle('clamp');
+    more.textContent = folded ? 'more' : 'less';
+  });
+  const holder = document.createElement('span');
+  holder.append(span, ' ', more);
+  return holder;
+}
+
+/** The other sources' readings of a row, folded under it. */
+function altsBlock(alts: NonNullable<ProfileRow['alts']>): HTMLElement {
+  const details = document.createElement('details');
+  details.className = 'alts';
+  const summary = document.createElement('summary');
+  summary.textContent = `Also reported · ${alts.length}`;
+  details.append(summary);
+  for (const alt of alts) {
+    const line = document.createElement('div');
+    line.className = 'alt';
+    const source = document.createElement('b');
+    source.textContent = alt.source;
+    line.append(source, ' ', valueSpan(alt.text, alt.node));
+    if (alt.note) {
+      const note = document.createElement('small');
+      note.textContent = alt.note;
+      line.append(' ', note);
+    }
+    details.append(line);
+  }
+  return details;
+}
+
+function drawSheet(groups: ProfileGroup[], fineText: string): void {
   pProfile.replaceChildren();
   for (const group of groups) {
     const section = document.createElement('section');
@@ -937,15 +938,24 @@ function drawSheet(groups: ProfileGroup[]): void {
     for (const row of group.rows) {
       const dt = document.createElement('dt');
       dt.textContent = row.label;
+      if (row.extra) {
+        dt.className = 'wp';
+        dt.title = 'From the Wikipedia infobox';
+      }
       const dd = document.createElement('dd');
-      if (row.value === '—' || row.value === '…') dd.className = 'empty';
-      dd.textContent = row.value;
+      if (row.value === '—' || row.value === '…') {
+        dd.className = 'empty';
+        dd.textContent = row.value;
+      } else {
+        dd.append(valueSpan(row.value, row.node));
+      }
       if (row.note) {
         const note = document.createElement('small');
         note.textContent = row.note;
         if (row.far) note.className = 'far';
         dd.append(' ', note);
       }
+      if (row.alts?.length) dd.append(altsBlock(row.alts));
       if (row.source) dd.title = `Source: ${row.source}`;
       list.append(dt, dd);
     }
@@ -955,28 +965,45 @@ function drawSheet(groups: ProfileGroup[]): void {
   }
   const fine = document.createElement('p');
   fine.className = 'prof-fine';
-  fine.textContent = 'Dashes mean no figure is on record. Years in grey are the nearest year with data. Sources: Wikidata (CC0), World Bank (CC BY 4.0, modern states).';
+  fine.textContent = fineText;
   pProfile.append(fine);
   pProfile.hidden = false;
 }
 
-function renderProfile(): void {
-  if (!profileActive || !panelProfile) return;
-  drawSheet(buildSheet({
+const POLITY_FINE =
+  'Dashes mean no figure is on record. Years in grey are the nearest year with data. “Also reported” lists what other sources say; rows in a dimmer label come straight from the Wikipedia infobox. Sources: curated figures, World Bank (CC BY 4.0, modern states), Wikidata (CC0), Wikipedia infobox (CC BY-SA).';
+const GENERIC_FINE =
+  'Only rows with data are listed. “Also reported” lists what other sources say; every Wikipedia infobox row is kept. Sources: this project’s curated data, Wikidata (CC0), Wikipedia infobox (CC BY-SA).';
+
+/** Redraws the one sheet: the fixed polity sheet, or the shared sheet for every other entity. */
+function renderSheet(): void {
+  if (profileActive) {
+    if (!panelProfile) return; // the dash skeleton stays up until the data arrives
+    drawSheet(buildSheet({
+      year,
+      data: panelProfile.data,
+      wb: panelProfile.wb,
+      curated: panelProfile.curated,
+      realm: panelProfile.realm,
+      infobox: panelInfobox ?? undefined,
+      leaders: panelProfile.leaders,
+    }), POLITY_FINE);
+    return;
+  }
+  if (!panelSheet) return;
+  drawSheet(buildGenericSheet({
     year,
-    data: panelProfile.data,
-    wb: panelProfile.wb,
-    curated: panelProfile.curated,
-    realm: panelProfile.realm,
+    kind: pKind.textContent ?? 'Details',
+    own: panelSheet.own,
+    wikidata: panelSheet.wikidata,
     infobox: panelInfobox ?? undefined,
-    leaders: panelProfile.leaders,
-  }));
+  }), GENERIC_FINE);
 }
 
 async function loadProfile(qid: string | null, realm: string | undefined, ticket: number, signal: AbortSignal): Promise<void> {
   profileActive = true;
   panelProfile = null;
-  drawSheet(emptySheet());
+  drawSheet(emptySheet(), POLITY_FINE);
   try {
     const rulers = qid ? getLeaderHistory(qid, signal).catch((error) => {
       if (error instanceof DOMException && error.name === 'AbortError') throw error;
@@ -987,16 +1014,16 @@ async function loadProfile(qid: string | null, realm: string | undefined, ticket
     const wb = await getWorldBank(data?.iso, signal);
     if (ticket !== panelTicket) return;
     panelProfile = { data, wb, curated: qid ? curatedAll[qid] : undefined, realm };
-    renderProfile();
+    renderSheet();
     const leaders = await rulers;
     if (ticket !== panelTicket) return;
     panelProfile = { ...panelProfile, leaders };
-    renderProfile();
+    renderSheet();
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') return;
     if (ticket !== panelTicket) return;
     panelProfile = { data: null, wb: null, curated: undefined, realm, leaders: [] };
-    renderProfile();
+    renderSheet();
   }
 }
 
@@ -1062,16 +1089,13 @@ function resetPanel(): number {
   panelAbort = new AbortController();
   pFallback.hidden = true;
   pFallback.replaceChildren();
-  pFacts.hidden = true;
-  pFacts.replaceChildren();
   hideFigure();
-  pInfobox.hidden = true;
-  pInfobox.replaceChildren();
   pProfile.hidden = true;
   pProfile.replaceChildren();
   panelProfile = null;
   profileActive = false;
   panelInfobox = null;
+  panelSheet = null;
   pSubs.hidden = true;
   pSubs.replaceChildren();
   panelFacts = null;

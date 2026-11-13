@@ -16,8 +16,11 @@ export type RowKey =
   | 'area' | 'economy' | 'currency' | 'army' | 'before' | 'after';
 
 export interface Candidate {
+  /** Plain text of the cell, never shortened (the panel folds long values instead). */
   text: string;
   year?: number;
+  /** The cell as safe DOM (links into Wikipedia kept), shown instead of the plain text. */
+  node?: Node;
 }
 
 export const GROUP_ORDER = [
@@ -96,6 +99,20 @@ const GROUP_RULES: [GroupName, RegExp][] = [
   ['Military', /army|navy|air force|military|armed|forces|personnel|war|battle|conflict|strength|troops|fleet/i],
 ];
 
+/** The sheet section each infobox group is filed under (one sheet, same sections for every entity). */
+export const SECTION_OF_GROUP: Record<GroupName, string> = {
+  'Government and rulers': 'Government',
+  'Dates and events': 'History',
+  Geography: 'Land and economy',
+  People: 'People',
+  Economy: 'Land and economy',
+  Military: 'Military',
+  Reference: 'Reference',
+};
+
+/** Fixed order of sheet sections. Anything else (the entity's own group) comes first. */
+export const SECTION_ORDER = ['Government', 'History', 'People', 'Land and economy', 'Military', 'Lineage', 'Reference'] as const;
+
 function groupFor(label: string, section: string): GroupName {
   const text = `${section} ${label}`;
   for (const [group, rule] of GROUP_RULES) if (rule.test(label)) return group;
@@ -110,22 +127,22 @@ function push(mapped: OrganisedInfobox['mapped'], key: RowKey, c: Candidate): vo
 export function organiseInfobox(sections: InfoboxSection[] | null): OrganisedInfobox {
   const out: OrganisedInfobox = { mapped: {}, extras: [] };
   if (!sections) return out;
-  const clip = (t: string): string => (t.length > 200 ? `${t.slice(0, 197).trimEnd()}…` : t);
 
   for (const section of sections) {
     const sectionKey = SECTION_RULES.find(([, rule]) => rule.test(section.title))?.[0];
     section.rows.forEach((row: InfoboxRow) => {
       const label = row.label ? nodeText(row.label) : '';
-      const text = clip(nodeText(row.value));
+      const text = nodeText(row.value);
       if (!text) return;
+      const node = row.value;
       // Rows under a "Population" or "Area" heading: the label is the year.
       if (sectionKey && (!label || /^[•·\-–\s]*(c\.?|circa|est\.?)?\s*[\d,]+/i.test(label) || yearIn(label) !== undefined)) {
-        push(out.mapped, sectionKey, { text, year: yearIn(label) ?? yearIn(text) });
+        push(out.mapped, sectionKey, { text, node, year: yearIn(label) ?? yearIn(text) });
         return;
       }
       const key = RULES.find(([, rule]) => rule.test(label))?.[0];
       if (key) {
-        push(out.mapped, key, { text, year: key === 'population' || key === 'area' || key === 'economy' ? yearIn(text) ?? yearIn(label) : undefined });
+        push(out.mapped, key, { text, node, year: key === 'population' || key === 'area' || key === 'economy' ? yearIn(text) ?? yearIn(label) : undefined });
         return;
       }
       if (!label) {

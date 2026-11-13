@@ -1113,6 +1113,33 @@ a { color: var(--brass); }
 .prof dd small.far { color: #7d6a4a; }
 .prof-fine { margin: 6px 0 0; font-size: 10px; line-height: 1.45; color: var(--faint); }
 
+/* One sheet for every entity: rows from the Wikipedia infobox, other readings, long values */
+.prof dt.wp { color: #77716a; }
+.prof dd a { color: var(--brass-lt); text-decoration: none; }
+.prof dd a:hover { text-decoration: underline; }
+.prof .val.clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.prof .more {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 10.5px;
+  color: var(--brass);
+  cursor: pointer;
+}
+.prof .more:hover { color: var(--brass-lt); }
+.prof .alts { margin: 2px 0 0; }
+.prof .alts > summary { cursor: pointer; font-size: 10.5px; color: var(--faint); padding: 1px 0; }
+.prof .alts > summary:hover { color: var(--brass-lt); }
+.prof .alt { margin: 2px 0 0 8px; padding-left: 6px; border-left: 1px solid var(--line); font-size: 11.5px; line-height: 1.4; color: #b9b2a2; }
+.prof .alt b { font: 600 9.5px/1 system-ui, sans-serif; letter-spacing: 0.4px; text-transform: uppercase; color: var(--faint); margin-right: 3px; }
+
 .ib-all { margin: 0 0 12px; }
 .ib-all > summary {
   cursor: pointer;

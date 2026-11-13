@@ -12,12 +12,36 @@ glance. A row with no figure shows a dash instead of disappearing. Order:
 | **Lineage** | Preceded by, Succeeded by, Part of (realm) |
 
 The flag or coat of arms (for the year) is the first thing under the title; there is no separate
-ruler box. The Wikipedia infobox is no longer shown in the article's own order: each row is
-classified by its label and either fills a sheet row where Wikidata and the World Bank have
-nothing (dated rows such as "Population • 150 CE" are chosen by the year nearest the slider), or is
-sorted into fixed groups (Government and rulers, Dates and events, Geography, People, Economy,
-Military, Reference) in the folded "More from the Wikipedia infobox" at the bottom
-(`src/infobox-map.ts`).
+ruler box.
+
+## One sheet for every entity (since 12 Nov 2026)
+The panel has a single fact block, `#p-profile`, drawn by `drawSheet` in `src/main.ts`. The old
+Wikidata fact list and the folded "More from the Wikipedia infobox" block are gone: everything
+they showed is now inside the sheet, so nothing is dropped and nothing is shown twice.
+
+- **Polities** use the fixed sheet above (`buildSheet`).
+- **Provinces, civilizations, societies and ecoregions/climate** use `buildGenericSheet`
+  (`src/profile.ts`): the same sections in the same order, but only rows that have data. The
+  entity's own group comes first ("Civilization", "Society", "Province", "Ecoregion"), holding
+  this project's curated facts (sphere, lineage, power, climate...) and Wikidata's "Instance of".
+- **Section order everywhere:** the entity's own group, Government, History, People, Land and
+  economy, Military, Lineage, Reference. `History` and `Reference` appear only when the infobox
+  gives rows for them. Order constants: `SECTION_ORDER` in `src/infobox-map.ts`.
+- **Each row shows its best value** (curated, then World Bank, then Wikidata, then the infobox).
+  **Every other reading is kept** under the row as a folded "Also reported · N": other infobox
+  values (including each dated population or area figure) and other dated Wikidata values, each
+  tagged with its source and year. A reading the chosen value already contains is not repeated.
+- **Infobox rows with no fixed row** (rulers, legislature, "Today part of", ISO codes...) are filed
+  by `organiseInfobox` into a group (`GROUP_ORDER`) and `SECTION_OF_GROUP` maps the group to a
+  sheet section. Their labels are dimmer and say "From the Wikipedia infobox" on hover.
+- **Wikipedia links are kept**: values taken from the infobox are shown as safe DOM (links into
+  Wikipedia only), not flattened text. Nothing is cut at 200 characters any more; a value over 240
+  characters folds to three lines with a "more" button.
+- The sheet redraws whenever the year moves, the infobox arrives, or Wikidata arrives.
+
+To add a row that has a fixed place: add its key to `RowKey` and `RULES` in `src/infobox-map.ts`,
+then to the label and section tables above `buildGenericSheet` in `src/profile.ts` (and to
+`buildSheet` if polities should show a dash for it).
 
 ## Where each figure comes from
 Tried in this order, per row (`src/profile.ts`):

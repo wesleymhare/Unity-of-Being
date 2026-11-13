@@ -5,7 +5,9 @@ import './style.css';
 import { BiomeModel, CLASSES, GROUPS, climateShift, type EcoMeta, type EcoPatch } from './biomes';
 import { LabelLayer, type LabelProps } from './labels';
 import { organiseInfobox, type OrganisedInfobox } from './infobox-map';
-import { buildGenericSheet, buildSheet, emptySheet, fmtReign, getCurated, getProfileData, getWorldBank, type Curated, type ProfileData, type ProfileGroup, type ProfileRow, type WorldBank } from './profile';
+import { effectiveYears, recordKey, subKey, type Override } from './edit';
+import { initEditUi } from './edit-ui';
+import { buildGenericSheet, buildSheet, emptySheet, fmtReign, getCurated, getMaddison, getProfileData, getWorldBank, maddisonCode, type Curated, type MaddisonCountry, type ProfileData, type ProfileGroup, type ProfileRow, type WorldBank } from './profile';
 import {
   getArticlePhoto,
   getInfobox,
@@ -34,6 +36,8 @@ import {
 maplibregl.setWorkerUrl(workerUrl);
 
 const BASE = import.meta.env.BASE_URL;
+/** Absolute base for the vector tiles MapLibre's worker loads itself (a worker cannot resolve a page-relative path). */
+const dataBase = new URL(BASE, location.href).href;
 /** Zoom at which local civilization identities (level 3) fade in. */
 const LOCAL_ZOOM = 3.6;
 /** Hub label keys start here; network keys are small indexes. */
@@ -59,6 +63,8 @@ interface Props extends LabelProps {
   lv?: number;
   ln?: string;
   nt?: string;
+  /** Edit mode: this province is drawn as a polity of its own because its polity was split. */
+  split?: number;
   /** Provinces: parent polity name, its Wikidata id, and the era the province list describes. */
   p?: string;
   pq?: string;
@@ -68,6 +74,8 @@ interface Props extends LabelProps {
   hubs?: string;
   /** Societies: the sphere or group a network belongs to (sets its colour). */
   grp?: string;
+  /** Societies: 'network' (1,000 km or more) or 'faction' (smaller, or a single hub or area). */
+  sc?: string;
   /** Societies: power types it wields, and the lineage of its sphere. */
   pw?: string;
   lin?: string;
@@ -206,10 +214,6 @@ const SOON: Record<string, { title: string; body: string }> = {
     title: 'Tile view (Tier 2)',
     body: 'A planned zoom from the political map down to terrain and tiles for the place and year you are looking at: relief, settlements and, later, tile and hex dioramas.',
   },
-  edit: {
-    title: 'Edit mode: worldbuilding',
-    body: 'A planned mode for drawing and changing polities, civilizations, societies and biomes, keeping your own timelines and, later, sharing them.',
-  },
 };
 const soonBox = $('soon');
 const soonButtons = [...document.querySelectorAll<HTMLButtonElement>('.soon-btn')];
@@ -288,9 +292,16 @@ new ResizeObserver(() => {
 type Filter = maplibregl.ExpressionSpecification;
 type GeoData = maplibregl.GeoJSONSourceSpecification['data'];
 
-const yearFilter = (value: number): Filter => [
+/** Real polity records that edit mode hides or redraws from the edit source (by record index k). */
+let editExcluded: number[] = [];
+const rawYearFilter = (value: number): Filter => [
   'all', ['<=', ['get', 's'], value], ['>=', ['get', 'e'], value],
 ];
+const yearFilter = (value: number): Filter => editExcluded.length
+  ? ['all', rawYearFilter(value), ['!', ['in', ['get', 'k'], ['literal', editExcluded]]]]
+  : rawYearFilter(value);
+/** Polities drawn from the edit source: no exclusion, and never realm-only groups. */
+const editLayerFilter = (value: number): Filter => ['all', rawYearFilter(value), ['!', ['has', 'g']]];
 /** Shapes that are filled: everything except label-only realm groups. */
 const leafFilter = (value: number): Filter => ['all', yearFilter(value), ['!', ['has', 'g']]];
 /** Outlines of realms: groups and polities that are not part of a realm. */
@@ -328,12 +339,16 @@ const socFilter = (value: number, type: string, ...extra: Filter[]): Filter => {
 const YEAR_FILTERS: Record<string, (value: number) => Filter> = {
   'lake-fill': lakeFilter,
   'lake-line': lakeFilter,
+  'edit-fill': editLayerFilter,
+  'edit-line': editLayerFilter,
   'polity-fill': leafFilter,
   'polity-line': leafFilter,
   'polity-realm-casing': realmFilter,
   'polity-realm-line': realmFilter,
   'sub-fill': (value) => ['all', yearFilter(value), ['!', ['has', 'bd']]],
-  'sub-line': (value) => ['all', yearFilter(value), ['has', 'bd']],
+  'sub-line': (value) => ['all', yearFilter(value), ['has', 'bd'], ...(editExcludedParents.length ? [['!', ['in', ['get', 'p'], ['literal', editExcludedParents]]] as Filter] : [])],
+  'subedit-fill': editLayerFilter,
+  'subedit-line': editLayerFilter,
   'civilization-fill': yearFilter,
   'civilization-casing': yearFilter,
   'civilization-line': yearFilter,
@@ -348,7 +363,7 @@ const YEAR_FILTERS: Record<string, (value: number) => Filter> = {
 };
 
 const LENS_LAYERS: Record<Lens, string[]> = {
-  polities: ['polity-fill', 'polity-line', 'polity-realm-casing', 'polity-realm-line', 'polity-hl', 'sub-fill', 'sub-line', 'sub-hl'],
+  polities: ['polity-fill', 'polity-line', 'polity-realm-casing', 'polity-realm-line', 'polity-hl', 'edit-fill', 'edit-line', 'edit-hl', 'subedit-fill', 'subedit-line', 'subedit-hl', 'sub-fill', 'sub-line', 'sub-hl'],
   civilizations: ['civilization-fill', 'civilization-casing', 'civilization-line', 'civilization-hl'],
   societies: ['soc-zone-fill', 'soc-zone-line', 'soc-route-casing', 'soc-route', 'soc-route-sea', 'soc-node', 'soc-mark-badge', 'soc-mark', 'soc-hl-route', 'soc-hl-zone', 'soc-hl-node'],
   biomes: ['biome-raster', 'eco-lines', 'ocean-mask'],
@@ -366,6 +381,41 @@ const SUB_ZOOM = 3.4;
 let subProps: Props[] = [];
 let subParents = new Set<string>();
 let polityProps: Props[] = [];
+/** The real polity records and their shapes by index k; edit mode never changes these. */
+let basePolityProps: Props[] = [];
+/** Shapes of real polities and provinces, fetched in small chunks only when an edit needs one. */
+const SHAPE_CHUNK = 150;
+const shapeChunks = new Map<string, Promise<unknown[]>>();
+function realShape(k: number): Promise<unknown> {
+  const isSub = k >= SUB_K;
+  const index = isSub ? k - SUB_K : k;
+  const chunk = Math.floor(index / SHAPE_CHUNK);
+  const url = `${BASE}data/${isSub ? 'subdivision' : 'polity'}-shapes/${chunk}.json`;
+  let loading = shapeChunks.get(url);
+  if (!loading) {
+    loading = getJson<unknown[]>(url);
+    shapeChunks.set(url, loading);
+    loading.catch(() => shapeChunks.delete(url));
+  }
+  return loading.then((list) => list[index - chunk * SHAPE_CHUNK]);
+}
+/** The real province records (by k - SUB_K), the provinces of each polity name, and polity records by name. */
+let baseSubProps: Props[] = [];
+let subsByParent = new Map<string, Props[]>();
+let polityIdsByName = new Map<string, number[]>();
+/** Colours for the provinces of a split polity (each province becomes a polity of its own). */
+const SPLIT_PALETTE = ['#b5574f', '#d08a45', '#cdb050', '#8fa655', '#5f9e6e', '#4f9f95', '#5a9bb8', '#6b86c2', '#8878b8', '#a76fa4', '#c46f8d', '#9a6b52'];
+const overlaps = (a: { s: number; e: number }, b: { s: number; e: number }): boolean => a.s <= b.e && a.e >= b.s;
+/** Provinces belonging to a real polity record (same name, overlapping years). */
+const provincesOfPolity = (k: number): Props[] => {
+  const real = basePolityProps[k];
+  return real ? (subsByParent.get(real.n) ?? []).filter((item) => overlaps(item, real)) : [];
+};
+/** Parent names whose province border lines are hidden (a polity removed or split in the edited world). */
+let editExcludedParents: string[] = [];
+let editSeq = 0;
+let editActive = false;
+let editUi: ReturnType<typeof initEditUi> | null = null;
 let civilizationProps: Props[] = [];
 /** Societies: one record per network, and the label items (titles and hubs). */
 let societyProps: Props[] = [];
@@ -580,10 +630,7 @@ function setYear(next: number): void {
     slider.value = String(year);
     yearLabel.textContent = fmtYear(year);
 
-    for (const [id, make] of Object.entries(YEAR_FILTERS)) {
-      if (map.getLayer(id)) map.setFilter(id, make(year));
-    }
-    setHighlight(selectedKey >= 0 ? selectedProps : null);
+    applyYearFilters();
 
     if (activeLens === 'biomes') renderBiomes();
     subParents = new Set(subProps.filter((item) => item.s <= year && item.e >= year).map((item) => item.p as string));
@@ -847,7 +894,7 @@ async function loadSubdivisions(qid: string, ticket: number, signal: AbortSignal
 let profileActive = false;
 let panelInfobox: OrganisedInfobox | null = null;
 let panelSheet: { own: WikiFact[]; wikidata: WikiFact[] } | null = null;
-let panelProfile: { data: ProfileData | null; wb: WorldBank | null; curated: Curated[string] | undefined; realm?: string; leaders?: Leader[] } | null = null;
+let panelProfile: { data: ProfileData | null; wb: WorldBank | null; maddison?: MaddisonCountry; curated: Curated[string] | undefined; realm?: string; leaders?: Leader[] } | null = null;
 
 let rulersOpen = false;
 
@@ -971,7 +1018,7 @@ function drawSheet(groups: ProfileGroup[], fineText: string): void {
 }
 
 const POLITY_FINE =
-  'Dashes mean no figure is on record. Years in grey are the nearest year with data. “Also reported” lists what other sources say; rows in a dimmer label come straight from the Wikipedia infobox. Sources: curated figures, World Bank (CC BY 4.0, modern states), Wikidata (CC0), Wikipedia infobox (CC BY-SA).';
+  'Dashes mean no figure is on record. Years in grey are the nearest year with data. “Also reported” lists what other sources say; rows in a dimmer label come straight from the Wikipedia infobox. Sources: curated figures, World Bank (CC BY 4.0, modern states), Maddison Project (CC BY 4.0, from 1 CE), Wikidata (CC0), Wikipedia infobox (CC BY-SA).';
 const GENERIC_FINE =
   'Only rows with data are listed. “Also reported” lists what other sources say; every Wikipedia infobox row is kept. Sources: this project’s curated data, Wikidata (CC0), Wikipedia infobox (CC BY-SA).';
 
@@ -983,6 +1030,7 @@ function renderSheet(): void {
       year,
       data: panelProfile.data,
       wb: panelProfile.wb,
+      maddison: panelProfile.maddison,
       curated: panelProfile.curated,
       realm: panelProfile.realm,
       infobox: panelInfobox ?? undefined,
@@ -1011,9 +1059,10 @@ async function loadProfile(qid: string | null, realm: string | undefined, ticket
     }) : Promise.resolve([] as Leader[]);
     const [data, curatedAll] = await Promise.all([qid ? getProfileData(qid, signal) : Promise.resolve(null), getCurated(BASE)]);
     if (ticket !== panelTicket) return;
-    const wb = await getWorldBank(data?.iso, signal);
+    const [wb, maddisonAll] = await Promise.all([getWorldBank(data?.iso, signal), getMaddison(BASE)]);
     if (ticket !== panelTicket) return;
-    panelProfile = { data, wb, curated: qid ? curatedAll[qid] : undefined, realm };
+    const code = maddisonCode(qid ?? undefined, data?.iso);
+    panelProfile = { data, wb, maddison: code ? maddisonAll[code] : undefined, curated: qid ? curatedAll[qid] : undefined, realm };
     renderSheet();
     const leaders = await rulers;
     if (ticket !== panelTicket) return;
@@ -1121,8 +1170,122 @@ function showPanel(): void {
   });
 }
 
+/**
+ * Draw a world on top of the real polities. Changed records are taken out of the base layers and
+ * drawn from their own small source; hidden ones are just taken out. The real data is untouched.
+ */
+async function applyEdits(ops: Map<number, Override>): Promise<number> {
+  const seq = ++editSeq;
+  // Which shapes does this world need? Edited polities and provinces, and every province of a split polity.
+  const wanted = new Set<number>();
+  for (const [k, o] of ops) {
+    const real = k >= SUB_K ? baseSubProps[k - SUB_K] : basePolityProps[k];
+    if (!real) continue;
+    if (k < SUB_K && o.split) {
+      for (const prov of provincesOfPolity(k)) if (!ops.get(prov.k)?.hide) wanted.add(prov.k);
+    } else if (!o.hide) wanted.add(k);
+  }
+  const shapes = new Map<number, unknown>();
+  let failed = 0;
+  await Promise.all([...wanted].map(async (k) => {
+    try {
+      shapes.set(k, await realShape(k));
+    } catch {
+      failed++;
+    }
+  }));
+  if (seq !== editSeq) return failed; // a newer change superseded this one
+
+  const polyFeatures: unknown[] = [];
+  const subFeatures: unknown[] = [];
+  const hiddenPolities = new Set<number>();
+  const hiddenSubs = new Set<number>();
+  const splitSubs = new Set<number>();
+  editExcluded = [];
+  editExcludedParents = [];
+  polityProps = basePolityProps.slice();
+  subProps = baseSubProps.slice();
+  const splitLabels: Props[] = [];
+
+  // Province edits first, so a split polity's provinces pick up their own renames and colours.
+  const subEdit = (prov: Props): Props | null => {
+    const o = ops.get(prov.k);
+    if (o?.hide) return null;
+    const years = effectiveYears(prov, o);
+    return { ...prov, n: o?.name ?? prov.n, c: o?.colour ?? prov.c, s: years.s, e: years.e };
+  };
+  for (const [k, o] of ops) {
+    if (k >= SUB_K) {
+      const real = baseSubProps[k - SUB_K];
+      if (!real) continue;
+      editExcluded.push(k);
+      if (o.hide) { hiddenSubs.add(k); continue; }
+      const geometry = shapes.get(k);
+      if (!geometry) { editExcluded.pop(); continue; } // shape unavailable: leave the real province showing
+      const props = subEdit(real) as Props;
+      subProps[k - SUB_K] = props;
+      subFeatures.push({ type: 'Feature', properties: props, geometry });
+      continue;
+    }
+    const real = basePolityProps[k];
+    if (!real) continue;
+    if (o.hide || o.split) {
+      editExcluded.push(k);
+      hiddenPolities.add(k);
+      const provs = provincesOfPolity(k);
+      for (const prov of provs) editExcluded.push(prov.k);
+      editExcludedParents.push(real.n);
+      if (o.split) {
+        provs.forEach((prov, i) => {
+          const props = subEdit(prov);
+          if (!props) return;
+          const geometry = shapes.get(prov.k);
+          if (!geometry) return;
+          const own = ops.get(prov.k);
+          const shown: Props = { ...props, c: own?.colour ?? SPLIT_PALETTE[i % SPLIT_PALETTE.length] };
+          shown.split = 1;
+          subProps[prov.k - SUB_K] = shown;
+          splitSubs.add(prov.k);
+          subFeatures.push({ type: 'Feature', properties: shown, geometry });
+          splitLabels.push(shown);
+        });
+      }
+      continue;
+    }
+    const geometry = shapes.get(k);
+    if (!geometry) continue; // shape unavailable: leave the real polity showing rather than lose it
+    editExcluded.push(k);
+    const years = effectiveYears(real, o);
+    const props: Props = { ...real, n: o.name ?? real.n, c: o.colour ?? real.c, s: years.s, e: years.e };
+    polityProps[k] = props;
+    polyFeatures.push({ type: 'Feature', properties: props, geometry });
+  }
+
+  (map.getSource('polities-edit') as maplibregl.GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: polyFeatures } as GeoData);
+  (map.getSource('subs-edit') as maplibregl.GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: subFeatures } as GeoData);
+  // Labels: split provinces are named like polities (at every zoom); other provinces keep their zoomed-in labels.
+  const hiddenProvinceOfPolity = new Set<number>();
+  for (const k of hiddenPolities) for (const prov of provincesOfPolity(k)) hiddenProvinceOfPolity.add(prov.k);
+  polityLabels.setFeatures([...polityProps.filter((_, k) => !hiddenPolities.has(k)), ...splitLabels]);
+  subLabels.setFeatures(subProps.filter((item) => !hiddenSubs.has(item.k) && !hiddenProvinceOfPolity.has(item.k) && !splitSubs.has(item.k)));
+  subParents = new Set(subProps.filter((item) => item.s <= year && item.e >= year && !hiddenProvinceOfPolity.has(item.k)).map((item) => item.p as string));
+  if (selectedKey >= 0) selectedProps = (selectedKey >= SUB_K ? subProps[selectedKey - SUB_K] : polityProps[selectedKey]) ?? selectedProps;
+  applyYearFilters();
+  polityLabels.setYear(year, activeLens === 'polities');
+  subLabels.setYear(year, activeLens === 'polities');
+  return failed;
+}
+
+/** Re-run every year filter (the year changed, or edit mode changed what is hidden). */
+function applyYearFilters(): void {
+  for (const [id, make] of Object.entries(YEAR_FILTERS)) {
+    if (map.getLayer(id)) map.setFilter(id, make(year));
+  }
+  setHighlight(selectedKey >= 0 ? selectedProps : null);
+}
+
 function setHighlight(p: Props | null): void {
-  for (const id of ['polity-hl', 'civilization-hl', 'sub-hl', 'soc-hl-route', 'soc-hl-zone', 'soc-hl-node']) {
+  for (const id of ['subedit-hl', 'edit-hl', 'polity-hl', 'civilization-hl', 'sub-hl', 'soc-hl-route', 'soc-hl-zone', 'soc-hl-node']) {
     if (map.getLayer(id)) map.setFilter(id, NO_FEATURE);
   }
   if (!p) return;
@@ -1135,6 +1298,12 @@ function setHighlight(p: Props | null): void {
   }
   const id = p.k >= SUB_K ? 'sub-hl' : highlightLayerOf(activeLens);
   if (id && map.getLayer(id)) map.setFilter(id, highlightFilter(year, p.k));
+  if (id === 'polity-hl' && map.getLayer('edit-hl')) {
+    map.setFilter('edit-hl', ['all', rawYearFilter(year), ['==', ['get', 'k'], p.k]]);
+  }
+  if (id === 'sub-hl' && map.getLayer('subedit-hl')) {
+    map.setFilter('subedit-hl', ['all', rawYearFilter(year), ['==', ['get', 'k'], p.k]]);
+  }
 }
 
 function updateSelection(): void {
@@ -1315,6 +1484,14 @@ function renderLineage(p: Props): void {
 
 function openPanel(p: Props): void {
   if (activeLens === 'biomes') return;
+  if (editActive && activeLens === 'polities') {
+    // Edit mode: selecting a polity or province opens the toolbar's editor instead of the article.
+    selectedKey = p.k;
+    selectedProps = p;
+    editUi?.select(p.k);
+    updateSelection();
+    return;
+  }
   const name = p.n;
   const rawTitle = wikiTitle(p.w);
   const qid = /^Q\d+$/.test(p.q) ? p.q : null;
@@ -1362,6 +1539,7 @@ function openPanel(p: Props): void {
     if (p.lin && p.lin.includes(' > ')) extraFacts.push({ label: 'Lineage', value: p.lin.replace(/ > /g, ' → ') });
     if (p.pw) extraFacts.push({ label: 'Power', value: p.pw });
     if (p.kind) extraFacts.push({ label: 'Type', value: p.kind });
+    if (p.sc) extraFacts.push({ label: 'Scale', value: p.sc === 'faction' ? 'Faction or local movement (under 1,000 km, or one hub or area)' : 'Network (1,000 km or more)' });
     if (p.hubs) {
       const list = p.hubs.split(', ');
       extraFacts.push({ label: 'Connects', value: list.slice(0, 10).join(', ') + (list.length > 10 ? ' …' : '') });
@@ -1589,6 +1767,42 @@ playBtn.addEventListener('click', () => {
   requestAnimationFrame(tick);
 });
 
+// Step buttons: a tap moves the year by the amount on the button; holding repeats.
+function stepYear(amount: number): void {
+  if (playing) stopPlaying();
+  setYear(year + amount);
+  writeHash();
+}
+for (const button of document.querySelectorAll<HTMLButtonElement>('.step button')) {
+  const amount = Number(button.dataset.step);
+  let hold = 0;
+  let repeat = 0;
+  const stop = (): void => {
+    window.clearTimeout(hold);
+    window.clearInterval(repeat);
+  };
+  button.addEventListener('pointerdown', (event) => {
+    if (event.button > 0) return;
+    stepYear(amount);
+    stop();
+    // After a short hold, keep stepping (small steps repeat faster than big ones).
+    hold = window.setTimeout(() => {
+      repeat = window.setInterval(() => stepYear(amount), Math.abs(amount) >= 100 ? 220 : 90);
+    }, 380);
+  });
+  for (const type of ['pointerup', 'pointercancel', 'pointerleave']) button.addEventListener(type, stop);
+  // Keyboard activation (Enter or Space) arrives as a click with no pointer.
+  button.addEventListener('click', (event) => { if (event.detail === 0) stepYear(amount); });
+}
+document.addEventListener('keydown', (event) => {
+  const target = event.target as HTMLElement | null;
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA')) return;
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+    stepYear((event.key === 'ArrowLeft' ? -1 : 1) * (event.shiftKey ? 10 : 1));
+    event.preventDefault();
+  }
+});
+
 // ---- Data -------------------------------------------------------------------
 async function getResponse(
   url: string,
@@ -1667,20 +1881,9 @@ function checkSources(): void {
 
 map.on('load', async () => {
   try {
-    const [land, polityData, civilizationData, societyData, rivers, lakes, koppen, ecoBin, ecoMeta, ecoLines, ocean, subData] = await Promise.all([
+    const [land, polityList, civilizationData, societyData, rivers, lakes, koppen, ecoBin, ecoMeta, ecoLines, ocean, subList] = await Promise.all([
       getJson(`${BASE}data/land.geojson`),
-      getJson<FeatureCollection>(`${BASE}data/polities.geojson`, (loaded, total) => {
-        const megabytes = loaded / 1048576;
-        const percent = total > 0 ? Math.min(100, (loaded / total) * 100) : 0;
-        loadingText.textContent = total > 0
-          ? `Downloading borders… ${Math.round(percent)}%`
-          : `Downloading borders… ${megabytes.toFixed(1)} MB`;
-        if (total > 0) loadingProgress.style.width = `${percent}%`;
-        if (total > 0 && loaded >= total) {
-          loadingText.textContent = 'Building map…';
-          loadingProgress.style.width = '100%';
-        }
-      }),
+      getJson<Props[]>(`${BASE}data/polities-props.json`),
       getJson<FeatureCollection>(`${BASE}data/civilizations.geojson`).catch((error) => {
         console.error('Civilizations data:', error);
         return null;
@@ -1699,32 +1902,31 @@ map.on('load', async () => {
       getJson<EcoMeta>(`${BASE}data/ecoregions.json`).catch(() => null),
       getJson(`${BASE}data/ecoregion-lines.geojson`).catch(() => null),
       getJson(`${BASE}data/ocean.geojson`).catch(() => null),
-      getJson<FeatureCollection>(`${BASE}data/subdivisions.geojson`).catch(() => null),
+      getJson<Props[]>(`${BASE}data/subdivisions-props.json`).catch(() => null),
     ]);
 
     loadingText.textContent = 'Building map…';
     loadingProgress.style.width = '100%';
 
-    const polityFeatures = polityData.features;
+    // The big shape files are fetched by MapLibre's own worker (see the sources below), never parsed
+    // here: doing both held several copies in memory and phones killed the tab (data/split-web-data.py).
     const civilizationFeatures = civilizationData?.features ?? [];
-    polityFeatures.forEach((feature, index) => {
-      feature.properties.k = index;
-    });
     civilizationFeatures.forEach((feature, index) => {
       feature.properties.k = index;
     });
-    // Provinces: polygons get keys from SUB_K up; internal border lines (bd) carry none.
-    const subFeatures = subData?.features ?? [];
-    subProps = [];
-    for (const feature of subFeatures) {
-      const props = feature.properties as Props & { bd?: number };
-      if (props.bd) continue;
-      props.k = SUB_K + subProps.length;
-      props.q = '';
-      props.nt = `Provinces as in ${props.era}; borders are approximated from modern boundaries, so edges are rough.`;
-      subProps.push(props);
-    }
-    polityProps = polityFeatures.map((feature) => feature.properties);
+    // Provinces: polygons carry keys from SUB_K up (set in the data file); border lines (bd) carry none.
+    subProps = (subList ?? []).map((props) => ({
+      ...props,
+      q: '',
+      nt: `Provinces as in ${props.era}; borders are approximated from modern boundaries, so edges are rough.`,
+    }));
+    polityProps = polityList;
+    basePolityProps = polityProps.slice();
+    baseSubProps = subProps.slice();
+    subsByParent = new Map();
+    for (const item of baseSubProps) subsByParent.set(item.p as string, [...(subsByParent.get(item.p as string) ?? []), item]);
+    polityIdsByName = new Map();
+    basePolityProps.forEach((item) => polityIdsByName.set(item.n, [...(polityIdsByName.get(item.n) ?? []), item.k]));
     civilizationProps = civilizationFeatures.map((feature) => feature.properties);
     civilizationFootprints = buildFootprints(civilizationFeatures);
     societyProps = societyData?.entities ?? [];
@@ -1767,9 +1969,21 @@ map.on('load', async () => {
     }
 
     map.addSource('land', { type: 'geojson', data: land as GeoData });
+    // Polities and provinces are static vector tiles (data/build-tiles.mjs), not GeoJSON: parsing and
+    // indexing the 40 MB of shapes took 2 GB or more and phones killed the tab.
     map.addSource('polities', {
+      type: 'vector',
+      tiles: [`${dataBase}data/tiles/polities/{z}/{x}/{y}.pbf`],
+      minzoom: 0,
+      maxzoom: 6,
+    });
+    map.addSource('polities-edit', {
       type: 'geojson',
-      data: { type: 'FeatureCollection', features: polityFeatures } as GeoData,
+      data: { type: 'FeatureCollection', features: [] } as GeoData,
+    });
+    map.addSource('subs-edit', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] } as GeoData,
     });
     map.addSource('civilizations', {
       type: 'geojson',
@@ -1780,8 +1994,10 @@ map.on('load', async () => {
       data: { type: 'FeatureCollection', features: societyData?.features ?? [] } as GeoData,
     });
     map.addSource('subdivisions', {
-      type: 'geojson',
-      data: { type: 'FeatureCollection', features: subFeatures } as GeoData,
+      type: 'vector',
+      tiles: [`${dataBase}data/tiles/subdivisions/{z}/{x}/{y}.pbf`],
+      minzoom: 0,
+      maxzoom: 6,
     });
 
     const visible = (lens: Lens): 'visible' | 'none' => (activeLens === lens ? 'visible' : 'none');
@@ -1797,6 +2013,7 @@ map.on('load', async () => {
       id: 'polity-fill',
       type: 'fill',
       source: 'polities',
+      'source-layer': 'polities',
       filter: leafFilter(year),
       paint: { 'fill-color': ['get', 'c'], 'fill-opacity': 0.84 },
       layout: { visibility: visible('polities') },
@@ -1895,6 +2112,7 @@ map.on('load', async () => {
       id: 'polity-line',
       type: 'line',
       source: 'polities',
+      'source-layer': 'polities',
       filter: leafFilter(year),
       paint: {
         'line-color': '#2a2118',
@@ -1907,6 +2125,7 @@ map.on('load', async () => {
       id: 'polity-realm-casing',
       type: 'line',
       source: 'polities',
+      'source-layer': 'polities',
       filter: realmFilter(year),
       paint: {
         'line-color': '#201811',
@@ -1919,6 +2138,7 @@ map.on('load', async () => {
       id: 'polity-realm-line',
       type: 'line',
       source: 'polities',
+      'source-layer': 'polities',
       filter: realmFilter(year),
       paint: {
         'line-color': '#2a2118',
@@ -1931,6 +2151,63 @@ map.on('load', async () => {
       id: 'polity-hl',
       type: 'line',
       source: 'polities',
+      'source-layer': 'polities',
+      filter: NO_FEATURE,
+      paint: { 'line-color': '#f6e7b8', 'line-width': 2.4, 'line-opacity': 0.95 },
+      layout: { 'line-join': 'round', visibility: visible('polities') },
+    });
+
+    // Edit mode: records the user's world changed are drawn from their own small source, outlined in amber.
+    map.addLayer({
+      id: 'edit-fill',
+      type: 'fill',
+      source: 'polities-edit',
+      filter: editLayerFilter(year),
+      paint: { 'fill-color': ['get', 'c'], 'fill-opacity': 0.84 },
+      layout: { visibility: visible('polities') },
+    });
+    map.addLayer({
+      id: 'edit-line',
+      type: 'line',
+      source: 'polities-edit',
+      filter: editLayerFilter(year),
+      paint: { 'line-color': '#d99a2b', 'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.8, 5, 1.4, 9, 2.2], 'line-opacity': 0.9 },
+      layout: { ...roundLines, visibility: visible('polities') },
+    });
+    map.addLayer({
+      id: 'edit-hl',
+      type: 'line',
+      source: 'polities-edit',
+      filter: NO_FEATURE,
+      paint: { 'line-color': '#f6e7b8', 'line-width': 2.4, 'line-opacity': 0.95 },
+      layout: { 'line-join': 'round', visibility: visible('polities') },
+    });
+
+    // Edit mode, provinces: edited provinces, and the provinces of a split polity drawn as polities of their own.
+    map.addLayer({
+      id: 'subedit-fill',
+      type: 'fill',
+      source: 'subs-edit',
+      filter: editLayerFilter(year),
+      paint: { 'fill-color': ['get', 'c'], 'fill-opacity': ['case', ['has', 'split'], 0.84, 0.55] },
+      layout: { visibility: visible('polities') },
+    });
+    map.addLayer({
+      id: 'subedit-line',
+      type: 'line',
+      source: 'subs-edit',
+      filter: editLayerFilter(year),
+      paint: {
+        'line-color': ['case', ['has', 'split'], '#2a2118', '#3fc6d6'],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.8, 5, 1.4, 9, 2.2],
+        'line-opacity': 0.9,
+      },
+      layout: { ...roundLines, visibility: visible('polities') },
+    });
+    map.addLayer({
+      id: 'subedit-hl',
+      type: 'line',
+      source: 'subs-edit',
       filter: NO_FEATURE,
       paint: { 'line-color': '#f6e7b8', 'line-width': 2.4, 'line-opacity': 0.95 },
       layout: { 'line-join': 'round', visibility: visible('polities') },
@@ -1941,6 +2218,7 @@ map.on('load', async () => {
       id: 'sub-fill',
       type: 'fill',
       source: 'subdivisions',
+      'source-layer': 'subdivisions',
       filter: ['all', yearFilter(year), ['!', ['has', 'bd']]],
       paint: { 'fill-color': ['get', 'c'], 'fill-opacity': 0.02 },
       layout: { visibility: visible('polities') },
@@ -1949,6 +2227,7 @@ map.on('load', async () => {
       id: 'sub-line',
       type: 'line',
       source: 'subdivisions',
+      'source-layer': 'subdivisions',
       filter: ['all', yearFilter(year), ['has', 'bd']],
       paint: {
         'line-color': '#2a2118',
@@ -1962,6 +2241,7 @@ map.on('load', async () => {
       id: 'sub-hl',
       type: 'line',
       source: 'subdivisions',
+      'source-layer': 'subdivisions',
       filter: NO_FEATURE,
       paint: { 'line-color': '#f6e7b8', 'line-width': 2.2, 'line-opacity': 0.95 },
       layout: { 'line-join': 'round', visibility: visible('polities') },
@@ -2082,6 +2362,37 @@ map.on('load', async () => {
       layout: { visibility: visible('societies') },
     });
 
+    const realRecord = (k: number): { k: number; n: string; s: number; e: number; c: string; parent?: string } | undefined => {
+      const item = k >= SUB_K ? baseSubProps[k - SUB_K] : basePolityProps[k];
+      return item ? { k, n: item.n, s: item.s, e: item.e, c: item.c, parent: k >= SUB_K ? (item.p as string) : undefined } : undefined;
+    };
+    const editKeys = new Map<string, number>();
+    basePolityProps.forEach((item) => editKeys.set(recordKey(item), item.k));
+    baseSubProps.forEach((item) => editKeys.set(subKey(item as Props & { p: string }), item.k));
+    editUi = initEditUi({
+      index: () => editKeys,
+      keyOf: (k) => {
+        const item = k >= SUB_K ? baseSubProps[k - SUB_K] : basePolityProps[k];
+        return item ? (k >= SUB_K ? subKey(item as Props & { p: string }) : recordKey(item)) : undefined;
+      },
+      real: realRecord,
+      provincesOf: (k) => provincesOfPolity(k).map((item) => realRecord(item.k)).filter((item): item is NonNullable<typeof item> => !!item),
+      parentOf: (k) => {
+        const item = baseSubProps[k - SUB_K];
+        const ids = item ? (polityIdsByName.get(item.p as string) ?? []).filter((id) => overlaps(basePolityProps[id], item)) : [];
+        return ids[0];
+      },
+      apply: applyEdits,
+      fmtYear,
+      setActive: (on) => { editActive = on; closePanel(); },
+      isPolityLens: () => activeLens === 'polities',
+      highlight: (k) => setHighlight(k === null ? null : (k >= SUB_K ? subProps[k - SUB_K] : polityProps[k]) ?? null),
+    });
+    $('edit-btn').addEventListener('click', (event) => {
+      event.stopPropagation();
+      editUi?.toggle();
+    });
+
     map.on('click', (event) => {
       if (activeLens === 'biomes') {
         openBiomePanel(event.lngLat.lng, event.lngLat.lat);
@@ -2122,7 +2433,9 @@ map.on('load', async () => {
         return;
       }
       const fill = fillLayerOf(activeLens);
-      const hits = fill ? map.queryRenderedFeatures(event.point, { layers: [fill] }) : [];
+      const hits = fill
+        ? map.queryRenderedFeatures(event.point, { layers: fill === 'polity-fill' && map.getLayer('edit-fill') ? [fill, 'edit-fill'] : [fill] })
+        : [];
       if (!hits.length) {
         closePanel();
         return;
@@ -2139,16 +2452,18 @@ map.on('load', async () => {
         stack.push(all[key]);
       }
       // Provinces under the click: listed first when zoomed in, after the polity otherwise.
-      const subHits = map.getLayer('sub-fill')
-        ? map.queryRenderedFeatures(event.point, { layers: ['sub-fill'] })
-        : [];
+      const subHits = map.queryRenderedFeatures(event.point, { layers: ['sub-fill', 'subedit-fill'].filter((id) => map.getLayer(id)) });
       const subs: Props[] = [];
       for (const hit of subHits) {
         const key = (hit.properties as { k?: number }).k;
         const item = typeof key === 'number' ? subProps[key - SUB_K] : undefined;
         if (item && !subs.includes(item)) subs.push(item);
       }
-      const ordered = map.getZoom() >= SUB_ZOOM - 0.2 ? [...subs, ...stack] : [...stack, ...subs];
+      // In edit mode a province is chosen when zoomed in or when its polity was split; otherwise the polity.
+      const splitHit = subHits.some((hit) => (hit.layer.id === 'subedit-fill') && (hit.properties as { split?: number }).split);
+      const ordered = editActive && !(splitHit || (subs.length && map.getZoom() >= SUB_ZOOM - 0.2))
+        ? stack
+        : map.getZoom() >= SUB_ZOOM - 0.2 || splitHit ? [...subs, ...stack] : [...stack, ...subs];
       overlapSet = ordered;
       if (ordered.length) openPanel(ordered[0]);
     });

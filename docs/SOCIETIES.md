@@ -8,7 +8,8 @@ banks and companies, alliances and blocs, orders, NGOs and international organis
 roads, ports and cables they run. A state can be a Society, but only when it works as a network of
 control, and it is one kind among many.
 
-Status: **settled for now** (8 November 2026). The definition, the test, the spheres and the checks below
+Status: **settled for now** (8 November 2026), **extended the same day to cover factions and movements**
+(see "Factions and movements" below). The definition, the test, the spheres and the checks below
 are in place and enforced when the data is built. What is deliberately left for later is listed under
 "Next".
 
@@ -35,13 +36,40 @@ Something is a Society only if it passes all four:
    by what the law says.
 3. **Network.** It is made of nodes (hubs) and links (routes, kin ties, credit lines, command
    chains), so it can be drawn as dots, lines and areas, with years.
-4. **Scale.** A continent, a major region, or the whole world. In practice: its farthest points are
-   **at least 1,000 km apart**, with at least two hubs and a route or an area. A single family firm,
-   one market town or one local movement does not count (yet).
+4. **Scale.** A *network* spans a continent, a major region or the world: its farthest points are
+   **at least 1,000 km apart**, with at least two hubs and a route or an area. Anything smaller can still
+   be a **faction** (next section) if it passes tests 1 to 3. A single family firm or one market town
+   is still too small.
 
-`python3 data/build-societies.py` checks this for every network and stops with a list if one fails.
-It also checks that each has a sphere, a power type, a note saying what it controls, a Wikipedia
-title, years in order and a unique name.
+`python3 data/build-societies.py` checks this for every entry and stops with a list if one fails. It tags
+each one `network` or `faction` by size, and checks that each has a sphere, a power type, a note saying
+what it controls, a Wikipedia title, years in order (a single year is allowed) and a unique name. A
+faction needs at least one hub or an area.
+
+## Factions and movements
+Much of how the world is run was never in a state's borders: sects and schismatic churches, rebel and
+breakaway movements, communes and leagues, warlords, pirates, mafias and cartels, and parties that
+governed places the law did not give them. They hold ground, routes or markets de facto, so they pass
+the same affinity, control and network tests. They are **not required to span 1,000 km**: a faction
+needs one hub or an area, years, and a note on what it controlled. In the app the panel says
+"Scale: Faction or local movement" and its label appears when you zoom in.
+
+Examples now mapped (`data/societies_factions.py`): Cathars, Waldensians, Hussites, Lollards, Anabaptists,
+Bogomils, Old Believers, Donatists, the Western Schism, Huguenots, Lingayats, the Sikh misls, the Nizari
+Ismailis, Qarmatians, the Zanj, Red Turbans, the White Lotus, Boxers, the Zapatistas, the Paris Commune,
+the Lombard League, the German Peasants' War, the Vendée, the Sanfedisti, Makhnovshchina, the Spanish
+collectives, the Carbonari, the Maroons, the Underground Railroad, Wokou raiders, Barbary corsairs,
+Caribbean pirates, Cossack hosts, the Sicilian Mafia, the Medellín, Cali and Sinaloa cartels, Chinese
+warlords, Afghan mujahideen, Somali militias, the Khmer Rouge, the Ho Chi Minh Trail, FARC, the Tamil
+Tigers, the Muslim Brotherhood, the Ba'ath Party, Hezbollah, Hamas, and the Libyan rebels and militias.
+
+Three new spheres colour them: **Dissenting and schismatic movements** (a child of Christendom),
+**Insurgents, rebels and breakaway movements**, and **Warlords, cartels and the underworld**.
+
+Rules for the modern entries, stricter than for old ones: name the organisation, never a living person;
+include only what court judgments, UN or government bodies or major reporting document; use hedged
+wording where control is contested; end a group in 2026 only if the sources show it still exists.
+Entries whose recent state is uncertain (for example Hamas and Hezbollah since 2023) say so in their note.
 
 ## What can be a Society (there is no closed list)
 | Form | Examples |

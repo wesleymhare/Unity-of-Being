@@ -102,7 +102,7 @@ a { color: var(--brass); }
   white-space: nowrap;
 }
 
-#map { position: fixed; inset: 56px 0 120px 0; }
+#map { position: fixed; inset: 56px 0 156px 0; }
 
 #loading {
   position: fixed;
@@ -125,7 +125,7 @@ a { color: var(--brass); }
 
 #map-veil {
   position: fixed;
-  inset: 56px 0 120px;
+  inset: 56px 0 156px;
   z-index: 11;
   display: grid;
   place-items: center;
@@ -167,7 +167,7 @@ a { color: var(--brass); }
   right: 16px;
   z-index: 9;
   width: min(360px, calc(100vw - 32px));
-  max-height: calc(100vh - 72px - 136px);
+  max-height: calc(100vh - 72px - 172px);
   overflow: auto;
   overscroll-behavior: contain;
   overflow-anchor: none;
@@ -365,7 +365,7 @@ a { color: var(--brass); }
   left: 0;
   right: 0;
   bottom: 0;
-  height: 120px;
+  height: 156px;
   z-index: 10;
   padding: 10px 20px 8px;
   background: linear-gradient(180deg, rgba(22, 29, 36, 0.97), rgba(16, 22, 28, 0.99));
@@ -542,24 +542,24 @@ a { color: var(--brass); }
   .lens-btn { padding: 5px 7px; font-size: 9.5px; letter-spacing: 1px; }
   .era { display: none; }
 
-  #map { inset: 52px 0 100px 0; }
-  #map-veil { inset: 52px 0 100px; }
+  #map { inset: 52px 0 136px 0; }
+  #map-veil { inset: 52px 0 136px; }
   #loading { top: 64px; }
 
   #panel {
     top: auto;
     left: 8px;
     right: 8px;
-    bottom: 108px;
+    bottom: 144px;
     width: auto;
-    max-height: 56vh;
+    max-height: 52vh;
     padding: 14px 16px;
     border-radius: 12px;
   }
   #p-name { font-size: 24px; }
   #p-osm-frame { height: 132px; }
 
-  #timeline { height: 100px; padding: 8px 12px 6px; }
+  #timeline { height: 136px; padding: 8px 12px 6px; }
   .controls { gap: 10px; min-height: 40px; }
   #play { width: 38px; height: 38px; }
   #year-label { font-size: 26px; }
@@ -603,10 +603,10 @@ a { color: var(--brass); }
 #legend {
   position: fixed;
   left: 16px;
-  bottom: 164px;
+  bottom: 200px;
   z-index: 8;
   width: min(272px, calc(100vw - 32px));
-  max-height: calc(100vh - 56px - 164px - 24px);
+  max-height: calc(100vh - 56px - 200px - 24px);
   overflow: auto;
   padding: 9px 11px 10px;
   background: rgba(22, 29, 36, 0.93);
@@ -702,13 +702,13 @@ a { color: var(--brass); }
 }
 
 @media (max-width: 760px) {
-  #legend { left: 8px; bottom: 112px; width: min(260px, calc(100vw - 16px)); max-height: 40vh; }
+  #legend { left: 8px; bottom: 148px; width: min(260px, calc(100vw - 16px)); max-height: 40vh; }
 }
 
 .era-note {
   position: fixed;
   left: 16px;
-  bottom: 132px;
+  bottom: 168px;
   z-index: 8;
   max-width: min(330px, calc(100vw - 32px));
   padding: 7px 10px;
@@ -722,7 +722,7 @@ a { color: var(--brass); }
 }
 .poly-label.eco { font-size: inherit; font-weight: 600; }
 @media (max-width: 760px) {
-  .era-note { left: 8px; bottom: 108px; max-width: calc(100vw - 16px); }
+  .era-note { left: 8px; bottom: 144px; max-width: calc(100vw - 16px); }
 }
 
 .note {
@@ -1177,4 +1177,140 @@ a { color: var(--brass); }
   letter-spacing: 1.3px;
   text-transform: uppercase;
   color: var(--faint);
+}
+
+/* ---- Edit mode ---- */
+.top-btn#edit-btn[aria-pressed="true"] { border-style: solid; }
+.top-btn#edit-btn.on-branch { color: #ffd98a; border-color: #d99a2b; }
+.alt-tag {
+  position: fixed;
+  top: 64px;
+  left: 60px;
+  z-index: 8;
+  max-width: min(300px, calc(100vw - 32px));
+  padding: 4px 9px;
+  border: 1px solid #d99a2b;
+  border-radius: 7px;
+  background: rgba(40, 28, 10, 0.92);
+  color: #ffd98a;
+  font-size: 11px;
+  pointer-events: none;
+}
+/* A toolbar under the top bar, so the info panel and the map below stay usable. */
+.edit {
+  position: fixed;
+  top: 56px;
+  left: 0;
+  right: 0;
+  z-index: 12;
+  max-height: 52vh;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 6px 10px 8px;
+  border-bottom: 2px solid #d99a2b;
+  background: rgba(22, 29, 36, 0.98);
+  color: var(--text);
+  font-size: 12.5px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+.edit > * { max-width: 760px; margin-left: auto; margin-right: auto; }
+.edit-bar { display: flex; align-items: center; gap: 8px; }
+.edit-badge { flex: none; padding: 2px 7px; border-radius: 5px; background: #4a3411; color: #ffd98a; font-size: 11px; font-weight: 600; }
+.edit-bar select {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg2);
+  color: var(--text);
+  font: inherit;
+}
+.edit-bar button, #edit-fold {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #212c36;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+.edit-bar button:hover, #edit-fold:hover { color: var(--text); border-color: var(--brass); }
+.edit-menu { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.edit-menu button, .edit-btns button {
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #212c36;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.edit-menu button:hover:not(:disabled), .edit-btns button:hover:not(:disabled) { border-color: var(--brass); }
+.edit-menu button:disabled, .edit-btns button:disabled { opacity: 0.4; cursor: default; }
+.edit-btns .primary { background: #6b4a12; border-color: #d99a2b; color: #fff1cf; }
+.edit-btns { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px auto; }
+.edit-note { margin: 6px auto; color: var(--muted); line-height: 1.4; overflow-wrap: anywhere; }
+.edit-note[hidden] { display: none; }
+.edit-fine { margin: 6px auto; color: var(--faint); font-size: 10.5px; line-height: 1.45; }
+.edit-selrow { display: flex; align-items: center; gap: 8px; margin-top: 6px; min-height: 32px; }
+.edit-sel { flex: 1 1 auto; min-width: 0; color: var(--text); overflow-wrap: anywhere; }
+.edit-kind { flex: none; padding: 1px 6px; border-radius: 5px; font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; }
+.edit-kind:empty { display: none; }
+.edit-kind.pol { background: #4a3411; color: #ffd98a; }
+.edit-kind.prov { background: #11404a; color: #8fe3f0; }
+#edit-form.folded { display: none; }
+.edit-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; color: var(--muted); }
+.edit-row input[type="text"], .edit-row input[type="number"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg2);
+  color: var(--text);
+  font: inherit;
+}
+.edit-row input[type="color"] { width: 44px; height: 32px; padding: 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg2); }
+.edit-years { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.edit-years .edit-row { flex: 1 1 90px; min-width: 0; }
+.edit-check { display: flex; align-items: center; gap: 7px; margin: 6px 0 2px; color: var(--muted); }
+.edit-chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
+.edit-chip { padding: 3px 8px; border: 1px solid #11404a; border-radius: 12px; background: #142a31; color: #8fe3f0; font: inherit; font-size: 11px; cursor: pointer; }
+.edit-chip:hover { border-color: #8fe3f0; }
+@media (max-width: 760px) {
+  .edit { top: 52px; }
+}
+/* While editing, the article panel is not used, and the map keeps the room below the toolbar. */
+body.editing #panel { display: none; }
+
+/* ---- Year steps: tap to move the year by a fixed amount (the slider alone is too coarse on a phone) ---- */
+.step { display: flex; gap: 5px; margin: 6px 0 0; }
+.step button {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #212c36;
+  color: var(--text);
+  font: 600 12px system-ui, sans-serif;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+}
+.step button:hover { border-color: var(--brass); }
+.step button:active { background: #2e3d4a; }
+.step button[data-step^="-"] { color: #cfd6dc; }
+@media (max-width: 760px) {
+  .step { margin-top: 4px; }
+  .step button { height: 32px; font-size: 12.5px; }
 }

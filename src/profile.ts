@@ -118,6 +118,15 @@ interface CuratedEntry {
 }
 export type Curated = Record<string, Partial<Record<'population' | 'area' | 'army' | 'economy' | 'spending', CuratedEntry[]>>>;
 
+/** Maddison Project series for one country: [year, value] pairs, sparse before 1820. */
+export interface MaddisonCountry {
+  n: string;
+  /** population (people) */
+  p: [number, number][];
+  /** GDP per person, 2011 international dollars */
+  g: [number, number][];
+}
+
 const dataCache = new Map<string, ProfileData | null>();
 const wbCache = new Map<string, WorldBank | null>();
 let curatedPromise: Promise<Curated> | null = null;
@@ -299,6 +308,37 @@ function wbAt(series: WbSeries | undefined, year: number): { value: number; at: 
   return best === null ? null : { value: series.get(best) as number, at: best };
 }
 
+// ---- Maddison Project (CC BY 4.0): population and GDP per person back to 1 CE -------------------
+let maddisonPromise: Promise<Record<string, MaddisonCountry>> | null = null;
+export function getMaddison(base: string): Promise<Record<string, MaddisonCountry>> {
+  maddisonPromise ??= fetch(`${base}data/maddison.json`)
+    .then((r) => (r.ok ? (r.json() as Promise<Record<string, MaddisonCountry>>) : {}))
+    .catch(() => ({}));
+  return maddisonPromise;
+}
+
+/** Maddison codes for states that no longer have an ISO 3166 code (by Wikidata id). */
+const MADDISON_ALIAS: Record<string, string> = { Q15180: 'SUN', Q36704: 'YUG', Q33946: 'CSK' };
+export const maddisonCode = (qid: string | undefined, iso: string | undefined): string | undefined =>
+  iso ?? (qid ? MADDISON_ALIAS[qid] : undefined);
+
+const MADDISON_SOURCE = 'Maddison Project Database 2023 (CC BY 4.0), present-day borders';
+/** Row note for a Maddison figure: its year when not the year shown, and that it follows today's borders. */
+function madNote(mad: { at: number; distance: number }, year: number): { note: string; far?: boolean } {
+  const base = noteFor({ distance: mad.distance, item: { year: mad.at } }, year);
+  return { note: `${base.note ? `${base.note} · ` : ''}today’s borders`, far: base.far };
+}
+
+/** The figure nearest a year, within 150 years (the series is sparse before 1820). */
+function maddisonAt(series: [number, number][] | undefined, year: number, within = 150): { value: number; at: number; distance: number } | null {
+  let best: { value: number; at: number; distance: number } | null = null;
+  for (const [at, value] of series ?? []) {
+    const distance = Math.abs(at - year);
+    if (distance <= within && (!best || distance < best.distance)) best = { value, at, distance };
+  }
+  return best;
+}
+
 // ---- Curated figures ------------------------------------------------------------------------
 export function getCurated(base: string): Promise<Curated> {
   curatedPromise ??= fetch(`${base}data/polity-stats.json`)
@@ -339,6 +379,8 @@ export interface SheetInput {
   year: number;
   data: ProfileData | null;
   wb: WorldBank | null;
+  /** Maddison Project series for the state's present-day country, if it has one. */
+  maddison?: MaddisonCountry;
   curated: Curated[string] | undefined;
   /** Realm this polity belongs to, from the map data. */
   realm?: string;
@@ -349,7 +391,7 @@ export interface SheetInput {
 }
 
 export function buildSheet(input: SheetInput): ProfileGroup[] {
-  const { year, data, wb, curated, realm, infobox, leaders } = input;
+  const { year, data, wb, maddison, curated, realm, infobox, leaders } = input;
   const label = (id: string): string => data?.labels.get(id) ?? id;
   const list = (ids: string[] | undefined): string => (ids ?? []).map(label).filter((x) => !/^Q\d+$/.test(x)).join(', ');
   const row = (name: string, value: string | undefined, extra: Partial<ProfileRow> = {}): ProfileRow =>
@@ -381,7 +423,10 @@ export function buildSheet(input: SheetInput): ProfileGroup[] {
   } else {
     const pick = data ? nearest(data.population, year) : null;
     const box = bestCandidate(infobox?.mapped.population, year);
-    if (box && box.c.year !== undefined && (!pick || (box.distance < pick.distance && box.distance <= 200))) {
+    const mad = maddisonAt(maddison?.p, year);
+    if (mad && mad.distance <= Math.min(pick?.distance ?? Infinity, box?.distance ?? Infinity)) {
+      population = row('Population', fmtCount(mad.value), { ...madNote(mad, year), source: MADDISON_SOURCE });
+    } else if (box && box.c.year !== undefined && (!pick || (box.distance < pick.distance && box.distance <= 200))) {
       population = row('Population', box.c.text, { ...noteFor({ distance: box.distance, item: { year: box.c.year } }, year), source: 'Wikipedia infobox' });
     } else if (pick) {
       population = row('Population', fmtCount(pick.item.value), { ...noteFor(pick, year), source: 'Wikidata' });
@@ -413,7 +458,14 @@ export function buildSheet(input: SheetInput): ProfileGroup[] {
   else if (gdp && year - gdp.at <= 3) {
     const pc = gdpPc ? `, $${nf.format(Math.round(gdpPc.value))} per person` : '';
     economy = row('Economy', `GDP $${fmtCount(gdp.value)}${pc}`, { note: gdp.at === year ? undefined : String(gdp.at), source: 'World Bank' });
-  } else economy = row('Economy', fromInfobox('economy'), { source: 'Wikipedia infobox' });
+  } else {
+    const madPc = maddisonAt(maddison?.g, year);
+    const madPop = madPc ? maddisonAt(maddison?.p, madPc.at, 5) : null;
+    if (madPc) {
+      const total = madPop ? `GDP $${fmtCount(madPc.value * madPop.value)}, ` : '';
+      economy = row('Economy', `${total}$${nf.format(madPc.value)} per person (2011 int’l $)`, { ...madNote(madPc, year), source: MADDISON_SOURCE });
+    } else economy = row('Economy', fromInfobox('economy'), { source: 'Wikipedia infobox' });
+  }
 
   const armed = wbAt(wb?.armed, year);
   const curatedArmy = curatedAt(curated?.army, year);

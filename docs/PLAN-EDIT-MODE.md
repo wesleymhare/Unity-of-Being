@@ -1,7 +1,16 @@
 # Plan: Edit mode (alt-history and worldbuilding)
 
-Status: **plan agreed with Wes on 8 November 2026, nothing built yet.** The Edit button in the top
-bar is a placeholder.
+Status: **phase 1 is built (7 November 2026)**: worlds saved in the browser with export and import, and
+per-polity rename, recolour, change of years and removal. Phases 2 to 5 are not started.
+
+How phase 1 differs from the plan below:
+- A world's content is `ops`, **one override per real polity record**, keyed by `name|start|end` of the
+  record (computed in the browser, so the 26 MB data file did not change). Entity spans and the add, split,
+  merge and copy operations come with phase 2 and 3.
+- Changed records are taken out of the real layers with a filter on their index and drawn from the small
+  `polities-edit` source, outlined in amber. Realm outlines of a changed record are not redrawn.
+- Provinces (administrative subdivisions) are edited separately from their polity, keyed `sub:parent|name|start|end`; a polity can be split into its provinces (`split`). The editor is a toolbar along the top.
+- Code: `src/edit.ts` (model, validation, storage), `src/edit-ui.ts` (toolbar), `applyEdits` in `src/main.ts`.
 
 ## Decisions
 | Question | Decision |

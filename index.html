@@ -21,7 +21,7 @@
     </div>
     <div class="era">3400 BCE – 2026 CE</div>
     <button id="tiles-btn" class="top-btn soon-btn" type="button" data-soon="tiles" aria-label="Tile view (planned)" title="Tile view (planned)"><span class="top-ico" aria-hidden="true">▦</span><span class="top-txt">Tiles</span></button>
-    <button id="edit-btn" class="top-btn soon-btn" type="button" data-soon="edit" aria-label="Edit mode for worldbuilding (planned)" title="Edit mode (planned)"><span class="top-ico" aria-hidden="true">✎</span><span class="top-txt">Edit</span></button>
+    <button id="edit-btn" class="top-btn" type="button" aria-pressed="false" aria-controls="edit" aria-label="Edit mode: alt-history worlds" title="Edit mode: make your own alt-history"><span class="top-ico" aria-hidden="true">✎</span><span class="top-txt">Edit</span></button>
     <button id="help-btn" class="help-btn" type="button" aria-label="Help and sources" aria-expanded="false" aria-controls="help">?</button>
   </header>
 
@@ -98,6 +98,48 @@
     </div>
   </aside>
 
+  <div id="alt-tag" class="alt-tag" hidden></div>
+  <section id="edit" class="edit" aria-label="Edit mode" hidden>
+    <div class="edit-bar">
+      <span class="edit-badge">✎ Alt-history</span>
+      <select id="edit-branch" aria-label="World to edit"></select>
+      <button id="edit-menu-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="World actions">⋯</button>
+      <button id="edit-close" type="button" aria-label="Close edit mode">×</button>
+    </div>
+    <div id="edit-menu" class="edit-menu" hidden>
+      <button id="edit-new" type="button">New</button>
+      <button id="edit-copy" type="button">Copy</button>
+      <button id="edit-rename" type="button">Rename</button>
+      <button id="edit-delete" type="button">Delete</button>
+      <button id="edit-export" type="button">Export</button>
+      <button id="edit-import" type="button">Import</button>
+      <input id="edit-file" type="file" accept="application/json,.json" hidden>
+    </div>
+    <p id="edit-status" class="edit-note" role="status" hidden></p>
+    <div class="edit-selrow">
+      <span id="edit-kind" class="edit-kind"></span>
+      <span id="edit-sel" class="edit-sel"></span>
+      <button id="edit-fold" type="button" aria-expanded="true" aria-label="Fold or unfold the editor">▴</button>
+    </div>
+    <form id="edit-form" hidden>
+      <p id="edit-scope" class="edit-fine"></p>
+      <label class="edit-row">Name <input id="edit-name" type="text" maxlength="80" autocomplete="off"></label>
+      <div class="edit-years">
+        <label class="edit-row">Colour <input id="edit-colour" type="color"></label>
+        <label class="edit-row">From <input id="edit-from" type="number" inputmode="numeric" step="1"></label>
+        <label class="edit-row">To <input id="edit-to" type="number" inputmode="numeric" step="1"></label>
+      </div>
+      <label class="edit-check"><input id="edit-hide" type="checkbox"> Remove (for those years)</label>
+      <div class="edit-btns">
+        <button type="submit" class="primary">Apply</button>
+        <button id="edit-reset" type="button">Reset to real</button>
+        <button id="edit-split" type="button" hidden>Split into provinces</button>
+      </div>
+      <div id="edit-provs" class="edit-chips"></div>
+      <p class="edit-fine">Negative years are BCE. Worlds are saved in this browser only; export one to keep or share it. The real map is never changed, and changed shapes are outlined in amber.</p>
+    </form>
+  </section>
+
   <div id="soon" class="soon" role="dialog" aria-modal="false" aria-labelledby="soon-title" hidden>
     <div class="soon-card">
       <div class="soon-head">
@@ -119,11 +161,12 @@
       <h3>Using it</h3>
       <ul>
         <li><b>Polities</b> are states and empires (who governs). <b>Civilizations</b> are peoples and shared cultural identities (who you belong to). <b>Societies</b> are affinity groups that hold de facto control as logistical networks, how the world is actually run: states as networks, dynasties, trade routes, banks and companies, alliances, orders, NGOs, drawn as routes (lines), hubs (dots) and areas, and coloured by sphere of influence. <b>Biomes</b> are climate and ecoregions.</li>
+        <li>Tap the −100 to +100 buttons above the slider to step the year (hold to keep going; arrow keys step by 1, with Shift by 10).</li>
         <li>Drag the year slider or press play. Click any area for its Wikipedia summary, infobox and facts.</li>
         <li>Zoom in to see the provinces inside big polities and local identities inside peoples.</li>
         <li>In Societies, click a kind in the legend to hide or show it.</li>
         <li>In Civilizations, a click lists every identity you stand inside; none sits above the others.</li>
-        <li>Planned (placeholders for now): the left arrow on the timeline for deep time before 3400 BCE, <b>Tiles</b> for the tile view, and <b>Edit</b> for worldbuilding.</li>
+        <li><b>Edit</b> opens alt-history worlds: rename, recolour, change the years of, or remove a polity, and save the world in your browser. Planned (placeholders): the left arrow on the timeline for deep time before 3400 BCE, and <b>Tiles</b> for the tile view.</li>
       </ul>
       <h3>Sources</h3>
       <ul class="sources">
@@ -136,6 +179,7 @@
         <li><b>Coastlines, rivers &amp; lakes:</b> Natural Earth (public domain)</li>
         <li><b>Text, infoboxes &amp; images:</b> Wikipedia (CC BY-SA) and Wikimedia Commons (licence on each file page)</li>
         <li><b>Facts, flags &amp; rulers:</b> Wikidata (CC0)</li>
+        <li><b>Population &amp; GDP per person, 1 CE on:</b> <a href="https://doi.org/10.34894/INZBF2" target="_blank" rel="noopener noreferrer">Maddison Project Database 2023</a>, Bolt &amp; van Zanden (CC BY 4.0), present-day borders</li>
         <li><b>Modern map:</b> OpenStreetMap (ODbL)</li>
       </ul>
       <p class="help-fine">Borders, province and civilization areas and past climates are approximations and often disputed.</p>
@@ -158,6 +202,16 @@
         <div class="year-kicker">Year</div>
         <div id="year-label" aria-live="off">150 CE</div>
       </div>
+    </div>
+    <div class="step" role="group" aria-label="Change the year by steps">
+      <button type="button" data-step="-100" aria-label="100 years earlier">−100</button>
+      <button type="button" data-step="-10" aria-label="10 years earlier">−10</button>
+      <button type="button" data-step="-5" aria-label="5 years earlier">−5</button>
+      <button type="button" data-step="-1" aria-label="1 year earlier">−1</button>
+      <button type="button" data-step="1" aria-label="1 year later">+1</button>
+      <button type="button" data-step="5" aria-label="5 years later">+5</button>
+      <button type="button" data-step="10" aria-label="10 years later">+10</button>
+      <button type="button" data-step="100" aria-label="100 years later">+100</button>
     </div>
     <div class="scrub">
       <button id="deep-btn" class="deep-btn soon-btn" type="button" data-soon="deep" aria-label="Deep time before 3400 BCE (planned)" title="Deep time: before 3400 BCE (planned)"></button>

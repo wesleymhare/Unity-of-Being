@@ -31,6 +31,9 @@ KINDS = {
     'Dynasty or house network': '#c8b6e2',
     'Banking house': '#e0c36a',
     'Military or religious order': '#9aa7e0',
+    'Sect or dissenting church': '#8fa0f0',
+    'Rebel or insurgent movement': '#c04fa0',
+    'Warlord, pirate or criminal organisation': '#8d949c',
 }
 
 ENTITIES = []
@@ -265,3 +268,4 @@ net('Chinese Communist base areas and Long March', 'Faction or party', 1927, 194
 
 
 import societies_more  # noqa: E402,F401  (more networks, registered on import)
+import societies_factions  # noqa: E402,F401  (factions and movements without de jure borders)

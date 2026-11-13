@@ -4,6 +4,7 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import './style.css';
 import { BiomeModel, CLASSES, GROUPS, climateShift, type EcoMeta, type EcoPatch } from './biomes';
 import { LabelLayer, type LabelProps } from './labels';
+import { controlOf, ideologyOf, worldviewOf, type Theme, type Verdict } from './thematic';
 import { organiseInfobox, type OrganisedInfobox } from './infobox-map';
 import { effectiveYears, recordKey, subKey, type Override } from './edit';
 import { initEditUi } from './edit-ui';
@@ -132,8 +133,17 @@ const signed = (value: number): string =>
   `${value < 0 ? '−' : '+'}${Math.abs(value).toFixed(1)}`;
 
 // ---- State from the URL hash ------------------------------------------------
-type Lens = 'polities' | 'civilizations' | 'societies' | 'biomes';
-const LENSES: Lens[] = ['polities', 'civilizations', 'societies', 'biomes'];
+type Lens = 'polities' | 'civilizations' | 'societies' | 'ideologies' | 'worldviews' | 'biomes';
+const LENSES: Lens[] = ['polities', 'civilizations', 'societies', 'ideologies', 'worldviews', 'biomes'];
+/** Lenses that recolour the polity shapes by a rule-based class (src/thematic.ts). */
+type ThemeLens = 'societies' | 'ideologies' | 'worldviews';
+const isThemeLens = (lens: Lens): lens is ThemeLens => lens === 'ideologies' || lens === 'worldviews' || lens === 'societies';
+/** Each thematic lens: its fill layer and the feature-state key that holds its colour. */
+const THEME_FILLS: [ThemeLens, string, string][] = [
+  ['ideologies', 'ideo-fill', 'ideo'],
+  ['worldviews', 'world-fill', 'world'],
+  ['societies', 'ctrl-fill', 'ctrl'],
+];
 
 const params = new URLSearchParams(location.hash.replace(/^#/, ''));
 const num = (key: string, fallback: number): number => {
@@ -184,6 +194,7 @@ const pFigureKind = $('p-figure-kind');
 const pFigureLink = $<HTMLAnchorElement>('p-figure-link');
 const pProfile = $('p-profile');
 const pSubs = $('p-subs');
+const pStack = $('p-stack');
 const pOsm = $('p-osm');
 const pOsmFrame = $<HTMLIFrameElement>('p-osm-frame');
 const pOsmLink = $<HTMLAnchorElement>('p-osm-link');
@@ -370,6 +381,12 @@ const YEAR_FILTERS: Record<string, (value: number) => Filter> = {
   'sub-line': (value) => ['all', yearFilter(value), ['has', 'bd'], ...(editExcludedParents.length ? [['!', ['in', ['get', 'p'], ['literal', editExcludedParents]]] as Filter] : [])],
   'subedit-fill': editLayerFilter,
   'subedit-line': editLayerFilter,
+  'ideo-fill': leafFilter,
+  'ideo-line': leafFilter,
+  'world-fill': leafFilter,
+  'world-line': leafFilter,
+  'ctrl-fill': leafFilter,
+  'ctrl-line': leafFilter,
   'civilization-fill': yearFilter,
   'civilization-casing': yearFilter,
   'civilization-line': yearFilter,
@@ -386,14 +403,18 @@ const YEAR_FILTERS: Record<string, (value: number) => Filter> = {
 const LENS_LAYERS: Record<Lens, string[]> = {
   polities: ['polity-fill', 'polity-line', 'polity-realm-casing', 'polity-realm-line', 'polity-hl', 'edit-fill', 'edit-line', 'edit-hl', 'subedit-fill', 'subedit-line', 'subedit-hl', 'sub-fill', 'sub-line', 'sub-hl'],
   civilizations: ['civilization-fill', 'civilization-casing', 'civilization-line', 'civilization-hl'],
-  societies: ['soc-zone-fill', 'soc-zone-line', 'soc-route-casing', 'soc-route', 'soc-route-sea', 'soc-node', 'soc-mark-badge', 'soc-mark', 'soc-hl-route', 'soc-hl-zone', 'soc-hl-node'],
+  societies: ['ctrl-fill', 'ctrl-line', 'ctrl-hl', 'soc-zone-fill', 'soc-zone-line', 'soc-route-casing', 'soc-route', 'soc-route-sea', 'soc-node', 'soc-mark-badge', 'soc-mark', 'soc-hl-route', 'soc-hl-zone', 'soc-hl-node'],
+  ideologies: ['ideo-fill', 'ideo-line', 'ideo-hl'],
+  worldviews: ['world-fill', 'world-line', 'world-hl'],
   biomes: ['biome-raster', 'eco-lines', 'ocean-mask'],
 };
 
 const fillLayerOf = (lens: Lens): string | null =>
-  lens === 'polities' ? 'polity-fill' : lens === 'civilizations' ? 'civilization-fill' : null;
+  lens === 'polities' ? 'polity-fill' : lens === 'civilizations' ? 'civilization-fill'
+    : lens === 'ideologies' ? 'ideo-fill' : lens === 'worldviews' ? 'world-fill' : null;
 const highlightLayerOf = (lens: Lens): string | null =>
-  lens === 'polities' ? 'polity-hl' : lens === 'civilizations' ? 'civilization-hl' : null;
+  lens === 'polities' ? 'polity-hl' : lens === 'civilizations' ? 'civilization-hl'
+    : lens === 'ideologies' ? 'ideo-hl' : lens === 'worldviews' ? 'world-hl' : null;
 
 /** Province shapes carry keys from here up, so they never clash with polity keys. */
 const SUB_K = 1_000_000;
@@ -445,6 +466,10 @@ let societyProps: Props[] = [];
 let biomeModel: BiomeModel | null = null;
 
 const polityLabels = new LabelLayer<Props>(map, (p) => {
+  if (activeLens === 'ideologies' || activeLens === 'worldviews') {
+    openThemePanel(p);
+    return;
+  }
   // A polity with provinces lists them.
   overlapSet = [p, ...subProps.filter((item) => item.p === p.n && activeAt(item))].slice(0, 60);
   openPanel(p);
@@ -483,13 +508,71 @@ function activeLabels(): { schedule(): void } | null {
   if (activeLens === 'polities') {
     return { schedule: () => { polityLabels.schedule(); subLabels.schedule(); } };
   }
+  if (activeLens === 'ideologies' || activeLens === 'worldviews') return polityLabels;
   if (activeLens === 'civilizations') return civilizationLabels;
   if (activeLens === 'societies') return societyLabels;
   return biomeLabels;
 }
 
 function lensProps(lens: Lens): Props[] {
-  return lens === 'polities' ? polityProps : lens === 'civilizations' ? civilizationProps : lens === 'societies' ? societyProps : [];
+  return lens === 'polities' || lens === 'ideologies' || lens === 'worldviews' ? polityProps
+    : lens === 'civilizations' ? civilizationProps : lens === 'societies' ? societyProps : [];
+}
+
+// ---- Thematic lenses: Ideologies, Worldviews, and de facto control under Societies -------------
+/** Realm colours from the realm-group shapes, so each dynastic realm keeps its own colour. */
+let realmColours = new Map<string, string>();
+/** The class each active polity got for the current year and lens, for clicks and the legend. */
+let themeVerdicts = new Map<number, Verdict>();
+/** What has been written into feature state, per lens, so unchanged shapes are not touched again. */
+const themeApplied: Record<ThemeLens, Map<number, string>> = { ideologies: new Map(), worldviews: new Map(), societies: new Map() };
+
+function classify(lens: ThemeLens, p: Props, atYear: number): Verdict {
+  if (lens === 'ideologies') return ideologyOf(p, atYear);
+  if (lens === 'worldviews') return worldviewOf(p, atYear);
+  return controlOf(p, atYear);
+}
+
+/** Fill colour and opacity for a verdict: self-governing polities keep a faint wash of their own colour. */
+function themePaint(lens: ThemeLens, verdict: Verdict, p: Props): { colour: string; opacity: number } {
+  if (lens !== 'societies') return { colour: verdict.theme.colour, opacity: verdict.theme.id === 'unclassified' ? 0.35 : 0.82 };
+  if (verdict.theme.id === 'self') return { colour: p.c, opacity: 0.16 };
+  if (verdict.theme.id.startsWith('realm:')) return { colour: realmColours.get(verdict.theme.name) ?? verdict.theme.colour, opacity: 0.6 };
+  return { colour: verdict.theme.colour, opacity: 0.62 };
+}
+
+/** Classify every polity shape active this year and write its colour into feature state. */
+function applyThemes(): void {
+  if (!isThemeLens(activeLens) || !map.getSource('polities')) return;
+  const lens = activeLens;
+  const state = THEME_FILLS.find(([l]) => l === lens)?.[2] as string;
+  const applied = themeApplied[lens];
+  themeVerdicts = new Map();
+  for (const p of basePolityProps) {
+    if (p.g || p.s > year || p.e < year) continue;
+    const verdict = classify(lens, p, year);
+    themeVerdicts.set(p.k, verdict);
+    const { colour, opacity } = themePaint(lens, verdict, p);
+    const sig = `${colour}|${opacity}`;
+    if (applied.get(p.k) === sig) continue;
+    applied.set(p.k, sig);
+    map.setFeatureState({ source: 'polities', sourceLayer: 'polities', id: p.k }, { [state]: colour, [`${state}Op`]: opacity });
+  }
+}
+
+/** The themes present this year with how many polities each covers, most common first. */
+function themeCounts(): { theme: Theme; colour: string; count: number }[] {
+  const counts = new Map<string, { theme: Theme; colour: string; count: number }>();
+  for (const [k, verdict] of themeVerdicts) {
+    const lens = activeLens as ThemeLens;
+    const p = basePolityProps[k];
+    if (lens === 'societies' && verdict.theme.id === 'self') continue;
+    const colour = p ? themePaint(lens, verdict, p).colour : verdict.theme.colour;
+    const entry = counts.get(verdict.theme.id);
+    if (entry) entry.count++;
+    else counts.set(verdict.theme.id, { theme: verdict.theme, colour, count: 1 });
+  }
+  return [...counts.values()].sort((a, b) => b.count - a.count || a.theme.name.localeCompare(b.theme.name));
 }
 
 // ---- Hash -------------------------------------------------------------------
@@ -517,17 +600,65 @@ function renderEraNote(): void {
     `${shift.era}.${shift.events.length ? ` ${shift.events.join('; ')}.` : ''} Rough regional model, not a reconstruction.`;
 }
 
+/** Legend rows for the thematic classes active this year (Ideologies, Worldviews, or control under Societies). */
+function themeLegendRows(limit: number): HTMLElement[] {
+  const rows: HTMLElement[] = [];
+  for (const { theme, colour, count } of themeCounts().slice(0, limit)) {
+    const row = document.createElement('div');
+    row.className = 'legend-row';
+    row.title = theme.blurb;
+    const chip = document.createElement('i');
+    chip.style.background = colour;
+    const label = document.createElement('span');
+    label.textContent = theme.name;
+    const total = document.createElement('em');
+    total.textContent = String(count);
+    row.append(chip, label, total);
+    rows.push(row);
+  }
+  return rows;
+}
+
 function renderLegend(): void {
   renderEraNote();
   legendBody.replaceChildren();
-  if (activeLens !== 'civilizations' && activeLens !== 'societies') {
+  if (activeLens !== 'civilizations' && activeLens !== 'societies' && activeLens !== 'ideologies' && activeLens !== 'worldviews') {
     legend.hidden = true;
     return;
   }
   legend.hidden = false;
 
+  if (activeLens === 'ideologies' || activeLens === 'worldviews') {
+    legendTitle.textContent = activeLens === 'ideologies' ? 'How it was governed' : 'Faith and philosophy';
+    const rows = themeLegendRows(40);
+    if (rows.length) legendBody.append(...rows);
+    else legendBody.textContent = 'No polities are mapped for this year.';
+    const fine = document.createElement('p');
+    fine.className = 'legend-fine';
+    fine.textContent = 'This project’s first-pass rules (named regimes, then region and era). Click a place to see why.';
+    legendBody.append(fine);
+    return;
+  }
+
   if (activeLens === 'societies') {
-    legendTitle.textContent = 'Spheres and groups · click to filter';
+    // De facto control first: who actually ran each place, under the networks.
+    const head = document.createElement('div');
+    head.className = 'legend-sub';
+    head.textContent = 'De facto control';
+    legendBody.append(head);
+    const control = themeLegendRows(14);
+    if (control.length) legendBody.append(...control);
+    const self = document.createElement('p');
+    self.className = 'legend-fine';
+    self.textContent = control.length
+      ? 'Faint wash: self-governing. Click a place for who ran it and why.'
+      : 'Every polity here governed itself this year (faint wash). Click a place for details.';
+    legendBody.append(self);
+    const nets = document.createElement('div');
+    nets.className = 'legend-sub';
+    nets.textContent = 'Networks · click to filter';
+    legendBody.append(nets);
+    legendTitle.textContent = 'Who actually ran things';
     const present = new Map<string, { colour: string; count: number }>();
     for (const p of societyProps) {
       if (p.s > year || p.e < year || !p.grp) continue;
@@ -563,7 +694,12 @@ function renderLegend(): void {
       });
       legendBody.append(all);
     }
-    if (!present.size) legendBody.textContent = 'No networks are mapped for this year.';
+    if (!present.size) {
+      const none = document.createElement('p');
+      none.className = 'legend-fine';
+      none.textContent = 'No networks are mapped for this year.';
+      legendBody.append(none);
+    }
     const key = document.createElement('div');
     key.className = 'legend-key';
     key.innerHTML =
@@ -657,16 +793,18 @@ function setYear(next: number): void {
     yearLabel.textContent = fmtYear(year);
 
     applyYearFilters();
+    applyThemes();
 
     if (activeLens === 'biomes') renderBiomes();
     subParents = new Set(subProps.filter((item) => item.s <= year && item.e >= year).map((item) => item.p as string));
-    polityLabels.setYear(year, activeLens === 'polities');
+    polityLabels.setYear(year, activeLens === 'polities' || activeLens === 'ideologies' || activeLens === 'worldviews');
     subLabels.setYear(year, activeLens === 'polities');
     civilizationLabels.setYear(year, activeLens === 'civilizations');
     societyLabels.setYear(year, activeLens === 'societies');
     renderLegend();
     if (activeLens === 'biomes' && !panel.hidden && biomePoint) scheduleBiomePanel();
     if (!panel.hidden && panelQid && activeLens === 'polities') refreshPanelForYear();
+    if (!panel.hidden && themePanelFor) refreshThemePanel();
     if (!panel.hidden) renderSheet();
     scheduleHash();
   };
@@ -1173,6 +1311,10 @@ function resetPanel(): number {
   panelSheet = null;
   pSubs.hidden = true;
   pSubs.replaceChildren();
+  pStack.hidden = true;
+  pStack.replaceChildren();
+  themePanelFor = null;
+  themePanelTheme = '';
   panelFacts = null;
   panelSubs = [];
   pOsm.hidden = true;
@@ -1311,7 +1453,7 @@ function applyYearFilters(): void {
 }
 
 function setHighlight(p: Props | null): void {
-  for (const id of ['subedit-hl', 'edit-hl', 'polity-hl', 'civilization-hl', 'sub-hl', 'soc-hl-route', 'soc-hl-zone', 'soc-hl-node']) {
+  for (const id of ['subedit-hl', 'edit-hl', 'polity-hl', 'civilization-hl', 'sub-hl', 'soc-hl-route', 'soc-hl-zone', 'soc-hl-node', 'ideo-hl', 'world-hl', 'ctrl-hl']) {
     if (map.getLayer(id)) map.setFilter(id, NO_FEATURE);
   }
   if (!p) return;
@@ -1508,8 +1650,162 @@ function renderLineage(p: Props): void {
   }
 }
 
+// ---- Theme panel (Ideologies, Worldviews, de facto control) ----------------------------------
+/** The polity whose class the panel shows, while a thematic panel is open. */
+let themePanelFor: Props | null = null;
+let themePanelTheme = '';
+
+/** Several Wikipedia articles, one after another, for a theme (for example deism, then skepticism). */
+async function loadStack(titles: string[], ticket: number, signal: AbortSignal): Promise<void> {
+  pStack.replaceChildren();
+  pStack.hidden = false;
+  const head = document.createElement('div');
+  head.className = 'stack-head';
+  head.textContent = titles.length > 1 ? `From Wikipedia · ${titles.length} articles` : 'From Wikipedia';
+  pStack.append(head);
+  const blocks = titles.map((title) => {
+    const block = document.createElement('section');
+    block.className = 'stack-item';
+    const h = document.createElement('h4');
+    const a = document.createElement('a');
+    a.href = wikiUrl(title);
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.textContent = title;
+    h.append(a);
+    const text = document.createElement('p');
+    text.className = 'muted';
+    text.textContent = 'Loading…';
+    block.append(h, text);
+    pStack.append(block);
+    return { block, a, text, title };
+  });
+  await Promise.all(blocks.map(async ({ a, text, title }) => {
+    try {
+      const summary = await getSummary(title, signal);
+      if (ticket !== panelTicket) return;
+      if (!summary) {
+        a.href = wikiSearchUrl(title);
+        text.textContent = 'No article with this exact title; the link searches Wikipedia.';
+        return;
+      }
+      a.href = summary.url;
+      a.textContent = summary.title;
+      text.classList.remove('muted');
+      const extract = summary.extract ?? '';
+      text.textContent = extract.length > 700 ? `${extract.slice(0, 680).replace(/\s+\S*$/, '')}…` : extract;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      if (ticket !== panelTicket) return;
+      a.href = wikiSearchUrl(title);
+      text.textContent = 'Could not reach Wikipedia.';
+    }
+  }));
+}
+
+const THEME_KIND: Record<ThemeLens, string> = { ideologies: 'Ideology', worldviews: 'Worldview', societies: 'De facto control' };
+
+/** Open the class a polity has in the active thematic lens: its articles, the reason, and a way back to the polity. */
+function openThemePanel(p: Props): void {
+  if (!isThemeLens(activeLens)) return;
+  const lens = activeLens;
+  const verdict = classify(lens, p, year);
+  selectedKey = p.k;
+  selectedProps = p;
+  panelQid = null;
+  themePanelFor = p;
+  themePanelTheme = verdict.theme.id;
+  const ticket = resetPanel();
+  themePanelFor = p;
+  themePanelTheme = verdict.theme.id;
+  const controller = panelAbort as AbortController;
+  const { colour } = themePaint(lens, verdict, p);
+
+  pName.textContent = verdict.theme.name;
+  pName.title = verdict.theme.name;
+  pKind.textContent = THEME_KIND[lens];
+  pSource.textContent = 'Project rules';
+  pSwatch.style.background = colour;
+  pYears.textContent = `${p.n} · ${fmtYear(year)}`;
+  pNote.hidden = verdict.why === verdict.theme.blurb;
+  pNote.textContent = `Why: ${verdict.why}`;
+  pSummary.textContent = verdict.theme.blurb;
+  pLink.href = wikiUrl(verdict.theme.articles[0] ?? p.n);
+  pLink.textContent = 'Read on Wikipedia';
+  pFine.textContent = 'Classes and reasons: this project’s first-pass rules (src/thematic.ts, docs/THEMATIC-LENSES.md), not a published dataset · Text: Wikipedia (CC BY-SA)';
+
+  // A way back to the polity itself, and to the others in the same class this year.
+  pOthersList.replaceChildren();
+  pOthersHead.textContent = 'This polity';
+  pOthers.classList.remove('foldable', 'folded');
+  const back = document.createElement('button');
+  back.type = 'button';
+  const dot = document.createElement('i');
+  dot.style.background = p.c;
+  const label = document.createElement('span');
+  label.textContent = `${p.n} · open as a polity`;
+  back.append(dot, label);
+  back.addEventListener('click', () => {
+    setLens('polities');
+    openPanel(p);
+  });
+  pOthersList.append(back);
+  pOthers.hidden = false;
+
+  showPanel();
+  document.title = `${verdict.theme.name} · Unity of Being`;
+  const hl = THEME_FILLS.find(([l]) => l === lens)?.[1].replace('-fill', '-hl');
+  setHighlight(null);
+  if (hl && map.getLayer(hl)) map.setFilter(hl, highlightFilter(year, p.k));
+  updateSelection();
+  // The articles first (their placeholders are added synchronously), then the other polities in the class.
+  void loadStack(verdict.theme.articles, ticket, controller.signal);
+  const peers = [...themeVerdicts].filter(([k, v]) => k !== p.k && v.theme.id === verdict.theme.id && verdict.theme.id !== 'self' && verdict.theme.id !== 'unclassified');
+  if (peers.length) {
+    const box = document.createElement('div');
+    box.className = 'others stack-peers';
+    const head = document.createElement('div');
+    head.className = 'others-head';
+    head.textContent = `Also ${verdict.theme.name} in ${fmtYear(year)} · ${peers.length}`;
+    const list = document.createElement('div');
+    list.className = 'others-list';
+    box.append(head, list);
+    pStack.append(box);
+    for (const [k] of peers.slice(0, 40)) {
+      const other = basePolityProps[k];
+      if (!other) continue;
+      const button = document.createElement('button');
+      button.type = 'button';
+      const chip = document.createElement('i');
+      chip.style.background = colour;
+      const name = document.createElement('span');
+      name.textContent = other.n;
+      button.append(chip, name);
+      button.addEventListener('click', () => {
+        map.easeTo({ center: [other.lx, other.ly], duration: 700 });
+        openThemePanel(other);
+      });
+      list.append(button);
+    }
+  }
+}
+
+/** On a year change, reopen the panel if the polity's class changed (the polity may have ended). */
+function refreshThemePanel(): void {
+  const p = themePanelFor;
+  if (!p || !isThemeLens(activeLens)) return;
+  if (p.s > year || p.e < year) return;
+  const verdict = classify(activeLens, p, year);
+  if (verdict.theme.id !== themePanelTheme) openThemePanel(p);
+  else pYears.textContent = `${p.n} · ${fmtYear(year)}`;
+}
+
 function openPanel(p: Props): void {
   if (activeLens === 'biomes') return;
+  if (activeLens === 'ideologies' || activeLens === 'worldviews') {
+    openThemePanel(p);
+    return;
+  }
   if (editActive && activeLens === 'polities') {
     // Edit mode: selecting a polity or province opens the toolbar's editor instead of the article.
     selectedKey = p.k;
@@ -1686,6 +1982,7 @@ function closePanel(): void {
   pOsmFrame.src = 'about:blank';
   selectedKey = -1;
   selectedProps = null;
+  themePanelFor = null;
   biomePoint = null;
   hideBiomePin();
   setHighlight(null);
@@ -1707,6 +2004,11 @@ function updateLensButtons(): void {
     const active = button.dataset.lens === activeLens;
     button.classList.toggle('is-active', active);
     button.setAttribute('aria-pressed', String(active));
+    // On phones the lens bar scrolls sideways; keep the chosen lens in view.
+    const bar = button.parentElement;
+    if (active && bar && bar.scrollWidth > bar.clientWidth) {
+      bar.scrollTo({ left: button.offsetLeft - (bar.clientWidth - button.offsetWidth) / 2, behavior: 'smooth' });
+    }
   }
 }
 
@@ -1727,7 +2029,8 @@ function setLens(next: Lens): void {
   // Veil only while the new lens really has nothing to show; otherwise make sure no old one lingers.
   const source = activeSourceId();
   if (map.getSource(source) && !map.isSourceLoaded(source)) {
-    showVeil(next === 'civilizations' ? 'Drawing civilizations…' : next === 'societies' ? 'Drawing networks…' : next === 'biomes' ? 'Drawing climate…' : 'Drawing borders…');
+    showVeil(next === 'civilizations' ? 'Drawing civilizations…' : next === 'societies' ? 'Drawing networks…' : next === 'biomes' ? 'Drawing climate…'
+      : next === 'ideologies' ? 'Drawing governments…' : next === 'worldviews' ? 'Drawing worldviews…' : 'Drawing borders…');
   } else if (dataReady) {
     finishLoading();
   }
@@ -1735,7 +2038,7 @@ function setLens(next: Lens): void {
 
 /** Only the active lens's label layers may draw; the others are cleared and refuse queued frames. */
 function syncLabelLayers(): void {
-  polityLabels.setEnabled(activeLens === 'polities');
+  polityLabels.setEnabled(activeLens === 'polities' || activeLens === 'ideologies' || activeLens === 'worldviews');
   subLabels.setEnabled(activeLens === 'polities');
   civilizationLabels.setEnabled(activeLens === 'civilizations');
   societyLabels.setEnabled(activeLens === 'societies');
@@ -1858,12 +2161,50 @@ async function getJson<T = unknown>(
   return JSON.parse(await (await getResponse(url, onProgress)).text()) as T;
 }
 
+// ---- Loading splash ------------------------------------------------------------------------------
+// The first load shows a full splash (globe, steps, a rotating fact). Later lens switches reuse the
+// same element as a small toast ("compact").
+const SPLASH_FACTS = [
+  'The borders come from Cliopatria, part of the Seshat Global History Databank: about 12,500 dated shapes.',
+  'Six lenses: who governed, who lived there, who really ran things, how they governed, what they believed, and the land itself.',
+  'The Aral Sea, Lake Chad and Lake Texcoco shrink or vanish as the years go by.',
+  'From 2016 the map shows the de jure world: occupied land is drawn under the state the law gives it to.',
+  'Click any place for a Wikipedia summary, its infobox and figures from Wikidata and the World Bank.',
+  'Worldviews stack several articles: a place can be Protestant, deist and Enlightened all at once.',
+  'Societies draws de facto control: blocs, empires, occupiers and the networks that moved people and goods.',
+  'Edit mode lets you build your own alternate history on top of the real borders.',
+  'Biomes shift with a rough model of past climate: the green Sahara, the 4.2 ka drought, Maya droughts.',
+];
+const loadingFact = $('loading-fact');
+let factTimer = 0;
+let factIndex = Math.floor(Math.random() * SPLASH_FACTS.length);
+function showFact(): void {
+  loadingFact.textContent = SPLASH_FACTS[factIndex % SPLASH_FACTS.length];
+  factIndex++;
+}
+showFact();
+factTimer = window.setInterval(showFact, 4800);
+function markStep(step: string): void {
+  const items = [...loading.querySelectorAll<HTMLElement>('.splash-steps li')];
+  const at = items.findIndex((item) => item.dataset.step === step);
+  items.forEach((item, index) => {
+    item.classList.toggle('done', index < at || step === 'all');
+    item.classList.toggle('active', index === at);
+  });
+}
+markStep('fetch');
+
 let loadingDone = false;
 let loadingHideTimer = 0;
 let dataReady = false;
 function finishLoading(): void {
   if (loadingDone || !dataReady) return;
   loadingDone = true;
+  markStep('all');
+  if (factTimer) {
+    window.clearInterval(factTimer);
+    factTimer = 0;
+  }
   loading.classList.add('hide');
   mapVeil.hidden = true;
   if (loadingHideTimer) window.clearTimeout(loadingHideTimer);
@@ -1881,7 +2222,8 @@ function failLoading(message: string): void {
 }
 
 function activeSourceId(): string {
-  return activeLens === 'polities' ? 'polities' : activeLens === 'civilizations' ? 'civilizations' : activeLens === 'societies' ? 'societies' : 'ocean';
+  return activeLens === 'polities' || activeLens === 'ideologies' || activeLens === 'worldviews' ? 'polities'
+    : activeLens === 'civilizations' ? 'civilizations' : activeLens === 'societies' ? 'societies' : 'ocean';
 }
 
 /** Show the veil while a lens that has not drawn yet is being tiled. */
@@ -1891,6 +2233,7 @@ function showVeil(message: string): void {
   loadingHideTimer = 0;
   loadingDone = false;
   loading.hidden = false;
+  loading.classList.add('compact');
   loading.classList.remove('hide', 'error');
   loadingText.textContent = message;
   loadingProgress.style.width = '100%';
@@ -1933,6 +2276,7 @@ map.on('load', async () => {
 
     loadingText.textContent = 'Building map…';
     loadingProgress.style.width = '100%';
+    markStep('build');
 
     // The big shape files are fetched by MapLibre's own worker (see the sources below), never parsed
     // here: doing both held several copies in memory and phones killed the tab (data/split-web-data.py).
@@ -1951,6 +2295,7 @@ map.on('load', async () => {
     }));
     polityProps = polityList;
     basePolityProps = polityProps.slice();
+    realmColours = new Map(polityList.filter((item) => item.g).map((item) => [item.n, item.c]));
     baseSubProps = subProps.slice();
     subsByParent = new Map();
     for (const item of baseSubProps) subsByParent.set(item.p as string, [...(subsByParent.get(item.p as string) ?? []), item]);
@@ -2002,6 +2347,9 @@ map.on('load', async () => {
     // indexing the 40 MB of shapes took 2 GB or more and phones killed the tab.
     map.addSource('polities', {
       type: 'vector',
+      // Each shape's key k is its feature id, so the Ideologies, Worldviews and Societies lenses can
+      // colour it through feature state (see applyThemes) without rebuilding the tiles.
+      promoteId: 'k',
       tiles: [`${dataBase}data/tiles/polities/{z}/{x}/{y}.pbf`],
       minzoom: 0,
       maxzoom: 6,
@@ -2047,6 +2395,21 @@ map.on('load', async () => {
       paint: { 'fill-color': ['get', 'c'], 'fill-opacity': 0.84 },
       layout: { visibility: visible('polities') },
     });
+    // Thematic lenses: the same polity shapes, coloured by the class each one gets for the year.
+    for (const [lens, id, state] of THEME_FILLS) {
+      map.addLayer({
+        id,
+        type: 'fill',
+        source: 'polities',
+        'source-layer': 'polities',
+        filter: leafFilter(year),
+        paint: {
+          'fill-color': ['to-color', ['coalesce', ['feature-state', state], '#5c656d']],
+          'fill-opacity': ['to-number', ['coalesce', ['feature-state', `${state}Op`], 0]],
+        },
+        layout: { visibility: visible(lens) },
+      });
+    }
     map.addLayer({
       id: 'civilization-fill',
       type: 'fill',
@@ -2185,6 +2548,31 @@ map.on('load', async () => {
       paint: { 'line-color': '#f6e7b8', 'line-width': 2.4, 'line-opacity': 0.95 },
       layout: { 'line-join': 'round', visibility: visible('polities') },
     });
+    for (const [lens, id] of THEME_FILLS) {
+      const base = id.replace('-fill', '');
+      map.addLayer({
+        id: `${base}-line`,
+        type: 'line',
+        source: 'polities',
+        'source-layer': 'polities',
+        filter: leafFilter(year),
+        paint: {
+          'line-color': '#2a2118',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.25, 4, 0.5, 9, 1],
+          'line-opacity': lens === 'societies' ? 0.28 : 0.4,
+        },
+        layout: { ...roundLines, visibility: visible(lens) },
+      });
+      map.addLayer({
+        id: `${base}-hl`,
+        type: 'line',
+        source: 'polities',
+        'source-layer': 'polities',
+        filter: NO_FEATURE,
+        paint: { 'line-color': '#f6e7b8', 'line-width': 2.4, 'line-opacity': 0.95 },
+        layout: { 'line-join': 'round', visibility: visible(lens) },
+      });
+    }
 
     // Edit mode: records the user's world changed are drawn from their own small source, outlined in amber.
     map.addLayer({
@@ -2454,7 +2842,12 @@ map.on('load', async () => {
           if (entity && !stack.includes(entity)) stack.push(entity);
         }
         if (!stack.length) {
-          closePanel();
+          // No network under the click: say who held de facto control of the place.
+          const ground = map.getLayer('ctrl-fill') ? map.queryRenderedFeatures(event.point, { layers: ['ctrl-fill'] }) : [];
+          const key = ground.length ? (ground[ground.length - 1].properties as { k?: number }).k : undefined;
+          const polity = typeof key === 'number' ? basePolityProps[key] : undefined;
+          if (polity) openThemePanel(polity);
+          else closePanel();
           return;
         }
         overlapSet = stack;
@@ -2541,6 +2934,8 @@ map.on('load', async () => {
     setYear(year);
     relabel();
     dataReady = true;
+    markStep('draw');
+    loadingText.textContent = 'Drawing the first year…';
     checkSources();
     window.setTimeout(finishLoading, 60000);
     window.setTimeout(() => {

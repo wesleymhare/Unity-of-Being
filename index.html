@@ -16,7 +16,9 @@
     <div class="lens-switch" role="group" aria-label="Map lens">
       <button type="button" class="lens-btn is-active" data-lens="polities" aria-pressed="true">Polities</button>
       <button type="button" class="lens-btn" data-lens="civilizations" aria-pressed="false">Civilizations</button>
-      <button type="button" class="lens-btn" data-lens="societies" aria-pressed="false">Societies</button>
+      <button type="button" class="lens-btn" data-lens="societies" aria-pressed="false" title="Who actually ran things: de facto control and the networks behind it">Societies</button>
+      <button type="button" class="lens-btn" data-lens="ideologies" aria-pressed="false" title="How each place was governed">Ideologies</button>
+      <button type="button" class="lens-btn" data-lens="worldviews" aria-pressed="false" title="Faiths and philosophies">Worldviews</button>
       <button type="button" class="lens-btn" data-lens="biomes" aria-pressed="false">Biomes</button>
     </div>
     <div class="era">3400 BCE – 2026 CE</div>
@@ -27,9 +29,46 @@
 
   <div id="map" role="application" aria-label="Map of historical polities, civilizations, societies and biomes"></div>
 
-  <div id="loading" role="status" aria-live="polite">
-    <div id="loading-text">Loading map data…</div>
-    <div class="loading-bar" aria-hidden="true"><i id="loading-progress"></i></div>
+  <div id="loading" class="splash" role="status" aria-live="polite">
+    <div class="splash-card">
+      <svg class="splash-globe" viewBox="0 0 120 120" aria-hidden="true">
+        <defs>
+          <clipPath id="splash-clip"><circle cx="60" cy="60" r="46"/></clipPath>
+        </defs>
+        <circle class="g-sea" cx="60" cy="60" r="46"/>
+        <g clip-path="url(#splash-clip)">
+          <g class="g-spin">
+            <g id="splash-land" fill="#c9b88f" fill-opacity="0.9">
+              <!-- loose continents: the Americas, Europe-Africa, Asia; drawn twice, 80 px apart, so the spin loops -->
+              <path class="g-land" d="M6 30c5-4 13-3 15 2s-3 8-1 12 6 5 4 10-6 4-7 9 2 12-1 17-6 3-7-3 1-12-3-17-8-6-7-13 2-13 7-17z"/>
+              <path class="g-land" d="M36 34c4-3 9-2 10 2s-2 5 0 8 7 3 7 9-5 8-6 14-2 11-6 11-4-8-6-13-6-9-4-15 1-13 5-16z"/>
+              <path class="g-land" d="M50 28c8-5 22-4 28 2s2 10 6 14-1 9-7 9-8 6-13 4-7-7-11-8-6-6-6-11 0-8 3-10z"/>
+            </g>
+            <use href="#splash-land" x="80"/>
+          </g>
+          <g class="g-grid">
+            <ellipse cx="60" cy="60" rx="46" ry="16"/>
+            <ellipse cx="60" cy="60" rx="46" ry="34"/>
+            <ellipse cx="60" cy="60" rx="18" ry="46"/>
+            <ellipse cx="60" cy="60" rx="34" ry="46"/>
+            <line x1="14" y1="60" x2="106" y2="60"/>
+            <line x1="60" y1="14" x2="60" y2="106"/>
+          </g>
+        </g>
+        <circle class="g-rim" cx="60" cy="60" r="46"/>
+        <circle class="g-orbit" cx="60" cy="60" r="55"/>
+      </svg>
+      <div class="splash-title">Unity of Being</div>
+      <div class="splash-sub">Who ruled, who lived there, what they believed and who really ran things, from 3400 BCE to 2026.</div>
+      <ol class="splash-steps" aria-hidden="true">
+        <li data-step="fetch">Gathering borders, peoples and networks</li>
+        <li data-step="build">Laying out coasts, rivers and lakes</li>
+        <li data-step="draw">Drawing the first year</li>
+      </ol>
+      <div class="loading-bar" aria-hidden="true"><i id="loading-progress"></i></div>
+      <div id="loading-text">Loading map data…</div>
+      <p class="splash-fact" id="loading-fact"></p>
+    </div>
   </div>
 
   <div id="map-veil" role="status" aria-live="polite" hidden>
@@ -72,6 +111,7 @@
 
       <p id="p-summary" class="summary" aria-live="polite"></p>
       <div id="p-fallback" class="fallback" hidden></div>
+      <div id="p-stack" class="stack" hidden></div>
 
       <div id="p-profile" class="profile" hidden></div>
       <div id="p-subs" class="subs" hidden></div>
@@ -160,7 +200,7 @@
     <div class="help-body">
       <h3>Using it</h3>
       <ul>
-        <li><b>Polities</b> are states and empires (who governs). <b>Civilizations</b> are peoples and shared cultural identities (who you belong to). <b>Societies</b> are affinity groups that hold de facto control as logistical networks, how the world is actually run: states as networks, dynasties, trade routes, banks and companies, alliances, orders, NGOs, drawn as routes (lines), hubs (dots) and areas, and coloured by sphere of influence. <b>Biomes</b> are climate and ecoregions.</li>
+        <li><b>Polities</b> are states and empires (who governs). <b>Civilizations</b> are peoples and shared cultural identities (who you belong to). <b>Societies</b> are affinity groups that hold de facto control as logistical networks, how the world is actually run: states as networks, dynasties, trade routes, banks and companies, alliances, orders, NGOs, drawn as routes (lines), hubs (dots) and areas, and coloured by sphere of influence, over a fill showing who held de facto control of each place (blocs, empires, occupiers; a faint wash means self-governing). <b>Ideologies</b> colour each place by how it was governed (sacral kingship, feudal monarchy, communist one-party state, liberal democracy and so on). <b>Worldviews</b> colour it by faith and philosophy, often several stacked (for example Protestant Christianity with Enlightenment deism); click a place to read the stacked Wikipedia articles and why it got that class. <b>Biomes</b> are climate and ecoregions.</li>
         <li>Tap the −100 to +100 buttons above the slider to step the year (hold to keep going; arrow keys step by 1, with Shift by 10).</li>
         <li>Drag the year slider or press play. Click any area for its Wikipedia summary, infobox and facts.</li>
         <li>Zoom in to see the provinces inside big polities and local identities inside peoples.</li>
@@ -174,6 +214,7 @@
         <li><b>Provinces:</b> hand-built from <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener noreferrer">Natural Earth</a> modern boundaries (public domain); see <a href="https://github.com/wesleymhare/Unity-of-Being/blob/main/docs/SUBDIVISIONS.md" target="_blank" rel="noopener noreferrer">how</a></li>
         <li><b>Civilizations:</b> curated (<a href="https://github.com/wesleymhare/Unity-of-Being/blob/main/docs/CIVILIZATIONS.md" target="_blank" rel="noopener noreferrer">what counts</a>)</li>
         <li><b>Societies:</b> curated and schematic (<a href="https://github.com/wesleymhare/Unity-of-Being/blob/main/docs/SOCIETIES.md" target="_blank" rel="noopener noreferrer">what counts</a>)</li>
+        <li><b>Ideologies, worldviews &amp; de facto control:</b> this project&rsquo;s own first-pass rules by named regime, region and era, not a published dataset (<a href="https://github.com/wesleymhare/Unity-of-Being/blob/main/docs/THEMATIC-LENSES.md" target="_blank" rel="noopener noreferrer">how</a>)</li>
         <li><b>Climate:</b> <a href="https://doi.org/10.1127/metz/2016/0816" target="_blank" rel="noopener noreferrer">Köppen–Geiger, Rubel et al.</a>, shifted through time (schematic)</li>
         <li><b>Ecoregions:</b> <a href="https://doi.org/10.1093/biosci/bix014" target="_blank" rel="noopener noreferrer">RESOLVE 2017, Dinerstein et al.</a> (CC BY 4.0, after WWF)</li>
         <li><b>Coastlines, rivers &amp; lakes:</b> Natural Earth (public domain)</li>

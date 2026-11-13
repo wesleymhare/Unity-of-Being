@@ -104,12 +104,90 @@ a { color: var(--brass); }
 
 #map { position: fixed; inset: 56px 0 156px 0; }
 
+/* First load: a full splash over the whole app. Later lens switches: the same element as a small toast. */
 #loading {
   position: fixed;
-  top: 72px;
-  left: 50%;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background:
+    radial-gradient(ellipse at 50% 38%, rgba(210, 173, 100, 0.10), transparent 60%),
+    radial-gradient(ellipse at 50% 120%, rgba(91, 134, 201, 0.10), transparent 55%),
+    var(--bg2);
+  text-align: center;
+  transition: opacity 0.45s ease, visibility 0.45s ease;
+}
+#loading.hide { opacity: 0; visibility: hidden; }
+.splash-card { width: min(420px, 100%); }
+.splash-globe { width: 132px; height: 132px; display: block; margin: 0 auto 14px; overflow: visible; }
+.splash-globe .g-sea { fill: #1d2833; }
+.splash-globe .g-land { fill: #c9b88f; opacity: 0.9; }
+.splash-globe .g-spin { animation: splash-spin 9s linear infinite; }
+.splash-globe .g-grid { fill: none; stroke: rgba(240, 220, 168, 0.18); stroke-width: 0.7; }
+.splash-globe .g-rim { fill: none; stroke: var(--brass); stroke-width: 1.4; opacity: 0.85; }
+.splash-globe .g-orbit {
+  fill: none;
+  stroke: var(--brass);
+  stroke-width: 1.2;
+  stroke-dasharray: 34 312;
+  stroke-linecap: round;
+  transform-origin: 60px 60px;
+  animation: splash-orbit 2.4s cubic-bezier(0.55, 0.15, 0.45, 0.85) infinite;
+}
+@keyframes splash-spin { from { transform: translateX(0); } to { transform: translateX(-80px); } }
+@keyframes splash-orbit { to { transform: rotate(360deg); } }
+.splash-title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--brass-lt);
+}
+.splash-sub { margin: 6px auto 18px; max-width: 34ch; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.splash-steps { list-style: none; margin: 0 auto 12px; padding: 0; display: grid; gap: 6px; text-align: left; width: fit-content; max-width: 100%; }
+.splash-steps li { position: relative; padding-left: 20px; font-size: 12px; color: #8a959e; transition: color 0.3s ease; }
+.splash-steps li::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+}
+.splash-steps li.active { color: var(--text); }
+.splash-steps li.active::before { border-color: var(--brass); animation: splash-pulse 1.1s ease-in-out infinite; }
+.splash-steps li.done { color: var(--muted); }
+.splash-steps li.done::before { background: var(--brass); border-color: var(--brass); }
+@keyframes splash-pulse { 50% { box-shadow: 0 0 0 4px rgba(210, 173, 100, 0.18); } }
+#loading .loading-bar { width: min(260px, 80%); margin: 4px auto 8px; }
+#loading:not(.compact) .loading-bar i { width: 30%; animation: splash-bar 1.3s ease-in-out infinite; }
+#loading:not(.compact) .loading-bar i[style*="100%"] { animation: none; }
+@keyframes splash-bar { from { transform: translateX(-110%); } to { transform: translateX(360%); } }
+#loading-text { font-size: 12px; color: var(--muted); }
+.splash-fact {
+  min-height: 3.2em;
+  margin: 16px auto 0;
+  max-width: 36ch;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.5;
+  color: #b9b2a2;
+}
+@media (prefers-reduced-motion: reduce) {
+  .splash-globe .g-spin, .splash-globe .g-orbit, .splash-steps li.active::before, #loading .loading-bar i { animation: none !important; }
+}
+
+/* Compact: the old toast, used while a newly chosen lens draws */
+#loading.compact {
+  inset: 72px auto auto 50%;
   transform: translateX(-50%);
   z-index: 12;
+  display: block;
   min-width: 250px;
   padding: 11px 15px 10px;
   background: rgba(22, 29, 36, 0.97);
@@ -117,11 +195,16 @@ a { color: var(--brass); }
   border-radius: 9px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   font-size: 13px;
-  text-align: center;
   transition: opacity 0.25s ease, visibility 0.25s ease;
 }
-#loading.hide { opacity: 0; visibility: hidden; }
-#loading.error { border-color: #a9504d; color: #f1c9c6; }
+#loading.compact .splash-card { width: auto; }
+#loading.compact .splash-globe, #loading.compact .splash-title, #loading.compact .splash-sub,
+#loading.compact .splash-steps, #loading.compact .splash-fact { display: none; }
+#loading.compact .loading-bar { width: auto; margin: 9px 0 0; order: 2; }
+#loading.compact #loading-text { color: var(--text); font-size: 13px; }
+#loading.compact .splash-card { display: flex; flex-direction: column-reverse; }
+#loading.error, #loading.error #loading-text { color: #f1c9c6; }
+#loading.compact.error { border-color: #a9504d; }
 
 #map-veil {
   position: fixed;
@@ -544,7 +627,7 @@ a { color: var(--brass); }
 
   #map { inset: 52px 0 136px 0; }
   #map-veil { inset: 52px 0 136px; }
-  #loading { top: 64px; }
+  #loading.compact { top: 64px; }
 
   #panel {
     top: auto;
@@ -568,11 +651,29 @@ a { color: var(--brass); }
   #ticks span { font-size: 9px; }
   }
 
+/* Six lenses: drop the date range, then the button words, before the lens names have to scroll. */
+@media (max-width: 1180px) {
+  .era { display: none; }
+}
+@media (max-width: 980px) {
+  .top-txt { display: none; }
+  .lens-btn { padding: 5px 7px; letter-spacing: 0.9px; }
+}
+
 @media (max-width: 520px) {
-  /* Four lenses need the room. */
+  /* Six lenses need the room: the lens bar scrolls sideways if it must. */
   .brand { display: none; }
-  .lens-switch { flex: 1 1 auto; min-width: 0; }
-  .lens-btn { flex: 1 1 auto; padding: 5px 4px; font-size: 9px; letter-spacing: 0.4px; }
+  .lens-switch {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .lens-switch::-webkit-scrollbar { display: none; }
+  .lens-btn { flex: 0 0 auto; padding: 5px 6px; font-size: 9px; letter-spacing: 0.4px; }
+  .splash-title { font-size: 25px; }
+  .splash-globe { width: 104px; height: 104px; }
 }
 
 @media (max-width: 420px) {
@@ -660,6 +761,35 @@ a { color: var(--brass); }
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
 }
 .legend-row em { font-style: normal; font-size: 10px; color: var(--faint); }
+.legend-sub {
+  margin: 8px 0 3px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.legend-sub:first-child { margin-top: 0; }
+.legend-fine { margin: 5px 0 2px; font-size: 10px; line-height: 1.4; color: var(--faint); }
+
+/* ---- Stacked Wikipedia articles (Ideologies, Worldviews, de facto control) --------------------- */
+.stack { margin: 0 0 14px; }
+.stack-head {
+  margin: 0 0 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--line);
+  font: 700 9px/1.2 system-ui, sans-serif;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+.stack-item { padding: 6px 0 8px 10px; border-left: 2px solid var(--line); margin-bottom: 6px; }
+.stack-item h4 { margin: 0 0 3px; font-family: Georgia, 'Times New Roman', serif; font-size: 14px; }
+.stack-item h4 a { color: var(--brass-lt); text-decoration: none; }
+.stack-item h4 a:hover { text-decoration: underline; }
+.stack-item p { margin: 0; font-size: 12.5px; line-height: 1.5; color: #d7d0bf; }
+.stack-item p.muted { color: var(--faint); }
+.stack-peers { margin-top: 10px; }
 
 .legend-group { margin-bottom: 6px; }
 .legend-group-name {

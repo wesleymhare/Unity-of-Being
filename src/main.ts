@@ -5,6 +5,7 @@ import './style.css';
 import { BiomeModel, CLASSES, GROUPS, climateShift, type EcoMeta, type EcoPatch } from './biomes';
 import { LabelLayer, type LabelProps } from './labels';
 import { controlOf, ideologyOf, worldviewOf, type Theme, type Verdict } from './thematic';
+import { lineagesOf } from './haplogroups';
 import { organiseInfobox, type OrganisedInfobox } from './infobox-map';
 import { effectiveYears, recordKey, subKey, type Override } from './edit';
 import { initEditUi } from './edit-ui';
@@ -196,6 +197,7 @@ const pFigureLink = $<HTMLAnchorElement>('p-figure-link');
 const pProfile = $('p-profile');
 const pSubs = $('p-subs');
 const pStack = $('p-stack');
+const pDna = $('p-dna');
 const pOsm = $('p-osm');
 const pOsmFrame = $<HTMLIFrameElement>('p-osm-frame');
 const pOsmLink = $<HTMLAnchorElement>('p-osm-link');
@@ -1314,6 +1316,8 @@ function resetPanel(): number {
   pSubs.replaceChildren();
   pStack.hidden = true;
   pStack.replaceChildren();
+  pDna.hidden = true;
+  pDna.replaceChildren();
   themePanelFor = null;
   themePanelTheme = '';
   panelFacts = null;
@@ -1651,6 +1655,54 @@ function renderLineage(p: Props): void {
   }
 }
 
+// ---- Genetic lineage tags (Peoples) --------------------------------------------------------------
+/** Blue chips for Y-DNA (father to son), pink for mtDNA (mother to child); see src/haplogroups.ts. */
+function renderDna(p: Props): void {
+  pDna.replaceChildren();
+  const found = lineagesOf(p.n);
+  if (!found || (!found.y.length && !found.mt.length)) {
+    pDna.hidden = true;
+    return;
+  }
+  const head = document.createElement('div');
+  head.className = 'dna-head';
+  head.textContent = 'Genetic lineages';
+  const basis = document.createElement('span');
+  basis.textContent = found.basis === 'ancient' ? 'ancient DNA' : 'present-day samples';
+  head.append(basis);
+  pDna.append(head);
+  const row = (kind: 'y' | 'mt', label: string, title: string, list: string[]): void => {
+    if (!list.length) return;
+    const line = document.createElement('div');
+    line.className = `dna-row dna-${kind}`;
+    const name = document.createElement('span');
+    name.className = 'dna-kind';
+    name.textContent = label;
+    name.title = title;
+    line.append(name);
+    for (const group of list) {
+      const chip = document.createElement('a');
+      chip.className = 'dna-chip';
+      chip.textContent = group;
+      chip.title = `${title}: haplogroup ${group}`;
+      // "R1b-U106" -> search "Haplogroup R1b Y-DNA"; "U5b1b" -> "Haplogroup U5b1b mtDNA".
+      const base = group.split(/[ (]/)[0].replace(/-.*/, '');
+      chip.href = wikiSearchUrl(`Haplogroup ${base} ${kind === 'y' ? 'Y-DNA' : 'mtDNA'}`);
+      chip.target = '_blank';
+      chip.rel = 'noopener noreferrer';
+      line.append(chip);
+    }
+    pDna.append(line);
+  };
+  row('y', 'Y-DNA', 'Paternal line (father to son)', found.y);
+  row('mt', 'mtDNA', 'Maternal line (mother to child)', found.mt);
+  const fine = document.createElement('p');
+  fine.className = 'dna-fine';
+  fine.textContent = `${found.note ? `${found.note} ` : ''}Commonest lineages reported, in rough order; individuals vary and a haplogroup is one line of descent, not an identity.${found.src ? ` Source: ${found.src}.` : ''} First pass, to be checked against the cited studies.`;
+  pDna.append(fine);
+  pDna.hidden = false;
+}
+
 // ---- Theme panel (Ideologies, Worldviews, de facto control) ----------------------------------
 /** The polity whose class the panel shows, while a thematic panel is open. */
 let themePanelFor: Props | null = null;
@@ -1849,6 +1901,7 @@ function openPanel(p: Props): void {
 
   showPanel();
   renderLineage(p);
+  if (civilizations) renderDna(p);
   renderOthers(p);
   document.title = `${name} · Unity of Being`;
 

@@ -791,6 +791,36 @@ a { color: var(--brass); }
 .stack-item p.muted { color: var(--faint); }
 .stack-peers { margin-top: 10px; }
 
+/* ---- Genetic lineage tags (Peoples): blue = Y-DNA (paternal), pink = mtDNA (maternal) ------------ */
+.dna { margin: 0 0 14px; }
+.dna-head {
+  margin: 0 0 6px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--line);
+  font: 700 9px/1.2 system-ui, sans-serif;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+.dna-head span { margin-left: 6px; font-weight: 400; letter-spacing: 0.4px; text-transform: none; color: var(--faint); font-size: 10px; }
+.dna-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 5px; }
+.dna-kind { width: 46px; font-size: 10px; font-weight: 700; letter-spacing: 0.4px; }
+.dna-y .dna-kind { color: #7fb2ec; }
+.dna-mt .dna-kind { color: #f0a0c8; }
+.dna-chip {
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  line-height: 1.4;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.dna-y .dna-chip { background: rgba(74, 144, 226, 0.18); border: 1px solid rgba(110, 170, 240, 0.55); color: #bcd8fa; }
+.dna-mt .dna-chip { background: rgba(232, 112, 170, 0.16); border: 1px solid rgba(240, 150, 195, 0.55); color: #f8cfe3; }
+.dna-y .dna-chip:hover { background: rgba(74, 144, 226, 0.32); }
+.dna-mt .dna-chip:hover { background: rgba(232, 112, 170, 0.3); }
+.dna-fine { margin: 4px 0 0; font-size: 10px; line-height: 1.45; color: var(--faint); }
+
 .legend-group { margin-bottom: 6px; }
 .legend-group-name {
   display: block;

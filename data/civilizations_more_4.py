@@ -84,7 +84,7 @@ def register():
     # ---- Pacific -------------------------------------------------------------------------------------
     S('Tongans', -1000, 2026, 'AN', 'People', 'Tongan (Polynesian)', 'Tongans', blob(-175.2, -21.2, 0.5, 0.7), line='polynesia')
     S('Samoans', -1000, 2026, 'AN', 'People', 'Samoan (Polynesian)', 'Samoans', blob(-172.3, -13.7, 0.6, 0.3), line='polynesia')
-    S('Civilization Islands and Marquesas', 700, 2026, 'AN', 'People', 'Tahitian, Marquesan (Polynesian)', 'Tahitians',
+    S('Society Islands and Marquesas', 700, 2026, 'AN', 'People', 'Tahitian, Marquesan (Polynesian)', 'Tahitians',
       [blob(-149.5, -17.6, 0.9, 0.5), blob(-139.5, -9.0, 0.5, 0.4)], line='polynesia')
     S('Chamorro', -1500, 2026, 'AN', 'People', 'Chamorro (Austronesian)', 'Chamorros', blob(144.8, 13.5, 0.3, 0.4))
     S('Highlands peoples of New Guinea', -3400, 2026, 'PA', 'People', 'Trans-New Guinea languages', 'Papua New Guinean Highlanders', box(142.0, -7.0, 146.5, -5.0))

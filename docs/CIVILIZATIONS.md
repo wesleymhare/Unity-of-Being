@@ -1,4 +1,34 @@
-# What a "Civilization" is on this map
+# What a "Civilization" is on this map (the Peoples lens)
+
+> **Renamed in the app to "Peoples" on 13 November 2026** (owner request). The lens id is `peoples`;
+> old links with `lens=civilizations` still open it. The data files, build script and map source keep
+> the name `civilizations` so nothing had to be rebuilt; "Civilization" below means one people entry.
+>
+> **Genetic lineages (13 Nov 2026).** Peoples carry tags for their commonest paternal (Y-DNA, blue
+> chips) and maternal (mtDNA, pink chips) haplogroups, in `src/haplogroups.ts`, keyed by the exact
+> people name. 284 of 430 peoples are tagged. Each entry says whether it rests on ancient DNA (study
+> named) or present-day samples. They are a first pass from the broad consensus of population-genetic
+> surveys and well-known ancient-DNA papers, to be checked against the Allen Ancient DNA Resource
+> (AADR) and the cited studies before any figure is quoted. Now 323 of 479 peoples. Rule: only lineages a published study
+> reports as common for that people; never invent a tag for an untagged people; a haplogroup is one
+> line of descent, not an identity.
+>
+> **Finer peoples (13 Nov 2026).** `data/civilizations_more_5.py` adds 49 level-3 regional peoples
+> inside the large ones. Inside Germans: Old Saxons → Lower Saxons and Westphalians (line `saxons`),
+> Holsteiners and Mecklenburgers, Upper Saxons, Thuringians, Franconians, Hessians, Rhinelanders,
+> Palatines, Brandenburgers and Berliners, Pomeranians, East Prussians, German then Upper Silesians
+> (line `silesians`), Sudeten Germans, Sorbs, Luxembourgers and Tyroleans. Germans abroad: Baltic,
+> Transylvanian Saxon, Danube Swabian and Volga Germans. Elsewhere in Europe: Old Prussians,
+> Kashubians, Masurians, Gorals, Moravians, Rusyns, Hutsuls, Pomors, Northumbrians, Yorkshire and
+> West Country folk, Walloons, Picards, Burgundians, Gascons, Provençals, Auvergnats, Asturians,
+> Aragonese, Guanches → Canarians (line `canary`), Friulians, Ligurians, Emilians, Cretans and Faroese.
+> 39 of the 49 carry lineage tags; expelled or emigrant groups with no survey of their own are left
+> untagged. Rebuilding also re-trimmed about 120 older footprints at the Caspian and Aral seas, which
+> `land.geojson` gained on 3 Nov after the last build.
+>
+> Build on Windows: Python 3.12 is installed per user at
+> `%LOCALAPPDATA%\Programs\Python\Python312\python.exe` (not on PATH). Run from the repo root:
+> `python data/build-civilizations.py` (paths are relative to the root).
 
 > Renamed from "Societies" on 3 November 2026. A Civilization is the **sociocultural and ancestral** layer: peoples, languages, customs and (later) deep ancestry such as haplogroup distributions. Control networks, trade routes, factions and parties are the separate **Societies** lens; see docs/SOCIETIES.md.
 
@@ -93,8 +123,8 @@ Every stage has a level (`lvl`), which sets how it is drawn:
 
 ## How it is built
 
-`python3 data/build-civilizations.py` reads `data/civilizations_data.py` (and the batch modules
-`civilizations_more_1.py` to `civilizations_more_3.py` that it loads), applies the lineage table
+`python3 data/build-civilizations.py` (run from the repo root) reads `data/civilizations_data.py` (and the batch modules
+`civilizations_more_1.py` to `civilizations_more_5.py` that it loads), applies the lineage table
 in `data/civilizations_lineages.py`, trims each polygon to `public/data/land.geojson`,
 computes a label anchor inside each shape, and writes `public/data/civilizations.geojson`.
 `box()` and `blob()` build rough rectangles and ellipses for quick footprints.

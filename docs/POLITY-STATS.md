@@ -39,6 +39,21 @@ they showed is now inside the sheet, so nothing is dropped and nothing is shown 
   characters folds to three lines with a "more" button.
 - The sheet redraws whenever the year moves, the infobox arrives, or Wikidata arrives.
 
+### One panel order for every lens (18 Nov 2026)
+Every lens now fills the panel in the same order (`index.html`, `openPanel` and `openThemePanel` in
+`src/main.ts`): kicker, name, image, dates or context line, one-line note, then the body:
+1. the Wikipedia lead of the entity's main article;
+2. the fact sheet above (own group first, then the fixed sections);
+3. the lens's own blocks: genetic lineages (Peoples), provinces (Polities), further articles and the
+   other polities in the class (Ideologies, Worldviews, de facto control);
+4. "through time" (lineage), the modern-location map, then links and credits.
+
+Ideologies, Worldviews and the de facto control click used to show only stacked article summaries.
+Their main article now fills the lead, image and sheet like any other entity; the own group holds
+Class, Applies to, Why, Stacked from (how many articles) and Same class (peers); the stack lists only
+the remaining articles ("More from Wikipedia"). Biomes already used the shared sheet (ecoregion article
+and its infobox, own group "Ecoregion" or "Climate").
+
 To add a row that has a fixed place: add its key to `RowKey` and `RULES` in `src/infobox-map.ts`,
 then to the label and section tables above `buildGenericSheet` in `src/profile.ts` (and to
 `buildSheet` if polities should show a dash for it).

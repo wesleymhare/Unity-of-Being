@@ -330,11 +330,18 @@ const lakeFilter = (value: number): Filter => [
   ['>=', ['coalesce', ['get', 'e'], 9999], value],
 ];
 
+/**
+ * Local identities (level 3) fade in between these zooms; their names wait for the same zoom, so a
+ * name never floats without its shape. They used to fade in at 3.0-4.0 while names showed at every
+ * zoom, so at the default zoom (3) Kyrgyz and most regional peoples were only floating text.
+ */
+const LOCAL_FADE_FROM = 2.2;
+const LOCAL_FADE_TO = 3.0;
 /** Opacity that is `full` everywhere, except local identities (level 3), which fade in with zoom. */
 const localFade = (full: number): maplibregl.ExpressionSpecification => [
   'interpolate', ['linear'], ['zoom'],
-  LOCAL_ZOOM - 0.6, ['case', ['==', ['get', 'lv'], 3], 0, full],
-  LOCAL_ZOOM + 0.4, full,
+  LOCAL_FADE_FROM, ['case', ['==', ['get', 'lv'], 3], 0, full],
+  LOCAL_FADE_TO, full,
 ];
 const NO_FEATURE: Filter = ['==', ['get', 'k'], -1];
 
@@ -493,6 +500,7 @@ const civilizationLabels = new LabelLayer<Props>(map, (p) => {
 // Names may overhang their shape (as for societies and ecoregions); collisions still decide what
 // shows. Fitting inside the shape hid every small identity until it was clicked.
 civilizationLabels.minScore = 14;
+civilizationLabels.suppress = (f) => (f.lv ?? 2) === 3 && map.getZoom() < LOCAL_FADE_FROM + 0.2;
 const societyLabels = new LabelLayer<Props>(map, (p) => {
   const entity = societyProps[p.ent ?? p.k];
   if (!entity) return;
@@ -1714,7 +1722,7 @@ async function loadStack(titles: string[], ticket: number, signal: AbortSignal):
   pStack.hidden = false;
   const head = document.createElement('div');
   head.className = 'stack-head';
-  head.textContent = titles.length > 1 ? `From Wikipedia · ${titles.length} articles` : 'From Wikipedia';
+  head.textContent = titles.length > 1 ? `More from Wikipedia · ${titles.length} articles` : 'More from Wikipedia';
   pStack.append(head);
   const blocks = titles.map((title) => {
     const block = document.createElement('section');
@@ -1758,6 +1766,18 @@ async function loadStack(titles: string[], ticket: number, signal: AbortSignal):
 
 const THEME_KIND: Record<ThemeLens, string> = { ideologies: 'Ideology', worldviews: 'Worldview', societies: 'De facto control' };
 
+/** The project's own rows for a thematic class: they open the shared fact sheet, as Sphere and Type do for peoples. */
+function themeOwnRows(p: Props, verdict: Verdict, peerCount: number): WikiFact[] {
+  const rows: WikiFact[] = [
+    { label: 'Class', value: verdict.theme.name },
+    { label: 'Applies to', value: `${p.n}, ${fmtYear(year)}` },
+    { label: 'Why', value: verdict.why },
+  ];
+  if (verdict.theme.articles.length > 1) rows.push({ label: 'Stacked from', value: `${verdict.theme.articles.length} Wikipedia articles` });
+  if (peerCount) rows.push({ label: 'Same class', value: `${peerCount} other ${peerCount === 1 ? 'polity' : 'polities'} in ${fmtYear(year)}` });
+  return rows;
+}
+
 /** Open the class a polity has in the active thematic lens: its articles, the reason, and a way back to the polity. */
 function openThemePanel(p: Props): void {
   if (!isThemeLens(activeLens)) return;
@@ -1774,18 +1794,23 @@ function openThemePanel(p: Props): void {
   const controller = panelAbort as AbortController;
   const { colour } = themePaint(lens, verdict, p);
 
+  const peers = [...themeVerdicts].filter(([k, v]) => k !== p.k && v.theme.id === verdict.theme.id && verdict.theme.id !== 'self' && verdict.theme.id !== 'unclassified');
+
   pName.textContent = verdict.theme.name;
   pName.title = verdict.theme.name;
   pKind.textContent = THEME_KIND[lens];
   pSource.textContent = 'Project rules';
   pSwatch.style.background = colour;
   pYears.textContent = `${p.n} · ${fmtYear(year)}`;
-  pNote.hidden = verdict.why === verdict.theme.blurb;
-  pNote.textContent = `Why: ${verdict.why}`;
-  pSummary.textContent = verdict.theme.blurb;
+  // Same layout as every other lens: a one-line definition, the Wikipedia lead of the main article,
+  // the fixed fact sheet, then the lens's own blocks (further articles, the others in the class).
+  pNote.hidden = false;
+  pNote.textContent = verdict.theme.blurb;
+  pSummary.textContent = 'Loading Wikipedia…';
   pLink.href = wikiUrl(verdict.theme.articles[0] ?? p.n);
   pLink.textContent = 'Read on Wikipedia';
   pFine.textContent = 'Classes and reasons: this project’s first-pass rules (src/thematic.ts, docs/THEMATIC-LENSES.md), not a published dataset · Text: Wikipedia (CC BY-SA)';
+  const own = themeOwnRows(p, verdict, peers.length);
 
   // A way back to the polity itself, and to the others in the same class this year.
   pOthersList.replaceChildren();
@@ -1811,10 +1836,18 @@ function openThemePanel(p: Props): void {
   setHighlight(null);
   if (hl && map.getLayer(hl)) map.setFilter(hl, highlightFilter(year, p.k));
   updateSelection();
-  // The articles first (their placeholders are added synchronously), then the other polities in the class.
-  void loadStack(verdict.theme.articles, ticket, controller.signal);
-  const peers = [...themeVerdicts].filter(([k, v]) => k !== p.k && v.theme.id === verdict.theme.id && verdict.theme.id !== 'self' && verdict.theme.id !== 'unclassified');
+  // The main article fills the summary, image and fact sheet like any other entity; the stack below
+  // adds the other articles (their placeholders are added synchronously), then the other polities in the class.
+  const [primary, ...more] = verdict.theme.articles;
+  if (primary) {
+    void loadPanel(primary, null, verdict.theme.name, ticket, controller.signal, own);
+  } else {
+    pSummary.textContent = verdict.theme.blurb;
+    renderFacts(null, own);
+  }
+  if (more.length) void loadStack(more, ticket, controller.signal);
   if (peers.length) {
+    pStack.hidden = false;
     const box = document.createElement('div');
     box.className = 'others stack-peers';
     const head = document.createElement('div');
@@ -1849,8 +1882,17 @@ function refreshThemePanel(): void {
   if (!p || !isThemeLens(activeLens)) return;
   if (p.s > year || p.e < year) return;
   const verdict = classify(activeLens, p, year);
-  if (verdict.theme.id !== themePanelTheme) openThemePanel(p);
-  else pYears.textContent = `${p.n} · ${fmtYear(year)}`;
+  if (verdict.theme.id !== themePanelTheme) {
+    openThemePanel(p);
+    return;
+  }
+  pYears.textContent = `${p.n} · ${fmtYear(year)}`;
+  // Same class in a new year: keep the loaded article, refresh the rows that name the year.
+  if (panelSheet) {
+    const peerCount = [...themeVerdicts].filter(([k, v]) => k !== p.k && v.theme.id === verdict.theme.id && verdict.theme.id !== 'self' && verdict.theme.id !== 'unclassified').length;
+    panelSheet = { ...panelSheet, own: themeOwnRows(p, verdict, peerCount) };
+    renderSheet();
+  }
 }
 
 function openPanel(p: Props): void {
@@ -2068,6 +2110,14 @@ function updateLensButtons(): void {
 
 function setLens(next: Lens): void {
   if (next === activeLens) return;
+  if (!dataReady) {
+    // Still loading: a click used to be dropped silently, so the lens looked broken. Remember the
+    // choice; the load handler draws whatever lens is active once the data is in.
+    activeLens = next;
+    updateLensButtons();
+    scheduleHash();
+    return;
+  }
   if (next === 'peoples' && !civilizationProps.length) return;
   if (next === 'societies' && !societyProps.length) return;
   if (next === 'biomes' && !biomeModel) return;

@@ -91,7 +91,10 @@ Every stage has a level (`lvl`), which sets how it is drawn:
 2. **People**: a nation-scale community (for example "Greeks", "Poles", "Persians").
 3. **Local identity**: a regional or sub-ethnic community, or a diaspora (for example
    "Kosovo Albanians", "Modern Southern California", "Italian-Americans"). Drawn in a
-   deeper shade and shown from about zoom 3.6; you cannot click them when zoomed out.
+   deeper shade; they fade in between zoom 2.2 and 3.0, and their names appear with the shape. (They used
+   to fade in at 3.0 to 4.0 while names showed at every zoom, which left the Kyrgyz and most regional
+   peoples as floating text at the default zoom; fixed 18 Nov 2026, stops are `LOCAL_FADE_FROM` and
+   `LOCAL_FADE_TO` in `src/main.ts`.) Clicks choose a local identity from zoom 3.4.
 
 ## An entry
 

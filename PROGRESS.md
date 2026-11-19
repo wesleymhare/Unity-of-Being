@@ -2,12 +2,12 @@
 
 ## Current
 *Rewritten in place; last updated 13 Nov 2026. The dated log below holds the detail.*
-- **State:** `main` is `6eb7ca5` ("aa") on GitHub. The lenses, splash and control fill are pushed, but that push caught the Peoples rename half-done: `src/main.ts` uses the lens id `peoples` while the pushed `index.html` button still says `civilizations`, so **the live Peoples button is broken until the working tree is pushed**. Uncommitted: the rest of the rename, the lineage tags and the 49 finer peoples. Checked in a local dev server and `vite build`.
+- **State (18 Nov):** `main` is `01c2122` ("dd"), which holds the Peoples rename, lineage tags and 49 finer peoples. Uncommitted: three fixes from 18 Nov (early lens clicks, invisible local peoples, one panel order for every lens), see the 18 Nov entry. `tsc` and `vite build` pass; not yet seen in a live map.
 - **Python on this PC (13 Nov):** Python 3.12 per user at `%LOCALAPPDATA%\Programs\Python\Python312\python.exe` (not on PATH) with `data/requirements.txt` installed. Run the data scripts from the repo root.
 - **Build and preview on this PC:** there is no Node install, but GitHub Desktop's Electron runs as Node: `ELECTRON_RUN_AS_NODE=1 "%LOCALAPPDATA%\GitHubDesktop\app-3.6.10\GitHubDesktop.exe" node_modules/vite/bin/vite.js build` (or without `build` for a dev server). Native `tsc.exe` is in `node_modules/@typescript/typescript-win32-x64`.
 - **Side panel:** one entity sheet for every entity (`docs/POLITY-STATS.md`). Thematic lenses: `docs/THEMATIC-LENSES.md`.
 - **Peoples (owner request, 13 Nov):** the Civilizations lens is now **Peoples** (old `lens=civilizations` links still work) with Y-DNA (blue) and mtDNA (pink) lineage tags for 323 of 479 peoples (`src/haplogroups.ts`, first pass, to be checked against AADR and the cited studies). 49 finer regional peoples added (`data/civilizations_more_5.py`: Saxons, Franconians, Thuringians, Hessians, Silesians, Sorbs and others inside Germans, plus regional peoples across Europe).
-- **Open decision:** push to `main` (redeploys the site and fixes the broken Peoples button).
+- **Open decision:** commit and push the 18 Nov fixes to `main` (redeploys the site); then check them on the live site.
 - **Next action:** commit and push once the owner says so. Then finer peoples outside Europe if wanted, checking the lineage tags against AADR, and the researched-figures workflow (batch prompts + validator for `public/data/polity-stats.json`).
 - **Keep the Obsidian vault current:** after substantial work run `C:\Users\wesle\Documents\GitHub Obisidian Vault\Tools\Refresh project notes.cmd` (owner instruction, 12 Nov 2026).
 
@@ -83,6 +83,14 @@
 - **Caspian Sea added** (it was missing in every lens: the base land polygon fills it in and Natural Earth's lake file has none). The Aral Sea, Lake Chad, Lake Texcoco and Lop Nur now change with the year (`data/build-water-extra.py`).
 - **Societies are coloured by sphere/group**, not kind, with symbols: line = logistical route, dot = hub, crossed swords = frontier or conflict, handshake = trade or syncretism zone (42 marks).
 - **Placeholders (nothing built behind them):** a left-pointing triangle at the start of the timeline for deep time before 3400 BCE (continental drift, ice ages), a **Tiles** button for the Tier 2 tile view, and an **Edit** button for worldbuilding, to the left of Help.
+
+### 18 November 2026: Peoples visibility, early lens clicks, one panel order (uncommitted)
+- **Owner reports:** Peoples "broken" (live site), then "a lot of peoples are still invisible, only the floating text names show, like the Kyrgyz"; also "reorder the wiki data into a universal format for each lens".
+- **Live site check:** `dd` (14 Nov) already deployed the Peoples work; once loaded, clicking Peoples drew correctly. Real defect found: `setLens` silently ignored a lens click made while the page was still loading. It now records the choice and the load handler draws it.
+- **Invisible peoples:** level-3 local identities (Kyrgyz and most regional peoples, including the 49 new ones) had fill opacity 0 below zoom 3.0 (full at 4.0) while their names showed at every zoom. Fills now fade in at 2.2-3.0 and their labels wait for the same zoom (`LOCAL_FADE_FROM`/`LOCAL_FADE_TO`, `civilizationLabels.suppress`).
+- **Universal panel order:** Ideologies, Worldviews and the de facto control click now use the shared pipeline: main article → lead, image and fact sheet (own group Class / Applies to / Why / Stacked from / Same class), the stack only for the remaining articles. `#p-stack` moved after the sheet and the lens blocks in `index.html`. See `docs/POLITY-STATS.md`.
+- **Checks:** `tsc` and `vite build` pass. **Not seen in a live map:** the browser pane was hidden this session, so the map never finished loading there (software-rendered headless Edge did not finish either). Verify the early lens click, the Kyrgyz fill at the default zoom and the three theme panels after the push.
+- **Asked, not built:** batch research via DeepSeek (see the chat answer): an API script with a validator is possible; browser-driving the chat site is not recommended.
 
 ### 13 November 2026: Civilizations renamed Peoples, genetic lineage tags (uncommitted)
 - **Owner request:** "change civilizations to peoples and maybe integrate haplogroups as tags per people ... color ydna and mtdna tags differently, blue for the dad gene and pink for the matri"; also more granular peoples (Swabians, Saxons inside Germans).

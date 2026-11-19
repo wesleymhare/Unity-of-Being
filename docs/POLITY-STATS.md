@@ -58,6 +58,37 @@ To add a row that has a fixed place: add its key to `RowKey` and `RULES` in `src
 then to the label and section tables above `buildGenericSheet` in `src/profile.ts` (and to
 `buildSheet` if polities should show a dash for it).
 
+## Worldbuilding rows (built 18 Nov 2026)
+**Principle.** Wikipedia (infobox and lead) keeps what it covers well: prose, rulers, capital, languages,
+religion, dates, events. The researched layer adds only simple, comparable figures for worldbuilding,
+chosen by the owner:
+
+| Sheet section | Row | What it holds |
+|---|---|---|
+| People | **Population** | existing row (World Bank, researched figure, Maddison, Wikidata, infobox) |
+| People | **Cities** | up to five largest cities with their populations that year |
+| People | **Lingua franca and writing** | language(s) of administration or lingua franca, and the administrative script(s) |
+| Land and economy | **Wealth** | tonnes of gold-equivalent: annual economic output (GDP), else annual state revenue, else the treasury, with the conversion shown |
+| Military | **Standing troops** | standing or permanently embodied troops (the old "Armed forces" row, renamed), plus a few words on what they were |
+| Military | **Military tech** | the most advanced material in regular use (Stone, Bronze, Iron, Steel, Gunpowder, Industrial, Nuclear) and the main arm |
+
+**Wealth in gold.** One universal measure across eras: tonnes of gold-equivalent, a year's output or
+revenue (or the treasury's total), converted with the period's own coinage and metal ratios (for example
+Rome in 150 CE: about 20 billion sesterces, 100 sesterces to the aureus, 7.3 g of gold each, about 1,500 t).
+The basis (GDP, revenue or treasury) is always stated. It sits beside the existing "Economy" row, which keeps
+modern dollar figures.
+
+**Storage.** `public/data/polity-stats.json`, keyed by Wikidata id, with the keys `population`, `army`
+(standing troops), `tech`, `wealth`, `cities`, `lingua` (and the older `area`, `economy`, `spending`).
+Every entry is `{ y, v, src, conf, by, n? }`: the year, the text shown, the source, `conf` (high, medium or
+low), `by` (`curated` or `ai`) and, where there is one, the number behind the text (`n`). Entries with
+`by: "ai"` show on the sheet as "unverified, <confidence>" with the source marked AI-filled, and are only
+used where nothing better exists (World Bank, a curated figure, Maddison, Wikidata and the infobox come
+first for the rows that have them). Curated entries are never overwritten by an AI entry.
+
+**Filling it.** See `docs/RESEARCH-BATCHES.md`: Markdown batch files to paste into a chat model, and a
+checker that validates the reply before anything is merged.
+
 ## Where each figure comes from
 Tried in this order, per row (`src/profile.ts`):
 1. **Curated:** `public/data/polity-stats.json`, keyed by Wikidata id. For hand-checked figures with

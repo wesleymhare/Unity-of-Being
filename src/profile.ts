@@ -113,10 +113,22 @@ export interface WorldBank {
 
 interface CuratedEntry {
   y?: number;
+  /** The text shown. */
   v: string;
   src?: string;
+  /** Confidence of the figure: high, medium or low. */
+  conf?: 'high' | 'medium' | 'low';
+  /** Who filled it: by hand ("curated") or from a chat model ("ai", always shown as unverified). */
+  by?: 'curated' | 'ai';
+  /** The number behind `v` (tonnes of gold-equivalent, troops, people), kept for comparing polities. */
+  n?: number;
 }
-export type Curated = Record<string, Partial<Record<'population' | 'area' | 'army' | 'economy' | 'spending', CuratedEntry[]>>>;
+/**
+ * Researched figures per Wikidata id. `wealth` (gold-equivalent), `tech`, `cities` and `lingua`
+ * (lingua franca and administrative writing) are the worldbuilding rows; see docs/POLITY-STATS.md.
+ */
+export type CuratedKey = 'population' | 'area' | 'army' | 'economy' | 'spending' | 'wealth' | 'tech' | 'cities' | 'lingua';
+export type Curated = Record<string, Partial<Record<CuratedKey, CuratedEntry[]>>>;
 
 /** Maddison Project series for one country: [year, value] pairs, sparse before 1820. */
 export interface MaddisonCountry {
@@ -355,8 +367,12 @@ function curatedAt(entries: CuratedEntry[] | undefined, year: number): { row: Pr
     const d = entry.y === undefined ? 500 : Math.abs(entry.y - year);
     if (d < distance) { distance = d; best = entry; }
   }
-  const note = best.y === undefined ? undefined : (distance <= 1 ? undefined : `c. ${fmtYear(best.y)}`);
-  return { row: { label: '', value: best.v, note, far: distance > 120, source: best.src ?? 'Curated' } };
+  const yearNote = best.y === undefined ? undefined : (distance <= 1 ? undefined : `c. ${fmtYear(best.y)}`);
+  // Chat-model figures are never passed off as research: they say so on the row.
+  const ai = best.by === 'ai';
+  const note = [yearNote, ai ? `unverified${best.conf ? `, ${best.conf} confidence` : ''}` : undefined].filter(Boolean).join(' · ') || undefined;
+  const source = ai ? `${best.src ?? 'AI-filled'} (AI-filled, unverified)` : best.src ?? 'Curated';
+  return { row: { label: '', value: best.v, note, far: distance > 120, source } };
 }
 
 // ---- Rulers -----------------------------------------------------------------------------------
@@ -470,10 +486,20 @@ export function buildSheet(input: SheetInput): ProfileGroup[] {
   const armed = wbAt(wb?.armed, year);
   const curatedArmy = curatedAt(curated?.army, year);
   let army: ProfileRow;
-  if (curatedArmy) army = { ...curatedArmy.row, label: 'Armed forces' };
+  if (curatedArmy) army = { ...curatedArmy.row, label: 'Standing troops' };
   else if (armed && year - armed.at <= 6) {
-    army = row('Armed forces', `${fmtCount(armed.value)} personnel`, { note: armed.at === year ? undefined : String(armed.at), source: 'World Bank' });
-  } else army = row('Armed forces', fromInfobox('army'), { source: 'Wikipedia infobox' });
+    army = row('Standing troops', `${fmtCount(armed.value)} personnel`, { note: armed.at === year ? undefined : String(armed.at), source: 'World Bank' });
+  } else army = row('Standing troops', fromInfobox('army'), { source: 'Wikipedia infobox' });
+
+  // The worldbuilding rows come only from researched figures (polity-stats.json); no source is guessed at.
+  const curatedRow = (key: CuratedKey, name: string): ProfileRow => {
+    const found = curatedAt(curated?.[key], year);
+    return found ? { ...found.row, label: name } : row(name, undefined);
+  };
+  const wealth = curatedRow('wealth', 'Wealth');
+  const tech = curatedRow('tech', 'Military tech');
+  const cities = curatedRow('cities', 'Cities');
+  const lingua = curatedRow('lingua', 'Lingua franca and writing');
 
   const share = wbAt(wb?.spendShare, year);
   const usd = wbAt(wb?.spendUsd, year);
@@ -504,15 +530,18 @@ export function buildSheet(input: SheetInput): ProfileGroup[] {
     ] },
     { title: 'People', rows: [
       population,
+      cities,
       row('Languages', list(data?.languages) || fromInfobox('languages'), { source: 'Wikidata / Wikipedia infobox' }),
+      lingua,
       row('Religion', list(data?.religion) || fromInfobox('religion'), { source: 'Wikidata / Wikipedia infobox' }),
     ] },
     { title: 'Land and economy', rows: [
       area,
+      wealth,
       economy,
       row('Currency', dated(data?.currency) || fromInfobox('currency'), { source: 'Wikidata / Wikipedia infobox' }),
     ] },
-    { title: 'Military', rows: [army, spending] },
+    { title: 'Military', rows: [army, tech, spending] },
     { title: 'Lineage', rows: [
       row('Preceded by', list(data?.before) || fromInfobox('before'), { source: 'Wikidata / Wikipedia infobox' }),
       row('Succeeded by', list(data?.after) || fromInfobox('after'), { source: 'Wikidata / Wikipedia infobox' }),
@@ -531,7 +560,7 @@ export function buildSheet(input: SheetInput): ProfileGroup[] {
 const KEY_BY_LABEL: Record<string, RowKey> = {
   Government: 'government', Capital: 'capital', Existed: 'existed', Population: 'population',
   Languages: 'languages', Religion: 'religion', Area: 'area', Economy: 'economy', Currency: 'currency',
-  'Armed forces': 'army', 'Preceded by': 'before', 'Succeeded by': 'after',
+  'Standing troops': 'army', 'Preceded by': 'before', 'Succeeded by': 'after',
 };
 
 const KEY_ORDER: RowKey[] = [
@@ -549,7 +578,7 @@ const KEY_SECTION: Record<RowKey, string> = {
 const KEY_LABEL: Record<RowKey, string> = {
   government: 'Government', capital: 'Capital', existed: 'Existed', population: 'Population',
   languages: 'Languages', religion: 'Religion', area: 'Area', economy: 'Economy', currency: 'Currency',
-  army: 'Armed forces', before: 'Preceded by', after: 'Succeeded by',
+  army: 'Standing troops', before: 'Preceded by', after: 'Succeeded by',
 };
 
 /** Wikidata fact labels (from getWikidata) that match a sheet row. */
@@ -649,8 +678,14 @@ export function buildGenericSheet(input: GenericInput): ProfileGroup[] {
   const type = wikidata.find((f) => f.label === 'Type');
   if (type) mine.push({ label: 'Instance of', value: type.value, source: 'Wikidata' });
   const groups: ProfileGroup[] = mine.length ? [{ title: kind, rows: mine }] : [];
+  // Peoples show no population figures (owner request, 18 Nov 2026): not the Total population row, nor
+  // the "Regions with significant populations" block, which an ethnic-group infobox carries.
+  const noPopulation = kind === 'People';
+  const isPopulation = (e: ExtraRow): boolean => /population/i.test(e.label) || /population/i.test(e.section ?? '');
+  const extras = infobox?.extras.filter((e) => !(noPopulation && isPopulation(e)));
 
   for (const key of KEY_ORDER) {
+    if (noPopulation && key === 'population') continue;
     const fact = wikidata.find((f) => FACT_KEY[f.label] === key);
     const candidates = infobox?.mapped[key];
     let row: ProfileRow | null = null;
@@ -678,7 +713,7 @@ export function buildGenericSheet(input: GenericInput): ProfileGroup[] {
     }
     group.rows.push(row);
   }
-  if (infobox?.extras.length) attachExtras(groups, infobox.extras);
+  if (extras?.length) attachExtras(groups, extras);
   else groups.sort((a, b) => (SECTION_ORDER as readonly string[]).indexOf(a.title) - (SECTION_ORDER as readonly string[]).indexOf(b.title));
   return groups;
 }

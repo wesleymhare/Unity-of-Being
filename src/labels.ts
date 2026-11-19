@@ -134,6 +134,11 @@ export class LabelLayer<T extends LabelProps> {
   minScore = 26;
   /** Hide individual labels (used to drop a polity's name once its provinces are labelled). */
   suppress: ((feature: T) => boolean) | null = null;
+  /**
+   * The text to draw for a feature instead of its own name (the Ideologies and Worldviews lenses draw
+   * the class). The feature's name still decides duplicates and is the hover title. Null keeps the name.
+   */
+  text: ((feature: T) => string | null) | null = null;
 
   constructor(map: maplibregl.Map, onClick: (feature: T) => void, slack = 1) {
     this.map = map;
@@ -239,6 +244,7 @@ export class LabelLayer<T extends LabelProps> {
       if (names.has(f.n) && !isSelected) continue;
 
       const realm = !!f.g;
+      const label = this.text?.(f) || f.n;
       const freeW = (f.cw ?? f.sz) * ppd * this.slack;
       const freeH = (f.ch ?? f.sz) * ppd * this.slack;
       const fontMax = clamp(8.5 + Math.log10(Math.max(10, c.score)) * (realm ? 3.1 : 2.8), 11, realm ? 21 : 19);
@@ -250,7 +256,7 @@ export class LabelLayer<T extends LabelProps> {
       let bestScore = -Infinity;
       for (let size = Math.round(fontMax); size >= MIN_FONT; size--) {
         for (let lines = 1; lines <= 3; lines++) {
-          const trial = wrap(f.n, size, realm, lines);
+          const trial = wrap(label, size, realm, lines);
           if (trial.lines.length !== lines && lines > 1) continue;
           if (trial.width > freeW * 0.94 || trial.height > freeH * 0.9) continue;
           const score = size - 2.4 * (lines - 1);
@@ -265,7 +271,7 @@ export class LabelLayer<T extends LabelProps> {
         if (!isSelected) continue;
         font = 12;
         const cap = Math.max(90, Math.min(220, freeW));
-        layout = wrap(f.n, font, realm, 2);
+        layout = wrap(label, font, realm, 2);
         if (layout.width > cap) {
           layout = {
             lines: layout.lines.map((line) => ellipsize(line, font, realm, cap)),

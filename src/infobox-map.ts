@@ -32,6 +32,8 @@ export interface ExtraRow {
   group: GroupName;
   label: string;
   value: Node;
+  /** The infobox heading the row was under (empty for rows above the first heading). */
+  section?: string;
 }
 
 export interface OrganisedInfobox {
@@ -130,6 +132,10 @@ export function organiseInfobox(sections: InfoboxSection[] | null): OrganisedInf
 
   for (const section of sections) {
     const sectionKey = SECTION_RULES.find(([, rule]) => rule.test(section.title))?.[0];
+    // Remember the heading a row sat under, so callers can drop whole blocks ("Regions with significant populations").
+    const addExtra = (extra: Omit<ExtraRow, 'section'>): void => {
+      out.extras.push({ ...extra, section: section.title });
+    };
     section.rows.forEach((row: InfoboxRow) => {
       const label = row.label ? nodeText(row.label) : '';
       const text = nodeText(row.value);
@@ -146,7 +152,7 @@ export function organiseInfobox(sections: InfoboxSection[] | null): OrganisedInf
         return;
       }
       if (!label) {
-        out.extras.push({ group: groupFor('', section.title), label: section.title || 'Note', value: row.value });
+        addExtra({ group: groupFor('', section.title), label: section.title || 'Note', value: row.value });
         return;
       }
       // Bulleted or dated rows ("- 1636-1643 (proclaimed in Shenyang)  Chongde Emperor") belong to
@@ -154,17 +160,17 @@ export function organiseInfobox(sections: InfoboxSection[] | null): OrganisedInf
       const bulleted = /^[•·▪‣\-–]/.test(label) || /^\(?(c\.?\s*)?\d{3,4}\b/.test(label);
       if (bulleted && section.title) {
         const rest = label.replace(/^[•·▪‣\-–\s]+/, '');
-        out.extras.push({ group: groupFor(section.title, ''), label: `${section.title} · ${rest}`, value: row.value });
+        addExtra({ group: groupFor(section.title, ''), label: `${section.title} · ${rest}`, value: row.value });
         return;
       }
       if (bulleted) {
         // No heading above it: a bullet with a date is an event; otherwise judge it by its own words.
         const rest = label.replace(/^[•·▪‣\-–\s]+/, '');
         const group = /\b\d{3,4}\b/.test(text) && groupFor(rest, '') === 'Reference' ? 'Dates and events' : groupFor(rest, '');
-        out.extras.push({ group, label: rest, value: row.value });
+        addExtra({ group, label: rest, value: row.value });
         return;
       }
-      out.extras.push({ group: groupFor(label, section.title), label, value: row.value });
+      addExtra({ group: groupFor(label, section.title), label, value: row.value });
     });
   }
   // Fixed group order; inside a group keep the article's order.

@@ -27,10 +27,15 @@ All three answer a question about each polity shape in the year on the slider:
 - **Drawing.** The polity vector tiles are reused. The `polities` source has `promoteId: 'k'`, and
   `applyThemes()` in `src/main.ts` writes each active polity's colour and opacity into feature state
   (`ideo`, `world`, `ctrl`) whenever the year or lens changes. No tiles or data files are rebuilt.
-- **Panel.** Clicking a shape (or a polity name label) opens the class: name, polity and year, the
-  reason, the stacked Wikipedia summaries (loaded live), a button back to the polity, and the other
+- **Panel.** Clicking a shape (or a label) opens the class in the shared panel layout: name, polity and
+  year, the main article's lead and fact sheet (own group Class, Applies to, Why, Stacked from, Same
+  class), the further articles stacked (loaded live), a button back to the polity, and the other
   polities in the same class that year. On Societies, a click that hits no network opens the control
   class of the polity underneath.
+- **Map text (18 Nov 2026).** In Ideologies and Worldviews the names on the map are the class
+  ("Absolute monarchy", "Latin Christendom"), not the polity's name (the hover title still gives the
+  polity). Realm-group labels, which name polities, and shapes with no class are left unlabelled there.
+  Mechanism: `LabelLayer.text` in `src/labels.ts`, set for `polityLabels` in `src/main.ts`.
 - **Legend.** Classes present this year with counts. Societies shows "De facto control" above its
   network filters; self-governing polities keep a faint wash of their own colour.
 

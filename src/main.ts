@@ -491,7 +491,17 @@ const subLabels = new LabelLayer<Props>(map, (p) => {
   openPanel(p);
 }, 1);
 subLabels.minZoom = SUB_ZOOM;
-polityLabels.suppress = (f) => map.getZoom() >= SUB_ZOOM && subParents.has(f.n);
+const classLabels = (): boolean => activeLens === 'ideologies' || activeLens === 'worldviews';
+polityLabels.suppress = (f) => {
+  if (classLabels()) {
+    // These lenses name the class, not the polity: realm-group labels (which name polities) and
+    // shapes that got no class stay unlabelled.
+    return !!f.g || themeVerdicts.get(f.k)?.theme.id === 'unclassified';
+  }
+  return map.getZoom() >= SUB_ZOOM && subParents.has(f.n);
+};
+// Ideologies and Worldviews write the ideology or worldview on the map (hover shows the polity).
+polityLabels.text = (f) => (classLabels() ? themeVerdicts.get(f.k)?.theme.name ?? null : null);
 const civilizationLabels = new LabelLayer<Props>(map, (p) => {
   const stack = standingAt(p.lx, p.ly, year);
   overlapSet = stack.some((item) => item.k === p.k) ? stack : [p, ...stack];

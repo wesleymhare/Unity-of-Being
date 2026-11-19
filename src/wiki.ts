@@ -728,8 +728,17 @@ function cleanCell(cell: Element): DocumentFragment {
   return out;
 }
 
-const cellText = (cell: Element): string =>
-  (cell.textContent ?? '').replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
+/**
+ * Plain text of a header or label cell. Wikipedia puts <style> blocks (".mw-parser-output
+ * span.smallcaps{...}") inside these cells, and textContent includes their text, so they are removed
+ * first; line breaks become spaces so "Provincia Asia" and its Greek name do not run together.
+ */
+function cellText(cell: Element): string {
+  const copy = cell.cloneNode(true) as Element;
+  copy.querySelectorAll('style, script, link, .reference, .noprint, .mw-empty-elt, .nowrap-hidden').forEach((node) => node.remove());
+  copy.querySelectorAll('br').forEach((br) => br.replaceWith(' '));
+  return (copy.textContent ?? '').replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
+}
 
 /**
  * The infobox of an article, as sections of label/value rows. Ruler lists and
